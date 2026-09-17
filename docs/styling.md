@@ -167,7 +167,14 @@ Because Thane uses Light DOM (no Shadow DOM):
 
 ## Selector Minification
 
-In production builds (`thane build --prod`), component selectors are minified to shorter class names, reducing both CSS and HTML size.
+In production builds (`thane build --prod`), component selectors are minified to shorter class names, reducing both CSS and HTML size. `product-card` becomes something like `a-b` in the registration, in the host element the compiler creates, and in every component stylesheet that addresses `.product-card`.
+
+Two rules keep the renaming safe:
+
+- A selector is only renamed when every appearance of it in the output is one of those places. If the same text also appears inside another string (a route such as `/product-card/:id`, an asset path, one class among several in a `class` attribute), the selector keeps its name everywhere.
+- Only the JavaScript bundle and `index.html` are rewritten. A stylesheet served from the assets folder is not, so style a component host from a component's `styles` (or a `.css` import), not from a static stylesheet.
+
+Only selectors shaped like a custom element name (`my-card`, with a hyphen) are renamed; a single-word selector keeps its name.
 
 ## CSS Variables for Theming
 

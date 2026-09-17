@@ -158,7 +158,9 @@ const styles = '/* contents of Card.module.css */';
 
 ## Selector Minification
 
-In production builds, the **Minification** plugin replaces component selectors with shorter names (e.g., `product-card` → `_a`), reducing both CSS and HTML output size.
+In production builds, the **Minification** plugin replaces component selectors with shorter names (e.g., `product-card` → `a-b`), reducing both CSS and HTML output size. The selectors come from the compiler's own scan of the project, and one is renamed only when every appearance of it in the output is a place the plugin rewrites (see [Styling](styling.md#selector-minification)).
+
+The same plugin minifies the HTML and CSS template literals of the emitted files. It parses each file to find them, touches only literals whose whole content is HTML or CSS, and skips any chunk built entirely from `node_modules`, so a library and your own message strings are never rewritten.
 
 ## HTML Bootstrap Injection
 
