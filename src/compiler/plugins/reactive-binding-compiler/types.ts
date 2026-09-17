@@ -26,6 +26,14 @@ export interface AccessPattern {
   staticPrefix: string;
   /** Static template declaration format: class property or standalone const */
   staticTemplatePrefix: string;
+  /**
+   * Prepare a compiled template's HTML for emission. Identity in development; the HTML
+   * minifier in production. Every template the generated code carries goes through it, so
+   * templates are minified here, as HTML, and never later as part of a JavaScript file.
+   */
+  html: (template: string) => string;
+  /** The name a component selector is emitted under: itself, or its production short name */
+  selector: (name: string) => string;
 }
 
 /** Access pattern for defineComponent (closure-based) */
@@ -36,6 +44,8 @@ export const CLOSURE_ACCESS: AccessPattern = {
   rootAlias: 'const r = ctx.root;',
   staticPrefix: '',
   staticTemplatePrefix: 'const __tpl',
+  html: (template) => template,
+  selector: (name) => name,
 };
 
 export interface ConditionalBlock {

@@ -10,8 +10,7 @@ src/
       component-precompiler/   # CTFE: evaluates component setup at build time
       global-css-bundler/      # Bundles .css file imports as string exports
       html-bootstrap-injector/ # Injects mount() call into the root HTML file
-      js-output-optimizer/     # Post-build JS optimizations
-      minification/            # Selector & template whitespace minification
+      minification/            # Selector rename plan; HTML and CSS minifiers the compiler calls
       post-build-processor/    # Final output processing (gzip, metafile, dev server)
       reactive-binding-compiler/ # Core: compiles html`` templates → DOM bindings (+ its tests)
       router-typegen/          # Generates .thane/types for type-safe routing
@@ -60,15 +59,14 @@ The build process is an **esbuild plugin pipeline**. Each plugin handles a speci
 
 1. **Thane Linter** — scans source for patterns that would fail silently (THANE400-411)
 2. **Component Precompiler** — evaluates `defineComponent` setup with CTFE (Compile-Time Function Evaluation)
-3. **Reactive Binding Compiler** — transforms `html``\`\`` templates into static `<template>` elements plus `__b()` binding initializers
+3. **Reactive Binding Compiler** — transforms `html``\`\``templates into static`<template>`elements plus`__b()` binding initializers
 4. **Routes Precompiler** — processes `defineRoutes()` calls
 5. **Router Typegen** — generates `.thane/types/router/` type definitions
 6. **Global CSS Bundler** — converts `.css` imports to string exports
-7. **Minification** — minifies selectors and whitespace in production
+7. **Minification** — plans selector renames from the sources before a production build compiles anything. Templates and stylesheets are minified by the compiler where it emits them; emitted JavaScript is minified by esbuild and never edited
 8. **TSC Type Checker** — runs TypeScript checking (errors/warnings)
 9. **HTML Bootstrap Injector** — injects the compiled entry point into `index.html`
-10. **JS Output Optimizer** — post-build JavaScript optimization
-11. **Post-Build Processor** — gzip/brotli compression, metafile output
+10. **Post-Build Processor** — gzip/brotli compression, metafile output
 
 ## Runtime Architecture
 

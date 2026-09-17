@@ -757,7 +757,7 @@ export const generateInitBindingsFunction = (
           propsExpr = renameIdentifierInExpression(propsExpr, repeatCtx.indexVar, '_idx');
         }
       }
-      setupLines.push(`${indent}const ${varName} = document.createElement('${cm.selector}');`);
+      setupLines.push(`${indent}const ${varName} = document.createElement('${ap.selector(cm.selector)}');`);
       if (repeatCtx) {
         setupLines.push(
           `${indent}const ${anchorVar} = (_el.id === '${cm.anchorId}' ? _el : _el.querySelector('#${cm.anchorId}'));`,
@@ -909,7 +909,7 @@ export const generateInitBindingsFunction = (
       const repeatSources = buildRepeatSubscriptionSources(rep, ap);
       lines.push(`    const _items_${rep.id} = () => ${rep.itemsExpression};`);
       if (rep.emptyTemplate) {
-        const escapedEmptyTemplate = rep.emptyTemplate.replace(/`/g, '\\`');
+        const escapedEmptyTemplate = ap.html(rep.emptyTemplate).replace(/`/g, '\\`');
         lines.push(`    let _empty_${rep.id};`);
         const emptyVar = `_empty_${rep.id}`;
         lines.push(
@@ -985,7 +985,8 @@ export const generateInitBindingsFunction = (
         const templateId = `__tpl_${rep.id}`;
 
         // Generate static template IIFE
-        const escapedStaticHtml = staticInfo.staticHtml
+        const escapedStaticHtml = ap
+          .html(staticInfo.staticHtml)
           .replace(/\\/g, '\\\\')
           .replace(/`/g, '\\`')
           .replace(/\n/g, '\\n')
@@ -1363,7 +1364,7 @@ export const generateInitBindingsFunction = (
           if (!condAnchorPath) continue;
           const condNavExpr = pathToSiblingNav('_el', condAnchorPath);
           lines.push(`        const _cond_${elVar(cond.id)} = ${condNavExpr};`);
-          const condTemplate = escapeTemplateLiteral(cond.templateContent);
+          const condTemplate = escapeTemplateLiteral(ap.html(cond.templateContent));
           const condInitNested = generateRepeatNestedCondInitFn(
             cond.nestedBindings,
             cond.nestedEventBindings,
@@ -1393,8 +1394,8 @@ export const generateInitBindingsFunction = (
           lines.push(`        const _cond_${elVar(we.elseId)} = ${elseNavExpr};`);
           const thenTplWithId = injectIdIntoFirstElement(we.thenTemplate, we.thenId);
           const elseTplWithId = injectIdIntoFirstElement(we.elseTemplate, we.elseId);
-          const escapedThen = escapeTemplateLiteral(thenTplWithId);
-          const escapedElse = escapeTemplateLiteral(elseTplWithId);
+          const escapedThen = escapeTemplateLiteral(ap.html(thenTplWithId));
+          const escapedElse = escapeTemplateLiteral(ap.html(elseTplWithId));
           const thenInitFn = generateRepeatNestedCondInitFn(we.thenBindings, [], rep.itemVar, ap);
           const elseInitFn = generateRepeatNestedCondInitFn(we.elseBindings, [], rep.itemVar, ap);
           const weSignals = we.signalNames.map((s) => ap.signal(s)).join(', ');
@@ -1421,7 +1422,8 @@ export const generateInitBindingsFunction = (
             nr.signalBindings,
           );
           const innerTplId = `__tpl_${nr.id}`;
-          const innerEscaped = innerStaticInfo.staticHtml
+          const innerEscaped = ap
+            .html(innerStaticInfo.staticHtml)
             .replace(/\\/g, '\\\\')
             .replace(/`/g, '\\`')
             .replace(/\n/g, '\\n')
@@ -1641,7 +1643,7 @@ export const generateInitBindingsFunction = (
         const repeatSources = buildRepeatSubscriptionSources(rep, ap);
         lines.push(`    const _items_${rep.id} = () => ${rep.itemsExpression};`);
         if (rep.emptyTemplate) {
-          const escapedEmptyTemplate = rep.emptyTemplate.replace(/`/g, '\\`');
+          const escapedEmptyTemplate = ap.html(rep.emptyTemplate).replace(/`/g, '\\`');
           lines.push(`    let _empty_${rep.id};`);
           const emptyVar = `_empty_${rep.id}`;
           lines.push(
@@ -1685,7 +1687,7 @@ export const generateInitBindingsFunction = (
           }
         }
 
-        const templateHtml = staticInfo.staticHtml;
+        const templateHtml = ap.html(staticInfo.staticHtml);
 
         const templateId = `__tpl_${rep.id}`;
         const escapedStaticHtml = templateHtml
@@ -1733,7 +1735,7 @@ export const generateInitBindingsFunction = (
         const repeatSources = buildRepeatSubscriptionSources(rep, ap);
         lines.push(`    const _items_${rep.id} = () => ${rep.itemsExpression};`);
         if (rep.emptyTemplate) {
-          const escapedEmptyTemplate = rep.emptyTemplate.replace(/`/g, '\\`');
+          const escapedEmptyTemplate = ap.html(rep.emptyTemplate).replace(/`/g, '\\`');
           lines.push(`    let _empty_${rep.id};`);
           const emptyVar = `_empty_${rep.id}`;
           lines.push(
@@ -1854,7 +1856,7 @@ export const generateInitBindingsFunction = (
       }
     });
     for (const cond of nestedConds) {
-      const nestedEscapedTemplate = escapeTemplateLiteral(cond.templateContent);
+      const nestedEscapedTemplate = escapeTemplateLiteral(ap.html(cond.templateContent));
       const nestedBindingsCode = generateNestedInitializer(
         cond.nestedBindings,
         cond.nestedConditionals,
@@ -1878,8 +1880,8 @@ export const generateInitBindingsFunction = (
     for (const nestedWe of nestedWE) {
       const nestedThenWithId = injectIdIntoFirstElement(nestedWe.thenTemplate, nestedWe.thenId);
       const nestedElseWithId = injectIdIntoFirstElement(nestedWe.elseTemplate, nestedWe.elseId);
-      const nestedThenTemplate = escapeTemplateLiteral(nestedThenWithId);
-      const nestedElseTemplate = escapeTemplateLiteral(nestedElseWithId);
+      const nestedThenTemplate = escapeTemplateLiteral(ap.html(nestedThenWithId));
+      const nestedElseTemplate = escapeTemplateLiteral(ap.html(nestedElseWithId));
       const thenInitCode = generateNestedInitializer(
         nestedWe.thenBindings,
         nestedWe.thenConditionals,
@@ -1936,7 +1938,7 @@ export const generateInitBindingsFunction = (
 
   // when() element content is a full sub-template — same initializer as a whenElse branch
   for (const cond of conditionals) {
-    const escapedTemplate = escapeTemplateLiteral(cond.templateContent);
+    const escapedTemplate = escapeTemplateLiteral(ap.html(cond.templateContent));
     const nestedCode = generateNestedInitializer(
       cond.nestedBindings,
       cond.nestedConditionals,
@@ -1961,8 +1963,8 @@ export const generateInitBindingsFunction = (
   for (const we of whenElseBlocks) {
     const thenTemplateWithId = injectIdIntoFirstElement(we.thenTemplate, we.thenId);
     const elseTemplateWithId = injectIdIntoFirstElement(we.elseTemplate, we.elseId);
-    const escapedThenTemplate = escapeTemplateLiteral(thenTemplateWithId);
-    const escapedElseTemplate = escapeTemplateLiteral(elseTemplateWithId);
+    const escapedThenTemplate = escapeTemplateLiteral(ap.html(thenTemplateWithId));
+    const escapedElseTemplate = escapeTemplateLiteral(ap.html(elseTemplateWithId));
     const thenCode = generateNestedInitializer(
       we.thenBindings,
       we.thenConditionals,
@@ -2010,7 +2012,7 @@ export const generateInitBindingsFunction = (
  * Generate a static template property for pre-compiled HTML
  */
 export const generateStaticTemplate = (content: string, ap: AccessPattern = CLOSURE_ACCESS): string => {
-  const escapedContent = content.replace(/`/g, '\\`');
+  const escapedContent = ap.html(content).replace(/`/g, '\\`');
   return `
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   ${ap.staticTemplatePrefix} = _T(\`${escapedContent}\`);`;

@@ -1,6 +1,34 @@
-import ts from 'typescript';
+/**
+ * Text minifiers for the two languages the compiler owns. They are only ever given text the
+ * compiler knows to be HTML (a compiled template) or CSS (a `css` template, a `.css` import),
+ * at compile time. Emitted JavaScript is never passed through them.
+ */
+
+/**
+ * Elements whose content is not HTML text: whitespace is significant in it (`pre`, `textarea`)
+ * or it is another language (`script`, where a line break ends a `//` comment, and `style`).
+ * They are carried through exactly as written.
+ */
+const VERBATIM_ELEMENT = /<(pre|textarea|script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+// Private-use characters: never in real markup
+const VERBATIM_OPEN = '';
+const VERBATIM_CLOSE = '';
 
 export const minifyHTML = (html: string): string => {
+  const verbatim: string[] = [];
+  const masked = html.replace(VERBATIM_ELEMENT, (block) => {
+    verbatim.push(block);
+    return `${VERBATIM_OPEN}${verbatim.length - 1}${VERBATIM_CLOSE}`;
+  });
+  const minified = collapseHTML(masked);
+  if (verbatim.length === 0) return minified;
+  return minified.replace(
+    new RegExp(`${VERBATIM_OPEN}(\\d+)${VERBATIM_CLOSE}`, 'g'),
+    (_match, index: string) => verbatim[Number(index)]!,
+  );
+};
+
+const collapseHTML = (html: string): string => {
   return (
     html
       .replace(/\s+/g, ' ')
@@ -82,88 +110,4 @@ export const minifyCSS = (css: string): string => {
   }
 
   return out;
-};
-
-/** Elements whose text is whitespace-sensitive: a template holding one is left alone. */
-const PREFORMATTED = /<(?:pre|textarea)[\s>]/i;
-
-/** A template the compiler produced (or markup written the same way): starts and ends with a tag. */
-const looksLikeHTML = (content: string): boolean => {
-  const trimmed = content.trim();
-  return /^<(?:[a-zA-Z]|!--)/.test(trimmed) && trimmed.endsWith('>') && !PREFORMATTED.test(trimmed);
-};
-
-/**
- * A stylesheet: starts like a selector or an at-rule, ends with a closing brace, its braces
- * balance, and at least one block opens with a `property:` declaration. Messages, JSON and
- * code that merely contain a colon or a brace do not match.
- */
-const looksLikeCSS = (content: string): boolean => {
-  const trimmed = content.trim();
-  if (!/^[.#:&*@[a-zA-Z]/.test(trimmed) || !trimmed.endsWith('}')) return false;
-  if (!/[{;]\s*-{0,2}[a-zA-Z][\w-]*\s*:/.test(trimmed)) return false;
-  let depth = 0;
-  for (const ch of trimmed) {
-    if (ch === '{') depth++;
-    else if (ch === '}' && --depth < 0) return false;
-  }
-  return depth === 0;
-};
-
-const minifyTemplateContent = (content: string): string => {
-  if (looksLikeHTML(content)) return minifyHTML(content);
-  if (looksLikeCSS(content)) return minifyCSS(content);
-  // Anything else is the application's own text: a message, a separator, a line break.
-  return content;
-};
-
-/**
- * Minify the HTML and CSS template literals of an emitted JavaScript file.
- *
- * The file is parsed, not scanned: a hand-written scanner cannot tell a regex literal from a
- * division, so a quote or a backtick inside a regex used to put it out of step with the
- * source and it rewrote code as if it were a template. Only template literals without
- * substitutions are considered (compiled templates and stylesheets are static text), tagged
- * templates are never touched, and a literal is only rewritten when its whole content is
- * recognisably HTML or CSS.
- */
-export const minifyTemplatesInSource = (source: string): string => {
-  if (!source.includes('`')) return source;
-
-  const sourceFile = ts.createSourceFile('__output.js', source, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS);
-  const edits: { start: number; end: number; text: string }[] = [];
-
-  const visit = (node: ts.Node): void => {
-    if (ts.isTaggedTemplateExpression(node)) {
-      // String.raw`…` and friends see the raw text: never rewrite it, but do look inside the
-      // tag and the substitutions.
-      visit(node.tag);
-      if (ts.isTemplateExpression(node.template)) {
-        for (const span of node.template.templateSpans) visit(span.expression);
-      }
-      return;
-    }
-
-    if (ts.isNoSubstitutionTemplateLiteral(node)) {
-      const start = node.getStart(sourceFile) + 1;
-      const end = node.getEnd() - 1;
-      const content = source.slice(start, end);
-      const minified = minifyTemplateContent(content);
-      if (minified !== content) edits.push({ start, end, text: minified });
-      return;
-    }
-
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-
-  if (edits.length === 0) return source;
-
-  let result = '';
-  let cursor = 0;
-  for (const edit of edits) {
-    result += source.slice(cursor, edit.start) + edit.text;
-    cursor = edit.end;
-  }
-  return result + source.slice(cursor);
 };

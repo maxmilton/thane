@@ -169,10 +169,14 @@ Because Thane uses Light DOM (no Shadow DOM):
 
 In production builds (`thane build --prod`), component selectors are minified to shorter class names, reducing both CSS and HTML size. `product-card` becomes something like `a-b` in the registration, in the host element the compiler creates, and in every component stylesheet that addresses `.product-card`.
 
-Two rules keep the renaming safe:
+The renaming is decided from your sources before the build compiles anything, and it is conservative: a selector is renamed only when every appearance of its text in the project is a place the compiler writes itself. Anything else keeps the selector's name everywhere, so a rename can never leave one half of a pair behind:
 
-- A selector is only renamed when every appearance of it in the output is one of those places. If the same text also appears inside another string (a route such as `/product-card/:id`, an asset path, one class among several in a `class` attribute), the selector keeps its name everywhere.
-- Only the JavaScript bundle and `index.html` are rewritten. A stylesheet served from the assets folder is not, so style a component host from a component's `styles` (or a `.css` import), not from a static stylesheet.
+- a string in your code: a route such as `/product-card/:id`, an asset path, `querySelector('product-card')`;
+- a `class` attribute or a hand-written `<product-card>` tag in a template;
+- a stylesheet that is served as a static file rather than imported, or one imported from a package;
+- a comment or a quoted string inside CSS.
+
+Nothing breaks in those cases; that one selector simply stays long. Emitted JavaScript is never searched or rewritten, so a library that happens to contain the same text is not affected either way.
 
 Only selectors shaped like a custom element name (`my-card`, with a hyphen) are renamed; a single-word selector keeps its name.
 

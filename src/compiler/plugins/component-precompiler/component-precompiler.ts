@@ -16,6 +16,8 @@ import {
   createBuildContext,
 } from '../../utils/index.js';
 import { transformDefineComponentSource } from '../reactive-binding-compiler/index.js';
+import type { CompileOptions } from '../reactive-binding-compiler/index.js';
+import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
 import { ErrorCode, createError } from '../../errors.js';
 
 /** Sentinel distinguishing "evaluation failed" from "evaluated to undefined". */
@@ -306,6 +308,9 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
   setup(build) {
     const componentDefinitions = new Map<string, ComponentDefinition>();
 
+    // Read per file: a production build plans its selector renames in onStart, before any load
+    const compileOptions = (): CompileOptions => ({ minify: ctx?.minify, selectorMap: ctx?.selectorMap });
+
     build.onStart(async () => {
       componentDefinitions.clear();
 
@@ -413,20 +418,26 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
     };
 
     /**
-     * Strip tagged template tags (css`...` → `...`, html`...` → `...`) using AST
-     * to avoid false positives from regex matching inside string literals.
+     * Replace tagged templates with plain ones using the AST: html`...` loses its tag, and
+     * css`...` is compiled (its tag goes, and a production build minifies the stylesheet).
      */
     const stripTemplateTags = (code: string): string => {
       const sf = ts.createSourceFile('__strip.ts', code, ts.ScriptTarget.Latest, true);
       // Collect positions to strip in reverse order (end → start)
-      const edits: { start: number; end: number }[] = [];
+      const edits: { start: number; end: number; replacement: string }[] = [];
+      const ownCssTag = declaresOwnCssTag(sf);
       const walk = (node: ts.Node) => {
-        if (ts.isTaggedTemplateExpression(node) && ts.isIdentifier(node.tag)) {
-          const tagName = node.tag.text;
-          if (tagName === 'css' || tagName === 'html') {
-            // Remove the tag identifier — keep only the template literal
-            edits.push({ start: node.tag.getStart(sf), end: node.template.getStart(sf) });
-          }
+        if (!ownCssTag && isCssTaggedTemplate(node)) {
+          edits.push({
+            start: node.getStart(sf),
+            end: node.getEnd(),
+            replacement: compileCssTemplate(node, sf, compileOptions()),
+          });
+          return; // nested css templates are compiled along with this one
+        }
+        if (ts.isTaggedTemplateExpression(node) && ts.isIdentifier(node.tag) && node.tag.text === 'html') {
+          // Remove the tag identifier — keep only the template literal
+          edits.push({ start: node.tag.getStart(sf), end: node.template.getStart(sf), replacement: '' });
         }
         ts.forEachChild(node, walk);
       };
@@ -435,7 +446,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
       let result = code;
       for (let i = edits.length - 1; i >= 0; i--) {
         const edit = edits[i]!;
-        result = result.substring(0, edit.start) + result.substring(edit.end);
+        result = result.substring(0, edit.start) + edit.replacement + result.substring(edit.end);
       }
       return result;
     };
@@ -454,7 +465,13 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
     ): { contents: string; loader: 'ts' } => {
       let result = modifiedSource;
       if (extendsComponentQuick(source)) {
-        const transformed = transformDefineComponentSource(result, filePath, childMounts, childMountCount);
+        const transformed = transformDefineComponentSource(
+          result,
+          filePath,
+          childMounts,
+          childMountCount,
+          compileOptions(),
+        );
         if (transformed) {
           result = transformed;
         }
@@ -478,12 +495,16 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           const rewritten = rewriteMountToMountComponent(source);
           if (rewritten) {
             logger.info(NAME, `Optimised mount() → mountComponent() in ${args.path}`);
-            return createLoaderResult(rewritten);
+            return createLoaderResult(source.includes(FN.CSS + '`') ? stripTemplateTags(rewritten) : rewritten);
           }
-          return undefined;
         }
 
         if (!source.includes(FN.HTML + '`')) {
+          // A module with only css`` templates (shared styles) still needs them compiled:
+          // the tag is a compile-time marker and does not exist at runtime.
+          if (source.includes(FN.CSS + '`')) {
+            return createLoaderResult(stripTemplateTags(source));
+          }
           return undefined;
         }
 

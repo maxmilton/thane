@@ -13,12 +13,11 @@ import { clearAllDebounceTimers } from '../plugins/post-build-processor/file-cop
 import { ProjectTypesSyncPlugin } from '../plugins/router-typegen/router-typegen.js';
 import { TSCTypeCheckerPlugin } from '../plugins/tsc-type-checker/tsc-type-checker.js';
 import { ComponentPrecompilerPlugin } from '../plugins/component-precompiler/component-precompiler.js';
-import { ReactiveBindingPlugin } from '../plugins/reactive-binding-compiler/index.js';
+import { createReactiveBindingPlugin } from '../plugins/reactive-binding-compiler/index.js';
 import { ThaneLinterPlugin } from '../plugins/thane-linter/thane-linter.js';
 import { GlobalCSSBundlerPlugin } from '../plugins/global-css-bundler/global-css-bundler.js';
 import { HTMLBootstrapInjectorPlugin } from '../plugins/html-bootstrap-injector/html-bootstrap-injector.js';
 import { MinificationPlugin } from '../plugins/minification/minification.js';
-import { JSOutputOptimizerPlugin } from '../plugins/js-output-optimizer/js-output-optimizer.js';
 import { PostBuildPlugin } from '../plugins/post-build-processor/post-build-processor.js';
 
 export async function runBuild(config: BuildConfig): Promise<void> {
@@ -46,13 +45,17 @@ export async function runBuild(config: BuildConfig): Promise<void> {
   const firstEntry = config.entryPoints[0];
   const projectRoot = config.projectRoot ?? (firstEntry ? resolveProjectRoot(firstEntry) : process.cwd());
 
+  // Templates, stylesheets and selectors are minified by the compiler as it emits them (see
+  // plugins/minification); esbuild minifies the JavaScript. Nothing edits the emitted files.
+  buildContext.minify = config.isProd;
+
   const basePlugins = [
     ProjectTypesSyncPlugin(projectRoot),
     TSCTypeCheckerPlugin({ strict: config.strictTypeCheck, projectRoot }),
     ThaneLinterPlugin(),
     ComponentPrecompilerPlugin(buildContext),
-    ReactiveBindingPlugin,
-    GlobalCSSBundlerPlugin({ minify: config.isProd }),
+    createReactiveBindingPlugin(() => ({ minify: buildContext.minify, selectorMap: buildContext.selectorMap })),
+    GlobalCSSBundlerPlugin({ minify: config.isProd, selectorMap: () => buildContext.selectorMap }),
     HTMLBootstrapInjectorPlugin({ entryPoints: config.entryPoints, buildContext }),
   ];
 
@@ -76,8 +79,11 @@ export async function runBuild(config: BuildConfig): Promise<void> {
 
   const prodPlugins = [
     ...basePlugins,
-    MinificationPlugin(buildContext),
-    JSOutputOptimizerPlugin,
+    MinificationPlugin(buildContext, {
+      projectRoot,
+      htmlPath: config.inputHTMLFilePath,
+      outDir: config.outDir,
+    }),
     PostBuildPlugin(postBuildOptions),
   ];
 
@@ -126,7 +132,7 @@ export async function runBuild(config: BuildConfig): Promise<void> {
     minifyIdentifiers: true,
     minifySyntax: true,
     ...(prodDrop.length > 0 && { drop: prodDrop }),
-    write: false,
+    write: true,
     plugins: prodPlugins,
   };
 

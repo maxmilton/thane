@@ -6,9 +6,7 @@ import ts from 'typescript';
 import type { ImportInfo, TemplateInfo } from '../../types.js';
 import {
   findSignalInitializers,
-  extractTemplateContent,
   isHtmlTemplate,
-  isCssTemplate,
   isDefineComponentCall,
   pascalToKebab,
   applyEdits,
@@ -22,6 +20,10 @@ import {
 } from '../../utils/index.js';
 import type { BindingInfo, ConditionalBlock, WhenElseBlock, RepeatBlock, EventBinding } from './types.js';
 import { CLOSURE_ACCESS } from './types.js';
+import type { AccessPattern } from './types.js';
+import { minifyHTML } from '../minification/template-minifier.js';
+import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
+import type { SelectorMap } from '../minification/selector-minifier.js';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
 
@@ -424,11 +426,20 @@ const findHtmlTemplates = (sourceFile: ts.SourceFile, defineComponentCall: ts.Ca
  * 3. Generated code uses bare signal references, ctx.root, etc.
  * 4. Inject __template and __bindings as properties on the setup function
  */
+/** What a production build asks of the compiler; a development build passes nothing. */
+export interface CompileOptions {
+  /** Minify each compiled template and stylesheet where it is emitted */
+  minify?: boolean | undefined;
+  /** Selector renames planned for this build (see minification/selector-minifier.ts) */
+  selectorMap?: SelectorMap | undefined;
+}
+
 export const transformDefineComponentSource = (
   source: string,
   filePath: string,
   childMounts?: ChildMountInfo[],
   _childMountCount?: number,
+  options: CompileOptions = {},
 ): string | null => {
   const sourceFile = sourceCache.parse(filePath, source);
 
@@ -474,6 +485,9 @@ export const transformDefineComponentSource = (
 
   if (!selector) return null;
 
+  // The name the selector is emitted under: its own, or the short name planned for this build.
+  const emittedSelector = options.selectorMap?.get(selector) ?? selector;
+
   const signalInitializers = findSignalInitializers(sourceFile);
 
   // Find html templates directly — no normalization needed.
@@ -514,15 +528,27 @@ export const transformDefineComponentSource = (
     });
   }
 
-  // Strip css tags
+  // An explicit selector is a string literal in the source: write the emitted name over it
+  if (hasExplicitSelector && emittedSelector !== selector) {
+    const selectorArg = args[0]!;
+    edits.push({
+      start: selectorArg.getStart(sourceFile),
+      end: selectorArg.getEnd(),
+      replacement: `'${emittedSelector}'`,
+    });
+  }
+
+  // Strip css tags. The text is known to be a stylesheet here, so this is where it is
+  // minified and where class selectors that address a renamed component host are renamed.
+  const ownCssTag = declaresOwnCssTag(sourceFile);
   const visitCss = (node: ts.Node) => {
-    if (ts.isTaggedTemplateExpression(node) && isCssTemplate(node)) {
-      const cssContent = extractTemplateContent(node.template, sourceFile);
+    if (!ownCssTag && isCssTaggedTemplate(node)) {
       edits.push({
         start: node.getStart(sourceFile),
         end: node.getEnd(),
-        replacement: '`' + cssContent + '`',
+        replacement: compileCssTemplate(node, sourceFile, options),
       });
+      return; // a css template nested in a substitution is compiled along with this one
     }
     ts.forEachChild(node, visitCss);
   };
@@ -657,7 +683,11 @@ export const transformDefineComponentSource = (
 
   // Generate bindings code with CLOSURE_ACCESS — natively emits bare signal refs,
   // ctx.root, and closure-compatible code. No post-hoc stripping needed.
-  const ap = CLOSURE_ACCESS;
+  const ap: AccessPattern = {
+    ...CLOSURE_ACCESS,
+    html: options.minify ? minifyHTML : CLOSURE_ACCESS.html,
+    selector: (name) => options.selectorMap?.get(name) ?? name,
+  };
   const { code: initBindingsFunction, staticTemplates: repeatStaticTemplates = [] } = generateInitBindingsFunction(
     allBindings,
     allConditionals,
@@ -782,7 +812,7 @@ export const transformDefineComponentSource = (
     const mountLines: string[] = [];
     for (const { cm, globalIndex } of topLevelChildMounts) {
       const varName = `_cm${globalIndex}`;
-      mountLines.push(`const ${varName} = document.createElement('${cm.selector}');`);
+      mountLines.push(`const ${varName} = document.createElement('${ap.selector(cm.selector)}');`);
       mountLines.push(`_gid('${cm.anchorId}').replaceWith(${varName});`);
       mountLines.push(
         `_subs.push(${BIND_FN.DESTROY_CHILD}(${cm.componentName}.__f(${varName}, ${cm.propsExpression})));`,
@@ -812,7 +842,7 @@ export const transformDefineComponentSource = (
 
   // Inject selector if auto-derived (before the setup function argument)
   if (!hasExplicitSelector && selector) {
-    result = result.replace(/defineComponent\s*((?:<[^(]*>)?)\s*\(/, `defineComponent$1('${selector}', `);
+    result = result.replace(/defineComponent\s*((?:<[^(]*>)?)\s*\(/, `defineComponent$1('${emittedSelector}', `);
   }
 
   // ── AST-based injection: re-parse the transformed source for reliable positions ──
@@ -951,7 +981,11 @@ export const transformDefineComponentSource = (
 // esbuild Plugin
 // ============================================================================
 
-export const ReactiveBindingPlugin: Plugin = {
+/**
+ * `getOptions` is read per file, after the build's onStart callbacks have run, so a production
+ * build's selector plan is in place by the time anything is compiled.
+ */
+export const createReactiveBindingPlugin = (getOptions: () => CompileOptions = () => ({})): Plugin => ({
   name: NAME,
   setup(build) {
     build.onLoad({ filter: /\.ts$/ }, async (args) => {
@@ -966,7 +1000,7 @@ export const ReactiveBindingPlugin: Plugin = {
       }
 
       try {
-        const transformed = transformDefineComponentSource(source, args.path);
+        const transformed = transformDefineComponentSource(source, args.path, undefined, undefined, getOptions());
 
         if (transformed === null) {
           return undefined;
@@ -985,4 +1019,6 @@ export const ReactiveBindingPlugin: Plugin = {
       }
     });
   },
-};
+});
+
+export const ReactiveBindingPlugin: Plugin = createReactiveBindingPlugin();

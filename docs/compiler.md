@@ -15,11 +15,10 @@ Source (.ts)
   ├─ 4. Routes Precompiler     → Processes defineRoutes() calls
   ├─ 5. Router Typegen         → Generates .d.ts for type-safe routing
   ├─ 6. Global CSS Bundler     → .css imports → string exports
-  ├─ 7. Minification           → Selector + whitespace minification (prod)
+  ├─ 7. Minification           → Plans selector renames from the sources (prod)
   ├─ 8. TSC Type Checker       → TypeScript checking (errors/warnings)
   ├─ 9. HTML Bootstrap Injector → Injects entry script into index.html
-  ├─ 10. JS Output Optimizer   → Post-build JavaScript optimization
-  └─ 11. Post-Build Processor  → gzip/brotli, metafile output
+  └─ 10. Post-Build Processor  → gzip/brotli, metafile output
   │
   ▼
 Output (dist/)
@@ -156,11 +155,23 @@ import styles from './Card.module.css';
 const styles = '/* contents of Card.module.css */';
 ```
 
-## Selector Minification
+## Production Minification
 
-In production builds, the **Minification** plugin replaces component selectors with shorter names (e.g., `product-card` → `a-b`), reducing both CSS and HTML output size. The selectors come from the compiler's own scan of the project, and one is renamed only when every appearance of it in the output is a place the plugin rewrites (see [Styling](styling.md#selector-minification)).
+A production build minifies three kinds of text, each by the tool that knows its language:
 
-The same plugin minifies the HTML and CSS template literals of the emitted files. It parses each file to find them, touches only literals whose whole content is HTML or CSS, and skips any chunk built entirely from `node_modules`, so a library and your own message strings are never rewritten.
+| What                                          | Minified by  | Where                                   |
+| --------------------------------------------- | ------------ | --------------------------------------- |
+| JavaScript, yours and every library's         | esbuild      | while bundling                          |
+| HTML templates                                | the compiler | where it emits a compiled template      |
+| Stylesheets (`css` templates, `.css` imports) | the compiler | where it reads the template or the file |
+
+**Thane never edits emitted JavaScript.** The output files are not read back, searched or patched, so nothing Thane does can change a library, whatever the library contains and however the bundle is split. A template or stylesheet is minified at the one point where the compiler holds it as HTML or CSS, not recognised afterwards by what a string looks like.
+
+In a `css` template the substitutions are located by the TypeScript parser and carried over untouched, and the literal text keeps its escape sequences exactly as written (`content: "\\201C"`). In a template, `<pre>` and `<textarea>` content is carried through as written; the same holds for inline `<script>` and `<style>` in `index.html`.
+
+### Selector minification
+
+Component selectors are replaced with shorter names (e.g., `product-card` → `a-b`). The **Minification** plugin decides which before anything is compiled: it reads the project's own TypeScript, stylesheets and `index.html` and renames a selector only when every appearance of its text is a place the compiler writes itself (see [Styling](styling.md#selector-minification)). The compiler then writes the short name where it writes a selector: the registration, the host element of a child component, the root tag in `index.html`, and `.product-card` class selectors in component stylesheets.
 
 ## HTML Bootstrap Injection
 

@@ -3,7 +3,8 @@ export { ProjectTypesSyncPlugin } from './router-typegen/router-typegen.js';
 
 export { ComponentPrecompilerPlugin } from './component-precompiler/component-precompiler.js';
 
-export { ReactiveBindingPlugin } from './reactive-binding-compiler/index.js';
+export { ReactiveBindingPlugin, createReactiveBindingPlugin } from './reactive-binding-compiler/index.js';
+export type { CompileOptions } from './reactive-binding-compiler/index.js';
 
 export { ThaneLinterPlugin } from './thane-linter/thane-linter.js';
 export type { ThaneLinterOptions } from './thane-linter/thane-linter.js';
@@ -14,7 +15,6 @@ export { GlobalCSSBundlerPlugin } from './global-css-bundler/global-css-bundler.
 export { HTMLBootstrapInjectorPlugin } from './html-bootstrap-injector/html-bootstrap-injector.js';
 
 export { MinificationPlugin, minifySelectorsInHTML } from './minification/minification.js';
-
-export { JSOutputOptimizerPlugin } from './js-output-optimizer/js-output-optimizer.js';
+export type { MinificationOptions } from './minification/minification.js';
 
 export { PostBuildPlugin } from './post-build-processor/post-build-processor.js';
