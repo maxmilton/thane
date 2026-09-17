@@ -180,6 +180,14 @@ const Routes = defineRoutes({
 });
 ```
 
+### What happens while a page loads
+
+The URL and `currentPath()` change as soon as a navigation starts, so an active link updates at once. The page on screen stays mounted until the next page's component has arrived; the two are then swapped, and the scroll position is set, in a single step. The outlet is never painted empty, whether the chunk takes two seconds or is already cached.
+
+- **A newer navigation cancels an older one.** If the user clicks another link while a chunk is still loading, only the latest page mounts; the overtaken one never appears.
+- **Going back to the page on screen keeps it.** If the user returns (back button, or the same link) before the next page has arrived, the load is cancelled and the current page is not re-created, so its state survives.
+- **A chunk that fails to load** is reported with `console.error` and the outlet is left empty; the router stays usable and other pages still load. Browsers remember a failed module import for the life of the document, so that one page needs a reload to recover.
+
 ## Scroll Restoration
 
 The router manages scroll position automatically:

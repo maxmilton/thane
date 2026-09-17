@@ -331,6 +331,10 @@ let _started = false;
 let _popstateHandler: ((event: PopStateEvent) => void) | null = null;
 /** Path and query of the mounted route; a change in either loads the route again */
 let _loadedUrl: string | null = null;
+/** Ticket of the newest route load. A load that finds a newer ticket once its component has arrived stands down. */
+let _navigationId = 0;
+/** True while the next route's component is being fetched: the URL is the new entry's, the page on screen is not */
+let _routePending = false;
 const locationUrl = (): string => window.location.pathname + window.location.search;
 let _scrollHandler: (() => void) | null = null;
 let _previousHistoryScrollRestoration: History['scrollRestoration'] | null = null;
@@ -415,6 +419,9 @@ const readScrollPositionFromHistoryState = (state: unknown): { left: number; top
 
 const persistCurrentScrollPosition = (): void => {
   if (!_scrollConfig.enabled || typeof window === 'undefined') return;
+  // While the next route loads, the scroll offset belongs to the page still on screen and the
+  // URL to the entry being loaded: writing one into the other would restore a wrong position later.
+  if (_routePending) return;
 
   _scrollPositions.set(window.location.pathname, { left: window.scrollX, top: window.scrollY });
 
@@ -441,15 +448,16 @@ const schedulePersistCurrentScrollPosition = (): void => {
   });
 };
 
-const applyScrollPosition = (pathname: string): void => {
+const applyScrollPosition = (
+  pathname: string,
+  action: 'init' | 'navigate' | 'pop',
+  popScrollPosition: { left: number; top: number } | null,
+): void => {
   if (!_scrollConfig.enabled || typeof window === 'undefined') return;
-
-  const action = _pendingScrollAction;
-  _pendingScrollAction = 'init';
 
   const saved =
     action === 'pop' && _scrollConfig.restoreOnBackForward
-      ? (_pendingPopScrollPosition ?? _scrollPositions.get(pathname))
+      ? (popScrollPosition ?? _scrollPositions.get(pathname))
       : undefined;
   const target =
     saved ??
@@ -457,23 +465,20 @@ const applyScrollPosition = (pathname: string): void => {
       ? { left: _scrollConfig.left, top: _scrollConfig.top }
       : undefined);
 
-  _pendingPopScrollPosition = null;
-
   if (!target) return;
 
   const apply = () => {
     window.scrollTo({ left: target.left, top: target.top, behavior: _scrollConfig.behavior });
   };
 
-  queueMicrotask(() => {
-    requestAnimationFrame(() => {
-      apply();
-      if (action === 'pop') {
-        requestAnimationFrame(apply);
-        _scrollRestorationTimers = [setTimeout(apply, 100)];
-      }
-    });
-  });
+  // The first write is synchronous: the new page is already in the DOM, so it is painted at its
+  // final position instead of at the previous page's offset for one frame. A restored position
+  // is applied again once content that arrives late (images, data) has had a chance to grow the page.
+  apply();
+  if (action === 'pop') {
+    requestAnimationFrame(apply);
+    _scrollRestorationTimers = [setTimeout(apply, 100)];
+  }
 };
 
 const isEagerRouteComponent = (value: unknown): value is ComponentHTMLSelector<any> => {
@@ -558,30 +563,66 @@ export const matchRoute = (pathname: string, routes: RoutesMap, notFound?: Route
 const loadRoute = async (): Promise<void> => {
   if (!_config || !_target) return;
 
+  const target = _target;
   const pathname = window.location.pathname;
   const url = locationUrl();
 
-  // Skip when this path and query are already mounted (guards against a redundant popstate).
-  // A change in the query alone mounts the route again, so `route.searchParams` is current;
-  // a change in the hash alone does not.
-  if (url === _loadedUrl && _currentHandle) return;
+  // How this load was triggered belongs to this load alone: a navigation that supersedes it,
+  // or one started while it mounts, must not inherit its scroll action or saved position.
+  const scrollAction = _pendingScrollAction;
+  const popScrollPosition = _pendingPopScrollPosition;
+  _pendingScrollAction = 'init';
+  _pendingPopScrollPosition = null;
 
-  // Tear down current route
-  if (_currentHandle) {
-    unmount(_currentHandle);
-    _target.innerHTML = '';
-    _currentHandle = null;
-  }
+  // Every load takes a ticket, also one that turns out to have nothing to do: taking it is
+  // what cancels a load that is still waiting for its component.
+  const navigationId = ++_navigationId;
 
   _currentPath(pathname);
-  _loadedUrl = url;
+
+  // Skip when this path and query are already mounted: a redundant popstate, a change in the
+  // hash alone, or the user returning to the page on screen while another one was loading
+  // (that load is now cancelled and the page keeps its state). A change in the query alone
+  // mounts the route again, so `route.searchParams` is current.
+  if (url === _loadedUrl && _currentHandle) {
+    _routePending = false;
+    return;
+  }
 
   const match = matchRoute(pathname, _config.routes, _config.notFound);
+
+  // Fetch the next page while the current one stays on screen. Tearing the current page down
+  // before this await left the outlet empty for as long as the chunk took to arrive, and for
+  // one painted frame even when it was already cached: the document collapsed to the shell,
+  // the footer jumped to the top and the page flashed.
+  let component: ComponentHTMLSelector<any> | undefined;
+  if (match) {
+    _routePending = true;
+    try {
+      component = await resolveRouteComponent(match.route);
+    } catch (error) {
+      console.error('[thane-router] Failed to load route:', error);
+    }
+    // Superseded by a newer navigation, or the router was stopped (or restarted) meanwhile:
+    // the outlet and the pending flag are no longer this load's to touch.
+    if (navigationId !== _navigationId || _target !== target) return;
+    _routePending = false;
+  }
+
+  // From here to the scroll write everything happens in one task, so the browser paints the
+  // previous page and then the next one, never the gap between them.
+  if (_currentHandle) {
+    const previous = _currentHandle;
+    _currentHandle = null;
+    unmount(previous);
+  }
+  target.innerHTML = '';
+  _loadedUrl = url;
+
   if (!match) {
     _currentRoutePattern = pathname;
     _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
     _routeParams = {};
-    _target.innerHTML = '';
     return;
   }
 
@@ -594,18 +635,19 @@ const loadRoute = async (): Promise<void> => {
   }
   _currentRouteTitle = match.route.title ?? (typeof document !== 'undefined' ? document.title : '');
 
+  // The component failed to load (reported above): the outlet stays empty
+  if (!component) return;
+
   try {
-    const component = await resolveRouteComponent(match.route);
-
-    // Guard: the user may have navigated away while we were loading
-    if (locationUrl() !== _loadedUrl) return;
-
-    if (component) {
-      _currentHandle = mountComponent(component, _target, undefined, { route: createCurrentRouteContext() });
-      applyScrollPosition(pathname);
-    }
+    _currentHandle = mountComponent(component, target, undefined, { route: createCurrentRouteContext() });
   } catch (error) {
     console.error('[thane-router] Failed to load route:', error);
+    return;
+  }
+
+  // A page that navigates while it mounts (a redirect) has started a newer load, which owns the scroll
+  if (navigationId === _navigationId) {
+    applyScrollPosition(pathname, scrollAction, popScrollPosition);
   }
 };
 
@@ -707,6 +749,10 @@ export function startRouter(
  */
 export function stopRouter(): void {
   if (!_started) return;
+
+  // A load still waiting for its component stands down when it resumes
+  _navigationId++;
+  _routePending = false;
 
   if (_currentHandle) {
     unmount(_currentHandle);
