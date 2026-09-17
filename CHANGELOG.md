@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+Found by porting a real Angular site (routing, forms, Firebase) to Thane.
+
+### Fixed
+
+- Production builds no longer rewrite library code. The template minifier ran over every emitted file with a scanner that could not tell a regex literal from a division, and it treated any template literal holding a colon or a tag as CSS or HTML; bundling the Firebase SDK silently broke Firestore's transport. Emitted files are now parsed, only template literals whose whole content is HTML or CSS are minified, application strings keep their whitespace and line breaks (a `'
+'` separator used to be emptied), and a chunk built entirely from `node_modules` is left exactly as esbuild emitted it.
+- The CSS minifier keeps the spaces `calc(a + b)` needs and no longer turns the descendant selector `.a :hover` into `.a:hover`. Quoted strings are copied verbatim and the last semicolon of a block is dropped.
+- Selector minification works again. It searched the output for a `selector: '…'` property that compiled `defineComponent()` code never contains, so nothing was ever renamed. Selectors now come from the compiler's scan of the project; one is renamed only when every appearance of it in the output is a place the renamer rewrites (otherwise it keeps its name everywhere), a generated name is never one already in use, and `.sel.active` and `:not(.sel)` are covered.
+- `style="width: ${w()}px"` dropped the `px` on every update, and `margin: ${a()}px ${b()}em` compiled to two writes that overwrote each other. A declaration value with static text or several expressions is one binding written as a template literal, and a `;` or `:` inside an expression no longer confuses the declaration split.
+- The entry `<script>` was not injected into `index.html` when the entry point came from `thane.config.json`: the config loader makes it absolute and it never matched the metafile's relative path.
+- The dev and serve server decode request paths, so assets with spaces or non-ASCII characters in their names are served instead of 404. Containment is checked on the decoded path.
+- Generated route types list the paths as string literals instead of importing `typeof Routes`. A lazily loaded page that called `navigate()` in its own template was part of its own type (TS7022) unless the loader carried a return type annotation.
 
 ## [0.2.0] - 2026-09-15
 
