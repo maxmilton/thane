@@ -2,7 +2,7 @@
  * Post-Build Processor — HTTP dev server
  */
 
-import { basename, join, extname, relative, resolve } from 'node:path';
+import { basename, join, extname, relative, resolve, sep } from 'node:path';
 import { brotliCompress, constants as zlibConstants } from 'node:zlib';
 import { promisify } from 'node:util';
 import type { Server } from 'bun';
@@ -36,6 +36,25 @@ export interface DevServerOptions {
 }
 
 const BROWSER_ERROR_SENTINEL = 'THANE_BROWSER_ERROR';
+
+/**
+ * The file a request path points at inside `distDir`, or null when the path is malformed or
+ * leaves the directory. A URL pathname is percent-encoded (`My%20Logo.png`); it is decoded
+ * before it is resolved, so file names with spaces or non-ASCII characters are found, and the
+ * containment check runs on the decoded path, so an encoded `..%2F` cannot slip past it.
+ */
+export const resolveRequestPath = (distDir: string, pathname: string): string | null => {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return null;
+  }
+  const root = resolve(distDir);
+  const requested = resolve(root, '.' + decoded);
+  if (requested !== root && !requested.startsWith(root + sep)) return null;
+  return requested;
+};
 
 type ResolvedBrowserLocation = {
   source: string;
@@ -400,8 +419,8 @@ export class DevServer {
           return new Response('WebSocket upgrade failed', { status: 400 });
         }
 
-        const requestedPath = resolve(canonicalDistDir, '.' + requestedUrl);
-        if (!requestedPath.startsWith(canonicalDistDir)) {
+        const requestedPath = resolveRequestPath(canonicalDistDir, requestedUrl);
+        if (requestedPath === null) {
           return new Response('Forbidden', { status: 403 });
         }
 
