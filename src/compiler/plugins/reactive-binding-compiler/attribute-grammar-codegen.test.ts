@@ -49,6 +49,17 @@ describe('One attribute grammar', () => {
     expect(js).toMatch(/\.style\.color = kind\(\)/);
   });
 
+  test('static text next to a style expression stays part of the value it belongs to', async () => {
+    const js = await buildAndReadJs(
+      componentApp('<i style="width: ${size()}px; margin: ${kind()}px ${size()}em; color: ${kind()}">y</i>'),
+    );
+    expect(js).toContain('`${size()}px`');
+    expect(js).toContain('`${kind()}px ${size()}em`');
+    // a value that is only the expression keeps the plain write
+    expect(js).toMatch(/\.style\.color = kind\(\)/);
+    expect(js).not.toMatch(/\.style\.width = size\(\)/);
+  });
+
   test('inside rows a mixed class and a style with static text are one binding each', async () => {
     const js = await buildAndReadJs(
       rowApp('<li class="row ${item.kind}" style="color: ${item.color}"><b style=${item.color}>${item.label}</b></li>'),

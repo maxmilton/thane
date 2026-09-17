@@ -72,8 +72,10 @@ template: html`
 `;
 ```
 
-The first form writes `style.cssText`. The second binds each `property: ${value}` pair on its
-own at component level; inside `repeat()` rows the whole style is one binding.
+The first form writes `style.cssText`. The second binds each declaration on its own at
+component level; inside `repeat()` rows the whole style is one binding. Static text next to an
+expression belongs to the value: `width: ${width()}px` writes `40px`, and
+`margin: ${y()}px ${x()}px` is one binding that reads both signals.
 
 ## Ternary Expressions
 

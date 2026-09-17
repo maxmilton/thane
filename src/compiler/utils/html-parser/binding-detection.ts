@@ -283,22 +283,72 @@ export function findTemplateExpressions(
   return results;
 }
 
-function inferStyleProperty(styleValue: string, expressionStart: number): string | null {
-  let colon = -1;
-  for (let i = expressionStart - 1; i >= 0; i--) {
-    const ch = styleValue[i];
-    if (ch === ';') break;
-    if (ch === ':') {
-      colon = i;
-      break;
+type TemplateExpressionSpan = { start: number; end: number; expression: string; full: string };
+
+interface StyleDeclaration {
+  property: string;
+  /** Range of the declaration's value inside the attribute value, surrounding whitespace excluded */
+  valueStart: number;
+  valueEnd: number;
+  /** The `${…}` expressions that sit inside the value */
+  expressions: TemplateExpressionSpan[];
+}
+
+/**
+ * Split an inline style into its declarations. Expressions are masked first, so a `;` or
+ * `:` inside `${a() ? 'x' : 'y'}` never ends a declaration or names a property; `;` inside
+ * parentheses or quotes (`url(data:…;base64,…)`) is ignored the same way.
+ */
+function splitStyleDeclarations(styleValue: string, expressions: TemplateExpressionSpan[]): StyleDeclaration[] {
+  const masked = styleValue.split('');
+  for (const expr of expressions) {
+    for (let i = expr.start; i < expr.end; i++) masked[i] = '';
+  }
+
+  const declarations: StyleDeclaration[] = [];
+  const pushDeclaration = (start: number, end: number): void => {
+    let colon = -1;
+    for (let i = start; i < end; i++) {
+      if (masked[i] === ':') {
+        colon = i;
+        break;
+      }
+    }
+    if (colon === -1) return;
+    const property = masked.slice(start, colon).join('').trim();
+    if (!/^[\w-]+$/.test(property)) return;
+
+    let valueStart = colon + 1;
+    let valueEnd = end;
+    while (valueStart < valueEnd && /\s/.test(styleValue[valueStart]!)) valueStart++;
+    while (valueEnd > valueStart && /\s/.test(styleValue[valueEnd - 1]!)) valueEnd--;
+    declarations.push({
+      property,
+      valueStart,
+      valueEnd,
+      expressions: expressions.filter((e) => e.start >= valueStart && e.end <= valueEnd),
+    });
+  };
+
+  let declStart = 0;
+  let parenDepth = 0;
+  let quote = '';
+  for (let i = 0; i < masked.length; i++) {
+    const ch = masked[i]!;
+    if (quote) {
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '(') parenDepth++;
+    else if (ch === ')' && parenDepth > 0) parenDepth--;
+    else if (ch === ';' && parenDepth === 0) {
+      pushDeclaration(declStart, i);
+      declStart = i + 1;
     }
   }
-  if (colon === -1) return null;
-
-  const declStart = styleValue.lastIndexOf(';', colon) + 1;
-  const prop = styleValue.substring(declStart, colon).trim();
-  if (!/^[\w-]+$/.test(prop)) return null;
-  return prop;
+  pushDeclaration(declStart, masked.length);
+  return declarations;
 }
 
 export function parseWhenElseExpression(
@@ -656,11 +706,39 @@ export function findBindingsInAttributes(
       /^\s*\$\{[\s\S]*\}\s*$/.test(attr.value) && findTemplateExpressions(attr.value).length === 1;
     if (name === 'style' && !wholeValueIsExpression) {
       const styleExprs = findTemplateExpressions(attr.value);
-      for (const expr of styleExprs) {
-        const signals = extractSignalsFromExpression(expr.expression);
+      for (const declaration of splitStyleDeclarations(attr.value, styleExprs)) {
+        if (declaration.expressions.length === 0) continue;
+        const propertyName = declaration.property;
+        const expr = declaration.expressions[0]!;
+        const valueIsOneExpression =
+          declaration.expressions.length === 1 &&
+          expr.start === declaration.valueStart &&
+          expr.end === declaration.valueEnd;
 
-        const propertyName = inferStyleProperty(attr.value, expr.start);
-        if (!propertyName) continue;
+        // `width: ${w()}px` or `margin: ${a()}px ${b()}em` — the static text belongs to the
+        // value, so the whole declaration value is one binding written as a template literal.
+        if (!valueIsOneExpression) {
+          const signals = [
+            ...new Set(declaration.expressions.flatMap((e) => extractSignalsFromExpression(e.expression))),
+          ];
+          if (signals.length > 0 || options?.detectNonSignalBindings) {
+            const valueText = attr.value.substring(declaration.valueStart, declaration.valueEnd);
+            bindings.push({
+              element,
+              type: 'style',
+              signalName: signals[0] ?? '',
+              signalNames: signals,
+              jsExpression: '`' + valueText + '`',
+              property: propertyName,
+              expressionStart: attr.valueStart + declaration.valueStart,
+              expressionEnd: attr.valueStart + declaration.valueEnd,
+              fullExpression: valueText,
+            });
+          }
+          continue;
+        }
+
+        const signals = extractSignalsFromExpression(expr.expression);
 
         if (signals.length > 0) {
           const bareSignal = expr.expression.match(/^\s*(\w+)\(\)\s*$/);
