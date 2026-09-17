@@ -136,8 +136,9 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     const { distDir } = config;
     const outputs = metafile.outputs;
 
-    // Normalize configured entry points for matching against metafile entryPoint paths
-    const configuredEntries = new Set(config.entryPoints.map((ep) => path.normalize(ep)));
+    // Entry points arrive relative from a CLI flag and absolute from a config file, while the
+    // metafile always reports them relative to the working directory: compare resolved paths.
+    const configuredEntries = new Set(config.entryPoints.map((ep) => path.resolve(ep)));
 
     // Build a map of configured entry basenames → hashed output filenames.
     // Only includes scripts the user explicitly specified via --entry (not code-split chunks).
@@ -155,7 +156,7 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
 
       totalBundleSizeInBytes += sizeInBytes;
       fileSizeLog.push({ fileName, sizeInBytes });
-      if (info.entryPoint && configuredEntries.has(path.normalize(info.entryPoint))) {
+      if (info.entryPoint && configuredEntries.has(path.resolve(info.entryPoint))) {
         const entryBasename = path.basename(info.entryPoint, path.extname(info.entryPoint));
         hashedFileNames[entryBasename] = fileName;
       }
