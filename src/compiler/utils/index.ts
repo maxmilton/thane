@@ -11,6 +11,7 @@ export {
   getContentType,
   createBuildContext,
   resolveProjectRoot,
+  projectRootWarning,
 } from './file-utils.js';
 
 export { applyEdits } from './source-editor.js';

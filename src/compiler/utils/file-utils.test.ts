@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
-import { createBuildContext } from './file-utils.js';
+import { createBuildContext, projectRootWarning } from './file-utils.js';
 
 const FILES: Record<string, string> = {
   'src/main.ts': `import { AppShell } from './app-shell';\nconsole.log(AppShell);\n`,
@@ -104,5 +104,21 @@ describe('H-15: the project root is scanned too when it lies outside the working
     const files = await scanFrom(join(root, 'src', 'widgets'), root);
     expect(files[0]).toBe('src/widgets/card.ts');
     expect(files.slice(1).sort()).toEqual(['deep/a/b/c/leaf.ts', 'src/app-shell.ts', 'src/main.ts']);
+  });
+});
+
+describe('projectRootWarning', () => {
+  const root = join(tmpdir(), 'thane-root-warning', 'repo');
+
+  test('the root above the folder Thane runs in: a warning that names both', () => {
+    const cwd = join(root, 'scratch', 'app');
+    const warning = projectRootWarning(root, cwd);
+    expect(warning).toContain(`${cwd} has no package.json or tsconfig.json, so it builds as part of ${root}`);
+  });
+
+  test('the root is the folder, or not above it: no warning', () => {
+    expect(projectRootWarning(root, root)).toBeNull();
+    expect(projectRootWarning(join(root, 'apps', 'site'), root)).toBeNull();
+    expect(projectRootWarning(join(root, 'other'), join(root, 'scratch'))).toBeNull();
   });
 });

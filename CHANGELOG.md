@@ -136,6 +136,7 @@ The simplification and hardening round fixed these defects in valid code:
 - A production build's short selector names depend only on the components its entry points reach. Every component under the project was planned, so adding one anywhere (another app, a test fixture) renamed the selectors of an app that never used it. Selectors named in the project's other sources, such as its e2e tests, still keep their names.
 - A shorthand property that names a row's item, such as `{ row }` in a handler inside a row's `when()` or `whenElse()`, compiles to `{ row: … }`. It failed the build. Row expressions are also rewritten without being printed again, so a template inside keeps its `html` tag as written.
 - `--analyze` writes `metafile.json` in `thane dev` and `thane serve` too, after every rebuild. It did in `thane build` only.
+- A folder without its own `package.json` or `tsconfig.json` builds as part of the enclosing one, as before, but the build now warns about it, naming both folders.
 
 ### Removed
 
