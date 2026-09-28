@@ -325,6 +325,7 @@ These are reported by the compiler while it compiles a template, as build errors
 | THANE009 | A template the compiler cannot bind reliably: markup the browser rebuilds (text directly in a table, an `<a>` inside an `<a>`, non-option content in a `<select>`), or a comment written like one of the compiler's own markers (`<!--b0-->`) |
 | THANE010 | A function as `repeat()`'s third argument, which is the empty template. Pass the key function fourth: `repeat(items, row, null, (it) => it.id)` |
 | THANE011 | A `repeat()` empty template that is not one static element: two roots, text outside an element, or a `${…}` in it. It is inserted as one element while the list is empty |
+| THANE012 | A template reads a name that the compiled bindings declare for themselves (a name starting with `_`, an element name such as `b3`, or `e` and `item` in a row), so it would read the compiler's value. Rename the variable |
 
 ### THANE007 — one root element per row
 
@@ -354,6 +355,20 @@ ${repeat(items(), (item) => html`<li>${item.name}</li>`, (item) => item.id)}
 
 // ✅ GOOD
 ${repeat(items(), (item) => html`<li>${item.name}</li>`, null, (item) => item.id)}
+```
+
+### THANE012 — names the compiled bindings keep for themselves
+
+The binding code the compiler writes into each component declares variables of its own. Their names start with `_`, or are element names such as `b3`; in a list row the event parameter is `e`, and an item the source leaves unnamed is `item`. A template that reads a setup variable, import or global with one of those names would read the compiler's variable, so the build stops instead:
+
+```typescript
+// ❌ BAD — `_subs` is a name of the compiled bindings
+const _subs = signal(0);
+return { template: html`<p>${_subs()}</p>` };
+
+// ✅ GOOD
+const subscribers = signal(0);
+return { template: html`<p>${subscribers()}</p>` };
 ```
 
 ### THANE011 — the empty template is one static element

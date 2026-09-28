@@ -46,12 +46,12 @@
 --- template
 <!--b0(--><div><button data-thane-ref="b1">A</button><!--b2--> <!----></div><!--b0)--><!--b3(--><!--b3)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
     const _ws_b0 = _ns[0].previousSibling;
     const _we_b0 = _ns[0].nextSibling;
     const _ws_b3 = _we_b0.nextSibling;
-    const _we_b3 = r.lastChild;
+    const _we_b3 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, show, `<div><button>A</button><!----> <!----></div>`, (_c) => {
       const b1 = _c.lastElementChild;
       const b2 = b1.nextSibling.nextSibling;
@@ -122,10 +122,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, outer, `<section><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></section>`, (_c) => {
       const _a_b8 = _c.lastChild.lastChild;
       const _ws_b1 = _c.firstChild;
@@ -193,13 +193,13 @@
 --- template
 <!--b0(--><!--b0)--><!--b3(--><!--b3|--><!--b3)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling.previousSibling.previousSibling;
     const _we_b0 = _ws_b0.nextSibling;
     const _ws_b3 = _we_b0.nextSibling;
     const _wm_b3 = _ws_b3.nextSibling;
-    const _we_b3 = r.lastChild;
+    const _we_b3 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><b title=""><!----> <!----></b></div>`, (_c) => {
       const b1 = _c.lastElementChild;
       const b2 = b1.firstChild.nextSibling;
@@ -234,11 +234,11 @@
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling;
     const _wm_b0 = _ws_b0.nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [mode], () => mode(), `<div><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
       const _a_b8 = _c.lastChild.lastChild;
       const _ws_b2 = _c.firstChild;
@@ -335,10 +335,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
       const _ws_b1 = _c.firstChild;
       const _wm_b1 = _ws_b1.nextSibling;
@@ -374,10 +374,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
       const _ws_b1 = _c.firstChild;
       const _wm_b1 = _ws_b1.nextSibling;
@@ -400,10 +400,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><ul><!----></ul></div>`, (_c) => {
       const _a_b1 = _c.lastChild.lastChild;
       const _rsubs_b1 = [];
@@ -448,11 +448,11 @@
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling;
     const _wm_b0 = _ws_b0.nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [a], () => a(), `<ul><!----></ul>`, (_c) => {
       const _a_b2 = _c.lastChild;
       const _rsubs_b2 = [];
@@ -495,13 +495,13 @@
 --- template
 <!--b0(--><!--b0)--><ul><!--b12.--></ul><!--b9(--><!--b9|--><!--b9)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
     const _ws_b0 = _ns[0].previousSibling.previousSibling;
     const _we_b0 = _ws_b0.nextSibling;
     const _ws_b9 = _ns[0].nextSibling;
     const _wm_b9 = _ws_b9.nextSibling;
-    const _we_b9 = r.lastChild;
+    const _we_b9 = _r.lastChild;
     const _a_b12 = _ns[0].lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><button>1</button><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
       const b8 = _c.firstElementChild;
@@ -596,10 +596,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
       const _ws_b1 = _c.firstChild;
       const _wm_b1 = _ws_b1.nextSibling;
@@ -646,11 +646,11 @@
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling;
     const _wm_b0 = _ws_b0.nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [b], () => b(), `<div><!----><!----></div>`, (_c) => {
       const _ws_b2 = _c.firstChild;
       const _we_b2 = _c.lastChild;
@@ -696,10 +696,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
       const _ws_b1 = _c.firstChild;
       const _wm_b1 = _ws_b1.nextSibling;
@@ -1066,10 +1066,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><x-kid></x-kid><b><!----> <!----></b></div>`, (_c) => {
       const _cm0 = _c.firstElementChild;
       const b1 = _c.lastChild.firstChild.nextSibling;
@@ -1106,11 +1106,11 @@
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling;
     const _wm_b0 = _ws_b0.nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [a], () => a(), `<div><x-kid></x-kid></div>`, (_c) => {
       const _cm0 = _c.lastElementChild;
       return [
@@ -1919,11 +1919,11 @@
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><!--b1.--></ul><ol><!--b3.--></ol><!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
     const b4 = _ns[0].lastChild.previousSibling;
     const _ws_b0 = _ns[2].nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     const _a_b1 = _ns[1].lastChild;
     const _a_b3 = _ns[2].lastChild;
     b4.data = t() ?? '';
@@ -1977,11 +1977,11 @@
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><!--b1.--></ul><ol><!--b3.--></ol><!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
     const b4 = _ns[0].lastChild.previousSibling;
     const _ws_b0 = _ns[2].nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     const _a_b1 = _ns[1].lastChild;
     const _a_b3 = _ns[2].lastChild;
     b4.data = t() ?? '';

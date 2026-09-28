@@ -69,7 +69,7 @@ export const Count = defineComponent(() => {
   };
 });
 `);
-    expect(out).toContain('  return {\n  __b: (ctx, _ns) => {\n  const _subs = [];\n');
+    expect(out).toContain('  return {\n  __b: (_ctx, _ns) => {\n  const _subs = [];\n');
     expect(out).toMatch(/_subs\[i\]\(\); \};\n {2}\},\n {2}\};\n\}, __tpl\);/);
   });
 });

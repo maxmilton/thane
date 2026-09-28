@@ -13,6 +13,7 @@ import {
   BIND_FN,
 } from '../../utils/index.js';
 import { getSetupFunction, unwrapParens } from '../../utils/component-ast.js';
+import { checkBindingNames } from './binding-names.js';
 import type { BindingInfo, ConditionalBlock, WhenElseBlock, RepeatBlock, EventBinding, EmitOptions } from './types.js';
 import { minifyHTML } from '../minification/template-minifier.js';
 import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
@@ -525,6 +526,9 @@ export const transformDefineComponentSource = (
     childHosts,
   );
 
+  // A template that reads one of the binding code's own names would read the compiler's value (THANE012)
+  if (setupArg) checkBindingNames(setupArg, bindingsBody);
+
   let staticTemplateCode = '';
   if (lastProcessedTemplateContent) {
     staticTemplateCode = generateStaticTemplate(lastProcessedTemplateContent, emit);
@@ -598,7 +602,7 @@ export const transformDefineComponentSource = (
     if (injectBindings) {
       const at = returnObj.getStart(sourceFile) + 1;
       // The registration factory passes the template's elements when the code reaches them by position
-      const params = elementList ? 'ctx, _ns' : 'ctx';
+      const params = elementList ? '_ctx, _ns' : '_ctx';
       edits.push({ start: at, end: at, replacement: `\n  __b: (${params}) => {\n  ${bindingsBody.trim()}\n  },` });
     }
   }

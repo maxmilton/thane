@@ -273,7 +273,7 @@ const createScope = (
 /**
  * The component template's scope. The registration factory hands `__b` the template's elements in
  * document order (`_ns`, listed from the clone before it is inserted), so an element is `_ns[i]`; any
- * other node is reached from one of them, or from the component root's last children (`r`).
+ * other node is reached from one of them, or from the component root's last children (`_r`).
  */
 const componentScope = (model: DomModel): NavScope & { used: () => boolean; usesRoot: () => boolean } => {
   let used = false;
@@ -282,7 +282,7 @@ const componentScope = (model: DomModel): NavScope & { used: () => boolean; uses
     '    ',
     [
       ...model.elements.map((el) => ({ node: el, expr: `_ns[${el.order}]`, cost: 5 + String(el.order).length })),
-      { node: null, expr: 'r', cost: 2 },
+      { node: null, expr: '_r', cost: 2 },
     ],
     (node) => {
       if (node.kind !== 'element') return undefined;
@@ -293,7 +293,7 @@ const componentScope = (model: DomModel): NavScope & { used: () => boolean; uses
   return {
     ...scope,
     used: () => used || scope.head.some((line) => line.includes('_ns[')),
-    usesRoot: () => scope.head.some((line) => line.includes(' = r.')),
+    usesRoot: () => scope.head.some((line) => line.includes(' = _r.')),
   };
 };
 
@@ -1739,7 +1739,7 @@ export const generateInitBindingsFunction = (
   lines.push(`    return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };`);
   // The component's anchors are reached before any of its code changes the DOM
   lines.splice(1, 0, ...top.head);
-  if (top.usesRoot()) lines.unshift(`    const r = ctx.root;`);
+  if (top.usesRoot()) lines.unshift(`    const _r = _ctx.root;`);
 
   return { code: lines.join('\n'), staticTemplates, helpers, elementList: top.used() };
 };
