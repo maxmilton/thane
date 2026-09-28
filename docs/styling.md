@@ -143,7 +143,7 @@ declare module '*.css' {
 Use `registerGlobalStyles()` for styles that apply globally — resets, typography, theme variables:
 
 ```typescript
-import { registerGlobalStyles } from 'thane';
+import { registerGlobalStyles, css } from 'thane';
 
 const resetStyles = css`
   *,

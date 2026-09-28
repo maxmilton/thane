@@ -33,7 +33,7 @@ export const doubled = computed(() => count() * 2);
 
 ```typescript
 // components/display.ts
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import { count, doubled } from '../state/global-state.js';
 
 export const Display = defineComponent(() => ({
@@ -43,7 +43,7 @@ export const Display = defineComponent(() => ({
 
 ```typescript
 // components/controls.ts
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import { count } from '../state/global-state.js';
 
 export const Controls = defineComponent(() => ({

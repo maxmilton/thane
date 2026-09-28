@@ -25,6 +25,7 @@ import {
   noCrossFileHtmlTemplate,
   duplicateMountTarget,
   singleReturnObject,
+  noAliasedThaneImport,
 } from './rules/index.js';
 
 /** The path passed to the rule. The source is parsed as 'parsed.ts', so the reported file must come from here. */
@@ -594,5 +595,70 @@ describe('THANE412 diagnostics', () => {
       'const notAComponent = () => { if (flag) return { a: 1 }; return { b: 2 }; };',
     ];
     expect(run(singleReturnObject, src)).toStrictEqual([]);
+  });
+});
+
+// ============================================================================
+// THANE413: no-aliased-thane-import
+// ============================================================================
+
+describe('THANE413 diagnostics', () => {
+  const error = diag('error', ErrorCode.NO_ALIASED_THANE_IMPORT);
+
+  test('reports a marker or defineComponent imported under another name, at the specifier', () => {
+    const src = [
+      "import { html as h, repeat, defineComponent as dc, signal as s } from 'thane';",
+      "import { css as style } from 'thane';",
+    ];
+    expect(run(noAliasedThaneImport, src)).toStrictEqual([
+      error(
+        src,
+        1,
+        'html as h',
+        "'html' is imported as 'h', and the compiler finds it only by its own name. Import it as 'html': import { html } from 'thane'",
+      ),
+      error(
+        src,
+        1,
+        'defineComponent as dc',
+        "'defineComponent' is imported as 'dc', and the compiler finds it only by its own name. " +
+          "Import it as 'defineComponent': import { defineComponent } from 'thane'",
+      ),
+      error(
+        src,
+        2,
+        'css as style',
+        "'css' is imported as 'style', and the compiler finds it only by its own name. Import it as 'css': import { css } from 'thane'",
+      ),
+    ]);
+  });
+
+  test("reports a marker read through a namespace import of 'thane'", () => {
+    const src = [
+      "import * as thane from 'thane';",
+      'export const App = thane.defineComponent(() => ({',
+      '  template: thane.html`<ul>${thane.repeat(items(), row)}</ul>`,',
+      '}));',
+      'const count = thane.signal(0);',
+    ];
+    const message = (text: string, name: string) =>
+      `'${text}' is not compiled: the compiler finds '${name}' only by its own name. Import it by name: import { ${name} } from 'thane'`;
+    expect(run(noAliasedThaneImport, src)).toStrictEqual([
+      error(src, 2, 'thane.defineComponent', message('thane.defineComponent', 'defineComponent')),
+      error(src, 3, 'thane.html', message('thane.html', 'html')),
+      error(src, 3, 'thane.repeat', message('thane.repeat', 'repeat')),
+    ]);
+  });
+
+  test('accepts the markers under their own names, other aliases, type imports and other modules', () => {
+    const src = [
+      "import { defineComponent, html, css, when, whenElse, repeat, signal as s } from 'thane';",
+      "import { type Signal as S } from 'thane';",
+      "import type { MountHandle as H } from 'thane';",
+      "import { html as litHtml } from 'lit';",
+      "import * as other from 'other';",
+      'other.html`<p></p>`;',
+    ];
+    expect(run(noAliasedThaneImport, src)).toStrictEqual([]);
   });
 });

@@ -32,13 +32,18 @@ const KEPT: Record<string, EntrySurface> = {
     values: [
       'batch',
       'computed',
+      'css',
       'defineComponent',
       'effect',
+      'html',
       'mount',
       'registerGlobalStyles',
+      'repeat',
       'signal',
       'unmount',
       'untrack',
+      'when',
+      'whenElse',
     ],
     types: ['Signal', 'ReadonlySignal', 'ComponentContext', 'ComponentHTMLSelector', 'MountHandle', 'RoutePaths'],
   },
@@ -69,8 +74,6 @@ const KEPT: Record<string, EntrySurface> = {
 const REMOVED: Record<string, string[]> = {
   'thane': [
     'mountComponent',
-    'html',
-    'css',
     'ComponentRoot',
     'ComponentReturnType',
     'MountOptions',

@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 
 // P13: a backslash and an escaped \${ in template text. The template's value is the text
 // `C:\dir` and the literal characters `${notExpr}`; neither is an interpolation.

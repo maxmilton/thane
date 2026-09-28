@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 
 export const HomePage = defineComponent('meta-home', () => ({
   template: html`<main>

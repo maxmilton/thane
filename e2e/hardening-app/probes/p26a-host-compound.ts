@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, css } from 'thane';
 
 // P26a: :host() with a compound argument that contains its own parentheses.
 // Correct scoping: the rule applies only while the host has .y and does not have .x.

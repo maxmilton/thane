@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // P15: a nested repeat() whose container is the outer row's root element; the inner list is

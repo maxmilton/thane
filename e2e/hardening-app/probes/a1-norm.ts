@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // Markup the browser's parser rebuilds. A table written without <tbody> (the parser inserts

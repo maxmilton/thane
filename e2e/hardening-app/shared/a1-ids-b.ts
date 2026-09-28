@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 import { expose } from './expose.js';
 
 /** A second component that uses the same developer ids as IdsA. */

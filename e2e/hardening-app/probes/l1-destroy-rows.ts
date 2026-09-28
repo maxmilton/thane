@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 import { Kid } from '../shared/kid.js';
 import { l1Tick } from '../shared/store.js';
 

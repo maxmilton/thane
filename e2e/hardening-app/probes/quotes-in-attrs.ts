@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // Double quotes inside an attribute expression, in rows and at component level: the row analysis

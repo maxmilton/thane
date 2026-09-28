@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, whenElse } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // Directives at the top level of the template: a when() element and a whenElse() that are

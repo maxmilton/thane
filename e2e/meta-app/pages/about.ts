@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 
 export const AboutPage = defineComponent('meta-about', () => ({
   template: html`<main>

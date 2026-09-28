@@ -769,7 +769,7 @@ export function startRouter(
   _pendingPopScrollPosition = readScrollPositionFromHistoryState(window.history.state);
   _pendingScrollAction = _pendingPopScrollPosition ? 'pop' : 'init';
 
-  // Expose navigation helpers globally (like when, whenElse, repeat)
+  // Expose the navigation helpers globally, for templates
   const g = globalThis as any;
   g.currentPath = _currentPath;
   g.navigate = navigate;

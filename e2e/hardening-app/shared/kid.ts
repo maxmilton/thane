@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import { countCall } from './expose.js';
 
 /** A child component that records each `onDestroy` call per label in `window.__counts.kidDestroy`. */

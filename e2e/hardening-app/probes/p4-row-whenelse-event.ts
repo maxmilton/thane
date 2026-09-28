@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, whenElse, repeat } from 'thane';
 
 // P4: an event handler inside a whenElse() branch inside a repeat() row.
 export const P4 = defineComponent('hardening-p4', () => {

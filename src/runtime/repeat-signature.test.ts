@@ -1,9 +1,9 @@
 /**
- * The global `repeat()` declaration (index.ts, `declare global`) type-checks every empty
+ * The `repeat()` marker's signature (markers.ts) type-checks every empty
  * template the compiler takes, and rejects a function in the third argument, where a key function is
  * easily written by mistake: `repeat(items, row, (it) => it.id)` (the key function goes fourth).
  *
- * One program holds the runtime's declarations and a usage file with one call per case, each in its
+ * One program holds the markers and a usage file with one call per case, each in its
  * own function; a case's diagnostics are the ones on its lines.
  */
 import { describe, expect, test } from 'bun:test';
@@ -27,7 +27,7 @@ const INVALID: Record<string, string> = {
 const USAGE = '/h54/usage.ts';
 const cases = Object.entries({ ...VALID, ...INVALID });
 const usage = [
-  'export {};',
+  `import { html, repeat } from '${join(import.meta.dir, 'markers.js').replaceAll('\\', '/')}';`,
   'const items = [{ id: 1 }];',
   'const row = (it: { id: number }) => html`<li>${it.id}</li>`;',
   ...cases.map(([, call], i) => `export function case${i}() {\n  return ${call};\n}`),
@@ -53,7 +53,7 @@ const diagnosticsByCase = (): Map<string, string[]> => {
       ? ts.createSourceFile(name, usage, languageVersion, true)
       : getSourceFile.call(host, name, languageVersion, ...rest);
   host.fileExists = (name) => name === USAGE || fileExists.call(host, name);
-  const program = ts.createProgram([join(import.meta.dir, 'index.ts'), USAGE], options, host);
+  const program = ts.createProgram([join(import.meta.dir, 'markers.ts'), USAGE], options, host);
   const file = program.getSourceFile(USAGE)!;
   const lines = usage.split('\n');
   const byCase = new Map<string, string[]>(cases.map(([name]) => [name, []]));
@@ -69,7 +69,7 @@ const diagnosticsByCase = (): Map<string, string[]> => {
 let computed: Map<string, string[]> | undefined;
 const diagnostics = (): Map<string, string[]> => (computed ??= diagnosticsByCase());
 
-describe('the global repeat() declaration', () => {
+describe('the repeat() marker', () => {
   test('every empty template the compiler takes type-checks', () => {
     expect(diagnostics().get('setup')).toBeUndefined();
     for (const name of Object.keys(VALID)) expect({ [name]: diagnostics().get(name) }).toEqual({ [name]: [] });

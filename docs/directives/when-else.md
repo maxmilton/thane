@@ -13,7 +13,7 @@ Both the `then` and `else` branches must be `html` tagged template results assig
 ## Basic Usage
 
 ```typescript
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, whenElse } from 'thane';
 
 export const LoginStatus = defineComponent(() => {
   const isLoggedIn = signal(false);

@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // P20: a repeat() inside a when() inside a repeat() row.

@@ -147,7 +147,7 @@ Key points:
 **`app.ts`**
 
 ```ts
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import appStyles from './App.module.css';
 import { Navbar } from './components/Navbar/Navbar.js';
 

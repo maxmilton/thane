@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 
 // P2: an event handler on an element in a nested repeat() row.
 export const P2 = defineComponent('hardening-p2', () => {

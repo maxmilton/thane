@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, whenElse } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // M1: a text-only whenElse() branch that starts hidden. Showing it put the text "null" in

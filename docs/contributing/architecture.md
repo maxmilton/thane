@@ -13,11 +13,11 @@ src/
       post-build-processor/    # Final output processing (assets, index.html, gzip, size report, dev server)
       reactive-binding-compiler/ # Core: compiles html`` templates → DOM bindings (+ its tests)
       router-typegen/          # Generates .thane/types (route types, .css declarations)
-      thane-linter/            # 12 compile-time lint rules (THANE400–THANE412) (+ its tests)
+      thane-linter/            # 13 compile-time lint rules (THANE400–THANE413) (+ its tests)
       tsc-type-checker/        # Type sync and TypeScript type checking at build start
     testing/                   # Shared helpers for build-through tests (not published)
     utils/                     # Shared compiler utilities (HTML parser, AST helpers, file scan, logger)
-    errors.ts                  # Diagnostic codes (THANE006–THANE012, THANE200, THANE202, THANE400–THANE412)
+    errors.ts                  # Diagnostic codes (THANE006–THANE012, THANE200, THANE202, THANE400–THANE413)
   contracts/                   # Names shared by the compiler and the runtime's compiled-output contract
     compiler/                  # Binding kinds, parser states, the code generator's result type
     runtime/                   # Runtime helper names, package entry specifiers

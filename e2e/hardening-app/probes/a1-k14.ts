@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // An event on an element with an empty id attribute. The id lookup ran

@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // Text bindings at the start, middle and end of mixed text, two in a row, next to developer

@@ -1,12 +1,12 @@
 # API Reference
 
-Complete API surface for the Thane framework, covering all public exports, global template functions, and types.
+Complete API surface for the Thane framework, covering all public exports, the template markers, the router globals, and types.
 
 ## Package Exports
 
 | Entry           | What it holds                                                                                              |
 | :-------------- | :--------------------------------------------------------------------------------------------------------- |
-| `thane`         | Signals, components, mounting, global styles, and the types an app writes in its own code                  |
+| `thane`         | Signals, components, mounting, global styles, the template markers, and the types an app writes in its own code |
 | `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`, `setMeta`, and the head-field helpers `metaName`, `metaProperty`, `linkTag` |
 | `thane/client`  | Type declarations for `.css` imports, which `thane` includes (see below)                                   |
 | `thane/runtime` | The helpers that compiled code calls. Only the compiler imports it: never import it in an app. It is not an API and changes with every version |
@@ -35,6 +35,20 @@ Complete API surface for the Thane framework, covering all public exports, globa
 
 `ComponentReturnType` and `MountOptions` are described under [Shapes You Pass In](#shapes-you-pass-in).
 
+#### Template Markers
+
+`import { html, css, when, whenElse, repeat } from 'thane'`. The compiler turns each use into DOM code at build time, so none of them reaches the bundle. It finds them by name: import them under their own names (THANE413). Called at run time, outside a compiled template, each one throws.
+
+| Export     | Signature                                                                                                                                                                         | Description                                  |
+| :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------- |
+| `html`     | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for HTML content             |
+| `css`      | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for CSS content              |
+| `when`     | `(condition: boolean \| (() => boolean)) => string`                                                                                                                               | Conditional rendering — show/hide an element |
+| `whenElse` | `<T, F>(condition: boolean \| (() => boolean), thenTemplate: T, elseTemplate: F) => T \| F`                                                                                       | If/else conditional rendering                |
+| `repeat`   | `<T>(items: T[] \| (() => T[]), templateFn: (item: T, index: number) => any, emptyTemplate?: string \| null, trackBy?: (item: T, index: number) => string \| number) => any[]` | List rendering with keyed reconciliation     |
+
+`repeat()`'s third argument is the empty template (an `html` template, or `null`); the key function goes fourth: `repeat(items(), row, null, (item) => item.id)`. A function in third place is a build error (THANE010).
+
 ### `thane/router` (subpath export)
 
 | Export         | Signature                                               | Description                                                              |
@@ -56,22 +70,15 @@ The entry that compiled code imports its helpers from (`__registerComponent`, `_
 
 ---
 
-## Global Template Functions
+## Router Globals
 
-These are available globally inside `html` tagged templates. The compiler transforms them at build time — they do not exist as runtime values you import.
+The router installs these as globals when it starts, so a template calls them without an import. `navigate` and `navigateBack` are also exported from `thane/router`.
 
-| Function       | Signature                                                                                                                                                                         | Description                                               |
-| :------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------- |
-| `html`         | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for HTML content                          |
-| `css`          | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for CSS content                           |
-| `when`         | `(condition: boolean \| (() => boolean)) => string`                                                                                                                               | Conditional rendering — show/hide an element              |
-| `whenElse`     | `<T, F>(condition: boolean \| (() => boolean), thenTemplate: T, elseTemplate: F) => T \| F`                                                                                       | If/else conditional rendering                             |
-| `repeat`       | `<T>(items: T[] \| (() => T[]), templateFn: (item: T, index: number) => any, emptyTemplate?: string \| null, trackBy?: (item: T, index: number) => string \| number) => any[]` | List rendering with keyed reconciliation                  |
-| `navigate`     | `(path: RoutePaths) => void`                                                                                                                                                      | Navigate to a path (type-safe when routes are registered) |
-| `navigateBack` | `() => void`                                                                                                                                                                      | Navigate back in browser history                          |
-| `currentPath`  | `ReadonlySignal<string>`                                                                                                                                                          | Read-only signal with the current pathname                |
-
-`repeat()`'s third argument is the empty template (an `html` template, or `null`); the key function goes fourth: `repeat(items(), row, null, (item) => item.id)`. A function in third place is a build error (THANE010).
+| Global         | Signature                | Description                                               |
+| :------------- | :----------------------- | :-------------------------------------------------------- |
+| `navigate`     | `(path: RoutePaths) => void` | Navigate to a path (type-safe when routes are registered) |
+| `navigateBack` | `() => void`             | Navigate back in browser history                          |
+| `currentPath`  | `ReadonlySignal<string>` | Read-only signal with the current pathname                |
 
 ---
 

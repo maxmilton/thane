@@ -1,6 +1,6 @@
 # Lint Rules
 
-Thane includes 12 compile-time lint rules (THANE400–THANE412; THANE406 is retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
+Thane includes 13 compile-time lint rules (THANE400–THANE413; THANE406 is retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
 
 The compiler reports a few more problems itself, while it compiles a template: see [Template Errors](#template-errors).
 
@@ -20,6 +20,7 @@ The compiler reports a few more problems itself, while it compiles a template: s
 | THANE410 | [no-cross-file-html-template](#thane410--no-cross-file-html-template)       | Warning  |
 | THANE411 | [duplicate-mount-target](#thane411--duplicate-mount-target)                 | Warning  |
 | THANE412 | [single-return-object](#thane412--single-return-object)                     | Error    |
+| THANE413 | [no-aliased-thane-import](#thane413--no-aliased-thane-import)               | Error    |
 
 ---
 
@@ -309,6 +310,27 @@ export const Card = defineComponent(() => {
     template: html`${whenElse(ready(), html`<p>Ready</p>`, html`<p>Loading…</p>`)}`,
   };
 });
+```
+
+---
+
+## THANE413 — no-aliased-thane-import
+
+**Severity:** Error
+
+The compiler finds the template markers (`html`, `css`, `when`, `whenElse`, `repeat`) and `defineComponent` by their names. Import them from `thane` under those names: a renamed import, or one read through a namespace import, is never compiled.
+
+```typescript
+// ❌ BAD — renamed: h`…` is not compiled
+import { defineComponent, html as h } from 'thane';
+
+// ❌ BAD — read through a namespace import
+import * as thane from 'thane';
+export const App = thane.defineComponent(() => ({ template: thane.html`<p>Hi</p>` }));
+
+// ✅ GOOD — imported under their own names
+import { defineComponent, html } from 'thane';
+export const App = defineComponent(() => ({ template: html`<p>Hi</p>` }));
 ```
 
 ---

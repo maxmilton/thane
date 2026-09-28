@@ -1,4 +1,4 @@
-import { defineComponent, signal, type Signal } from 'thane';
+import { defineComponent, signal, type Signal, html, when, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 
 type SigRow = { id: number; on: boolean; name: string };

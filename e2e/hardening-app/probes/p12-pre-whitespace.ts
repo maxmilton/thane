@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 
 // P12: whitespace inside <pre> in a component template.
 export const P12 = defineComponent('hardening-p12', () => ({

@@ -22,7 +22,7 @@ The template returned by `renderFn` has exactly one root element; every row is c
 ## Basic Usage
 
 ```typescript
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 
 export const TodoList = defineComponent(() => {
   const items = signal(['Buy milk', 'Walk dog', 'Write code']);
@@ -196,7 +196,7 @@ The reconciler includes several fast paths for common operations:
 From the [e-commerce app](../examples/e-commerce-app.md):
 
 ```typescript
-import { defineComponent } from 'thane';
+import { defineComponent, html, repeat } from 'thane';
 import type { Signal } from 'thane';
 import type { AppStateProduct } from '../../models/app-state.models.js';
 import { ProductCard } from '../ProductCard/ProductCard.js';

@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, whenElse } from 'thane';
 import { expose } from '../shared/expose.js';
 import { ProbeCard } from '../shared/probe-card.js';
 

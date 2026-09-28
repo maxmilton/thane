@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, whenElse } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // M1: whenElse() branches with more than one root node. The first section's then-branch has

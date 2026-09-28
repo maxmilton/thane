@@ -219,8 +219,9 @@ export const isCssTaggedTemplate = (node: ts.Node): node is ts.TaggedTemplateExp
 
 /**
  * True when the module brings its own `css` (another library's tag, a local helper). Thane's
- * `css` is a global, or an import from 'thane'; anything else is not Thane's to compile, and
- * is neither compiled nor counted as a stylesheet when selector renames are planned.
+ * `css` is the import from 'thane' (or an undeclared `css`, which the type checker reports);
+ * anything else is not Thane's to compile, and is neither compiled nor counted as a stylesheet
+ * when selector renames are planned.
  */
 export const declaresOwnCssTag = (sourceFile: ts.SourceFile): boolean => {
   for (const statement of sourceFile.statements) {

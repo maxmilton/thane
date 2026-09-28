@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, css } from 'thane';
 
 // `@namespace` in a component stylesheet: the rule right after the statement stays scoped to the
 // component (the runtime scoper used to read the statement as that rule's selector, and left it

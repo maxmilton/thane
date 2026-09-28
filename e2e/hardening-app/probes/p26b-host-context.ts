@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, css } from 'thane';
 
 // P26b: :host-context() applies while an ancestor of the component matches its argument.
 export const P26b = defineComponent('hardening-p26b', () => ({

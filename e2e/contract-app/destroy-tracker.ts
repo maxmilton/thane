@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 
 /**
  * Child component that tracks its onDestroy lifecycle.

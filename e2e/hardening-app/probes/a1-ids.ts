@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import { IdsA } from '../shared/a1-ids-a.js';
 import { IdsB } from '../shared/a1-ids-b.js';
 

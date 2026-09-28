@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, when } from 'thane';
 import styles from './Products.module.css';
 import { ProductGrid } from '../../components/ProductGrid/ProductGrid.js';
 import { Loader } from '../../components/Loader/Loader.js';

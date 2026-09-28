@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import { DestroyTracker } from './destroy-tracker';
 import { DestroyGrandchild } from './destroy-grandchild';
 

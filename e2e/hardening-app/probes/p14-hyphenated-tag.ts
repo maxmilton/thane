@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, whenElse } from 'thane';
 import { expose } from '../shared/expose.js';
 
 // P14: a hyphenated tag as a whenElse() branch root and as the element carrying when().

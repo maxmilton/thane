@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, css } from 'thane';
 
 // P26c: a quote inside a CSS comment (dev build). Every rule stays scoped to the component,
 // so the rule for .p26c-leak must not reach the element with that class outside the component.

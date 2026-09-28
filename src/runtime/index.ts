@@ -3,39 +3,8 @@
 /// <reference path="../../client.d.ts" preserve="true" />
 /** Runtime entry point. */
 
-// Global type declarations for template tags and directives
+// Router globals: `navigate()` and the others are real values the router installs for templates
 declare global {
-  /**
-   * Tagged template for HTML content
-   */
-  function html(strings: TemplateStringsArray, ...values: any[]): any;
-
-  /**
-   * Tagged template for CSS content
-   */
-  function css(strings: TemplateStringsArray, ...values: any[]): any;
-
-  /**
-   * Conditional directive - shows content when condition is truthy
-   */
-  function when(condition: boolean | (() => boolean)): string;
-
-  /**
-   * Conditional directive with else branch
-   */
-  function whenElse<T, F>(condition: boolean | (() => boolean), thenTemplate: T, elseTemplate: F): T | F;
-
-  /**
-   * Repeat directive for rendering arrays
-   * @param emptyTemplate shown while the list is empty: an html template, or null; the key function goes fourth
-   */
-  function repeat<T>(
-    items: T[] | (() => T[]),
-    templateFn: (item: T, index: number) => any,
-    emptyTemplate?: string | null,
-    trackBy?: (item: T, index: number) => string | number,
-  ): any[];
-
   /**
    * Navigate to a path (router).
    * Type-safe once Thane has generated the route types (any `thane` command does).
@@ -59,6 +28,7 @@ declare global {
 // are in ./internal.ts ('thane/runtime'), the router values in ./router-exports.ts ('thane/router').
 export type { Signal, ReadonlySignal } from './types.js';
 export { signal, batch, computed, effect, untrack } from './signal.js';
+export { html, css, when, whenElse, repeat } from './markers.js';
 export {
   defineComponent,
   registerGlobalStyles,

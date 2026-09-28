@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, when } from 'thane';
 import styles from './ProductDetails.module.css';
 import { addToCart, products } from '../../state/global-state.js';
 

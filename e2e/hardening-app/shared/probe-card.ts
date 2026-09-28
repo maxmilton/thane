@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 
 /** A child component without lifecycle hooks (registered lean). */
 export const ProbeCard = defineComponent<{ label: string }>('hardening-probe-card', ({ props }) => ({

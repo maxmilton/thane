@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 import { Kid } from '../shared/kid.js';
 
 // I1: a child component in a row whose props use the row index under a custom name.

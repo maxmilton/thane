@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when } from 'thane';
 import { expose } from '../shared/expose.js';
 import { IdsChild } from '../shared/a1-ids-child.js';
 

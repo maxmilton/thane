@@ -38,7 +38,7 @@ export default Routes;
 `;
 
 const page = (exportName: string, target: string): string => `
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 
 export const ${exportName} = defineComponent(() => ({
   template: html\`<a href="${target}" @click.prevent=\${navigate('${target}')}>go</a>\`,
@@ -94,7 +94,7 @@ export default Routes;
 `;
 
 const metaPage = (exportName: string, setMetaArgument: string): string => `
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import { setMeta } from 'thane/router';
 
 export const ${exportName} = defineComponent(() => {

@@ -29,7 +29,7 @@ const TSCONFIG = JSON.stringify({
 });
 
 const ROUTED_APP = [
-  "import { defineComponent, mount } from 'thane';",
+  "import { defineComponent, html, mount } from 'thane';",
   "import { defineRoutes } from 'thane/router';",
   '',
   "export const Home = defineComponent('home-page', () => ({ template: html`<p>home</p>` }));",

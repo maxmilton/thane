@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, css } from 'thane';
 
 /**
  * Minimal styled child component for CSS scoping/isolation tests.

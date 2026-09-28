@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, repeat } from 'thane';
 import { ProbeCard } from '../shared/probe-card.js';
 
 // P7: a child component inside a when() inside a repeat() row.

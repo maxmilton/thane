@@ -2,6 +2,14 @@
 
 Thane uses tagged template literals for HTML. At build time, the compiler transforms `html` templates into static `<template>` elements, then generates binding code that reaches the exact DOM nodes that need updating and subscribes them to their signals.
 
+`html`, `css` and the [directives](directives/README.md) are imported from `thane`:
+
+```typescript
+import { html, css, when, whenElse, repeat } from 'thane';
+```
+
+They exist only at build time: the compiler turns each use into DOM code, so none of them adds to the bundle. The compiler finds them by name, so import them under their own names ([THANE413](lint-rules.md#thane413--no-aliased-thane-import)). The examples below leave the imports out.
+
 ## Basic Template
 
 ```typescript
