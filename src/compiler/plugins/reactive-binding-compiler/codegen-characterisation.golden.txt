@@ -1,29 +1,25 @@
 === top: simple text, attr, class, style and expression bindings ===
 --- template
-<p id="b0" class="" style="color: "><!--b1--> <!----> and <!--b2--> <!----></p><input id="b3"><b id="b4" title=""><!--b5--> <!----></b>
+<p data-thane-ref="b0" class="" style="color: "><!--b1--> <!----> and <!--b2--> <!----></p><input data-thane-ref="b3"><b data-thane-ref="b4" title=""><!--b5--> <!----></b>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    const _cm = _fcm(r);
-    const b0 = _gid('b0');
-    const b1 = _cm['b1'];
-    const b2 = _cm['b2'];
-    const b3 = _gid('b3');
-    const b4 = _gid('b4');
-    const b5 = _cm['b5'];
+    const b1 = _ns[0].firstChild.nextSibling;
+    const b2 = _ns[0].lastChild.previousSibling;
+    const b5 = _ns[2].firstChild.nextSibling;
+    const b0 = _ns[0];
+    const b3 = _ns[1];
+    const b4 = _ns[2];
     b0.className = cls();
     b0.style.color = col();
-    b1.nextSibling.data = count() ?? '';
+    b1.data = count() ?? '';
     b3.value = v();
-    b5.nextSibling.data = label() ?? '';
+    b5.data = label() ?? '';
     _subs.push(cls.subscribe(v => { b0.className = v; }, true));
     _subs.push(col.subscribe(v => { b0.style.color = v; }, true));
-    _subs.push(count.subscribe(v => { b1.nextSibling.data = v ?? ''; }, true));
+    _subs.push(count.subscribe(v => { b1.data = v ?? ''; }, true));
     _subs.push(v.subscribe(v => { b3.value = v; }, true));
-    _subs.push(label.subscribe(v => { b5.nextSibling.data = v ?? ''; }, true));
-    let _pv_b2_0; const _upd_b2_0 = () => { if (_pv_b2_0 !== (_pv_b2_0 = a() + b())) b2.nextSibling.data = (_pv_b2_0) ?? ''; };
+    _subs.push(label.subscribe(v => { b5.data = v ?? ''; }, true));
+    let _pv_b2_0; const _upd_b2_0 = () => { if (_pv_b2_0 !== (_pv_b2_0 = a() + b())) b2.data = (_pv_b2_0) ?? ''; };
     _upd_b2_0();
     _subs.push(a.subscribe(_upd_b2_0, true));
     _subs.push(b.subscribe(_upd_b2_0, true));
@@ -34,113 +30,119 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<p id="b0" class="" style="color: "><!--b1--> <!----> and <!--b2--> <!----></p><input id="b3"><b id="b4" title=""><!--b5--> <!----></b>`);
+  const __tpl = _T(`<p class="" style="color: "><!----> <!----> and <!----> <!----></p><input><b title=""><!----> <!----></b>`);
 === top: events with modifiers ===
 --- template
-<button id="b0">+</button><button id="b1">go</button><input id="b2"><div id="b3">x</div>
+<button data-thane-ref="b0">+</button><button data-thane-ref="b1">go</button><input data-thane-ref="b2"><div data-thane-ref="b3">x</div>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    _gid('b0')?.addEventListener('click', inc);
-    _gid('b1')?.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); (() => go(1))(e); });
-    _gid('b2')?.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; save(); });
-    _gid('b3')?.addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; (close)(e); });
+    _ns[0].addEventListener('click', inc);
+    _ns[1].addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); (() => go(1))(e); });
+    _ns[2].addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; save(); });
+    _ns[3].addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; (close)(e); });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<button id="b0">+</button><button id="b1">go</button><input id="b2"><div id="b3">x</div>`);
+  const __tpl = _T(`<button>+</button><button>go</button><input><div>x</div>`);
 === top: when simple and expression, with bindings and events inside ===
 --- template
-<div id="b0"><button id="b1">A</button><!--b2--> <!----></div><template id="b3"></template>
+<!--b0(--><div><button data-thane-ref="b1">A</button><!--b2--> <!----></div><!--b0)--><!--b3(--><!--b3)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    _subs.push(__bindIf(r, show, 'b0', `<div id="b0"><button id="b1">A</button><!--b2--> <!----></div>`, () => {
-      const _wcm = _fcm(r);
-      const b2 = _wcm['b2'];
-      b2.nextSibling.data = n() ?? '';
-      _gid('b1')?.addEventListener('click', a);
+    const _ws_b0 = _ns[0].previousSibling;
+    const _we_b0 = _ns[0].nextSibling;
+    const _ws_b3 = _we_b0.nextSibling;
+    const _we_b3 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, show, `<div><button>A</button><!----> <!----></div>`, (_c) => {
+      const b1 = _c.lastElementChild;
+      const b2 = b1.nextSibling.nextSibling;
+      b2.data = n() ?? '';
+      b1.addEventListener('click', a);
       return [
-        n.subscribe(v => { b2.nextSibling.data = v ?? ''; }, true),
+        n.subscribe(v => { b2.data = v ?? ''; }, true),
       ];
     }));
-    _subs.push(__bindIfExpr(r, [a, b], () => a() && !b(), 'b3', `<div id="b3"><span id="b4" title=""><!--b5--> <!----></span></div>`, () => {
-      const _wcm = _fcm(r);
-      const b4 = _gid('b4');
-      const b5 = _wcm['b5'];
+    _subs.push(__bindIfExpr(_ws_b3, _we_b3, [a, b], () => a() && !b(), `<div><span title=""><!----> <!----></span></div>`, (_c) => {
+      const b4 = _c.lastElementChild;
+      const b5 = b4.firstChild.nextSibling;
       b4.setAttribute('title', t());
-      b5.nextSibling.data = m() ?? '';
+      b5.data = m() ?? '';
       return [
         t.subscribe(v => { b4.setAttribute('title', v); }, true),
-        m.subscribe(v => { b5.nextSibling.data = v ?? ''; }, true),
+        m.subscribe(v => { b5.data = v ?? ''; }, true),
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<div id="b0"><button id="b1">A</button><!--b2--> <!----></div><template id="b3"></template>`);
+  const __tpl = _T(`<!----><div><button>A</button><!----> <!----></div><!----><!----><!---->`);
 === top: whenElse with bindings and events in both branches ===
 --- template
-<template id="b0"></template><template id="b1"></template><p><!--b3--> <!----></p>
+<!--b0(--><!--b0|--><!--b0)--><p><!--b5--> <!----></p>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    const _cm = _fcm(r);
-    const b3 = _cm['b3'];
-    b3.nextSibling.data = other() ?? '';
-    _subs.push(other.subscribe(v => { b3.nextSibling.data = v ?? ''; }, true));
-    _subs.push(__bindIfExpr(r, [on], () => on(), 'b0', `<b id="b0"><!--b2--> <!----></b>`, () => {
-      const _wcm = _fcm(r);
-      const b2 = _wcm['b2'];
-      b2.nextSibling.data = t() ?? '';
-      _gid('b0')?.addEventListener('click', x);
+    const b5 = _ns[0].firstChild.nextSibling;
+    const _ws_b0 = _ns[0].previousSibling.previousSibling.previousSibling;
+    const _wm_b0 = _ws_b0.nextSibling;
+    const _we_b0 = _wm_b0.nextSibling;
+    b5.data = other() ?? '';
+    _subs.push(other.subscribe(v => { b5.data = v ?? ''; }, true));
+    _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [on], () => on(), `<b><!----> <!----></b>`, (_c) => {
+      const b2 = _c;
+      const b3 = _c.firstChild.nextSibling;
+      b3.data = t() ?? '';
+      b2.addEventListener('click', x);
       return [
-        t.subscribe(v => { b2.nextSibling.data = v ?? ''; }, true),
+        t.subscribe(v => { b3.data = v ?? ''; }, true),
       ];
     }));
-    _subs.push(__bindIfExpr(r, [on], () => !(on()), 'b1', `<i id="b1" title="">no</i>`, () => {
-      const b1 = _gid('b1');
-      b1.setAttribute('title', u());
-      _gid('b1')?.addEventListener('click', y);
+    _subs.push(__bindIfExpr(_wm_b0, _we_b0, [on], () => !(on()), `<i title="">no</i>`, (_c) => {
+      const b4 = _c;
+      b4.setAttribute('title', u());
+      b4.addEventListener('click', y);
       return [
-        u.subscribe(v => { b1.setAttribute('title', v); }, true),
+        u.subscribe(v => { b4.setAttribute('title', v); }, true),
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template><template id="b1"></template><p><!--b3--> <!----></p>`);
+  const __tpl = _T(`<!----><!----><!----><p><!----> <!----></p>`);
 === top: whenElse with a simple signal condition ===
 --- template
-<section><template id="b0"></template><template id="b1"></template></section>
+<section><!--b0(--><!--b0|--><!--b0)--></section>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    _subs.push(__bindIfExpr(r, [flag], () => flag(), 'b0', `<b id="b0">yes</b>`, () => []));
-    _subs.push(__bindIfExpr(r, [flag], () => !(flag()), 'b1', `<i id="b1">no</i>`, () => []));
+    const _ws_b0 = _ns[0].firstChild;
+    const _wm_b0 = _ws_b0.nextSibling;
+    const _we_b0 = _wm_b0.nextSibling;
+    _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [flag], () => flag(), `<b>yes</b>`, () => []));
+    _subs.push(__bindIfExpr(_wm_b0, _we_b0, [flag], () => !(flag()), `<i>no</i>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<section><template id="b0"></template><template id="b1"></template></section>`);
+  const __tpl = _T(`<section><!----><!----><!----></section>`);
 === nested: when simple and expression, whenElse and a list inside a when ===
 --- template
-<template id="b0"></template>
+<!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    _subs.push(__bindIf(r, outer, 'b0', `<section id="b0"><template id="b1"></template><template id="b3"></template><template id="b5"></template><template id="b6"></template><ul><template id="b8"></template></ul></section>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, outer, `<section><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></section>`, (_c) => {
+      const _a_b8 = _c.lastChild.lastChild;
+      const _ws_b1 = _c.firstChild;
+      const _we_b1 = _ws_b1.nextSibling;
+      const _ws_b3 = _we_b1.nextSibling;
+      const _we_b3 = _ws_b3.nextSibling;
+      const _ws_b5 = _we_b3.nextSibling;
+      const _wm_b5 = _ws_b5.nextSibling;
+      const _we_b5 = _wm_b5.nextSibling;
       const _rsubs_b8 = [];
       { const _subs = _rsubs_b8;
       const _tc_b8 = __tpl_b8.content.firstElementChild;
-      const _a_b8 = _gid('b8');
       const _ct_b8 = _a_b8.parentNode;
       const _bind_b8 = (_el, item, _idx) => {
           const _e0 = _el;
@@ -162,57 +164,56 @@
       _subs.push(() => _rc_b8.clearAll());
       }
       return [
-        __bindIf(r, inner, 'b1', `<div id="b1"><!--b2--> <!----></div>`, () => {
-      const _wcm = _fcm(r);
-      const b2 = _wcm['b2'];
-      b2.nextSibling.data = x() ?? '';
+        __bindIf(_ws_b1, _we_b1, inner, `<div><!----> <!----></div>`, (_c) => {
+      const b2 = _c.firstChild.nextSibling;
+      b2.data = x() ?? '';
       return [
-        x.subscribe(v => { b2.nextSibling.data = v ?? ''; }, true),
+        x.subscribe(v => { b2.data = v ?? ''; }, true),
       ];
     }),
-        __bindIfExpr(r, [p, q], () => p() || q(), 'b3', `<div id="b3"><b><!--b4--> <!----></b></div>`, () => {
-      const _wcm = _fcm(r);
-      const b4 = _wcm['b4'];
-      b4.nextSibling.data = y() ?? '';
+        __bindIfExpr(_ws_b3, _we_b3, [p, q], () => p() || q(), `<div><b><!----> <!----></b></div>`, (_c) => {
+      const b4 = _c.lastChild.firstChild.nextSibling;
+      b4.data = y() ?? '';
       return [
-        y.subscribe(v => { b4.nextSibling.data = v ?? ''; }, true),
+        y.subscribe(v => { b4.data = v ?? ''; }, true),
       ];
     }),
-        __bindIfExpr(r, [z], () => z(), 'b5', `<u id="b5"><!--b7--> <!----></u>`, () => {
-      const _wcm = _fcm(r);
-      const b7 = _wcm['b7'];
-      b7.nextSibling.data = t() ?? '';
+        __bindIfExpr(_ws_b5, _wm_b5, [z], () => z(), `<u><!----> <!----></u>`, (_c) => {
+      const b7 = _c.firstChild.nextSibling;
+      b7.data = t() ?? '';
       return [
-        t.subscribe(v => { b7.nextSibling.data = v ?? ''; }, true),
+        t.subscribe(v => { b7.data = v ?? ''; }, true),
       ];
     }),
-        __bindIfExpr(r, [z], () => !(z()), 'b6', `<s id="b6">none</s>`, () => []),
+        __bindIfExpr(_wm_b5, _we_b5, [z], () => !(z()), `<s>none</s>`, () => []),
         () => { for (let i = 0; i < _rsubs_b8.length; i++) _rsubs_b8[i](); },
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template>`);
+  const __tpl = _T(`<!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b8 = _T(`<li></li>`);
 === nested: expression bindings inside a when and a whenElse branch ===
 --- template
-<template id="b0"></template><template id="b3"></template><template id="b4"></template>
+<!--b0(--><!--b0)--><!--b3(--><!--b3|--><!--b3)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><b id="b1" title=""><!--b2--> <!----></b></div>`, () => {
-      const _wcm = _fcm(r);
-      const b1 = _gid('b1');
-      const b2 = _wcm['b2'];
+    const _ws_b0 = r.lastChild.previousSibling.previousSibling.previousSibling.previousSibling;
+    const _we_b0 = _ws_b0.nextSibling;
+    const _ws_b3 = _we_b0.nextSibling;
+    const _wm_b3 = _ws_b3.nextSibling;
+    const _we_b3 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><b title=""><!----> <!----></b></div>`, (_c) => {
+      const b1 = _c.lastElementChild;
+      const b2 = b1.firstChild.nextSibling;
       let _pv_b1_0; const _upd_b1_0 = () => { if (_pv_b1_0 !== (_pv_b1_0 = `${x()}-${y()}`)) b1.setAttribute('title', _pv_b1_0); };
       _upd_b1_0();
-      let _pv_b2_1; const _upd_b2_1 = () => { if (_pv_b2_1 !== (_pv_b2_1 = x() + y())) b2.nextSibling.data = (_pv_b2_1) ?? ''; };
+      let _pv_b2_1; const _upd_b2_1 = () => { if (_pv_b2_1 !== (_pv_b2_1 = x() + y())) b2.data = (_pv_b2_1) ?? ''; };
       _upd_b2_1();
       return [
         x.subscribe(_upd_b1_0, true),
@@ -221,37 +222,44 @@
         y.subscribe(_upd_b2_1, true),
       ];
     }));
-    _subs.push(__bindIfExpr(r, [c], () => c(), 'b3', `<i id="b3" style="width: "><!--b5--> <!----></i>`, () => {
-      const _wcm = _fcm(r);
-      const b3 = _gid('b3');
-      const b5 = _wcm['b5'];
-      let _pv_b3_0; const _upd_b3_0 = () => { if (_pv_b3_0 !== (_pv_b3_0 = `${w() * 2}px`)) b3.style.setProperty('width', _pv_b3_0); };
-      _upd_b3_0();
-      let _pv_b5_1; const _upd_b5_1 = () => { if (_pv_b5_1 !== (_pv_b5_1 = w() + 1)) b5.nextSibling.data = (_pv_b5_1) ?? ''; };
-      _upd_b5_1();
+    _subs.push(__bindIfExpr(_ws_b3, _wm_b3, [c], () => c(), `<i style="width: "><!----> <!----></i>`, (_c) => {
+      const b5 = _c;
+      const b6 = _c.firstChild.nextSibling;
+      let _pv_b5_0; const _upd_b5_0 = () => { if (_pv_b5_0 !== (_pv_b5_0 = `${w() * 2}px`)) b5.style.setProperty('width', _pv_b5_0); };
+      _upd_b5_0();
+      let _pv_b6_1; const _upd_b6_1 = () => { if (_pv_b6_1 !== (_pv_b6_1 = w() + 1)) b6.data = (_pv_b6_1) ?? ''; };
+      _upd_b6_1();
       return [
-        w.subscribe(_upd_b3_0, true),
-        w.subscribe(_upd_b5_1, true),
+        w.subscribe(_upd_b5_0, true),
+        w.subscribe(_upd_b6_1, true),
       ];
     }));
-    _subs.push(__bindIfExpr(r, [c], () => !(c()), 'b4', `<s id="b4">n</s>`, () => []));
+    _subs.push(__bindIfExpr(_wm_b3, _we_b3, [c], () => !(c()), `<s>n</s>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template><template id="b3"></template><template id="b4"></template>`);
+  const __tpl = _T(`<!----><!----><!----><!----><!---->`);
 === nested: directives inside whenElse branches, events in a branch list ===
 --- template
-<template id="b0"></template><template id="b1"></template>
+<!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    _subs.push(__bindIfExpr(r, [mode], () => mode(), 'b0', `<div id="b0"><template id="b2"></template><template id="b4"></template><template id="b5"></template><template id="b6"></template><ul><template id="b8"></template></ul></div>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _wm_b0 = _ws_b0.nextSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [mode], () => mode(), `<div><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
+      const _a_b8 = _c.lastChild.lastChild;
+      const _ws_b2 = _c.firstChild;
+      const _we_b2 = _ws_b2.nextSibling;
+      const _ws_b4 = _we_b2.nextSibling;
+      const _we_b4 = _ws_b4.nextSibling;
+      const _ws_b5 = _we_b4.nextSibling;
+      const _wm_b5 = _ws_b5.nextSibling;
+      const _we_b5 = _wm_b5.nextSibling;
       const _rsubs_b8 = [];
       { const _subs = _rsubs_b8;
       const _tc_b8 = __tpl_b8.content.firstElementChild;
-      const _a_b8 = _gid('b8');
       const _ct_b8 = _a_b8.parentNode;
       const _bind_b8 = (_el, item, _idx) => {
           _el.__d = item;
@@ -275,32 +283,30 @@
       _ct_b8.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b8) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; pick(item); });
       }
       return [
-        __bindIf(r, deep, 'b2', `<p id="b2"><!--b3--> <!----></p>`, () => {
-      const _wcm = _fcm(r);
-      const b3 = _wcm['b3'];
-      b3.nextSibling.data = d() ?? '';
+        __bindIf(_ws_b2, _we_b2, deep, `<p><!----> <!----></p>`, (_c) => {
+      const b3 = _c.firstChild.nextSibling;
+      b3.data = d() ?? '';
       return [
-        d.subscribe(v => { b3.nextSibling.data = v ?? ''; }, true),
+        d.subscribe(v => { b3.data = v ?? ''; }, true),
       ];
     }),
-        __bindIfExpr(r, [d], () => d() > 1, 'b4', `<p id="b4">many</p>`, () => []),
-        __bindIfExpr(r, [k], () => k(), 'b5', `<em id="b5"><!--b7--> <!----></em>`, () => {
-      const _wcm = _fcm(r);
-      const b7 = _wcm['b7'];
-      b7.nextSibling.data = e1() ?? '';
+        __bindIfExpr(_ws_b4, _we_b4, [d], () => d() > 1, `<p>many</p>`, () => []),
+        __bindIfExpr(_ws_b5, _wm_b5, [k], () => k(), `<em><!----> <!----></em>`, (_c) => {
+      const b7 = _c.firstChild.nextSibling;
+      b7.data = e1() ?? '';
       return [
-        e1.subscribe(v => { b7.nextSibling.data = v ?? ''; }, true),
+        e1.subscribe(v => { b7.data = v ?? ''; }, true),
       ];
     }),
-        __bindIfExpr(r, [k], () => !(k()), 'b6', `<em id="b6">b</em>`, () => []),
+        __bindIfExpr(_wm_b5, _we_b5, [k], () => !(k()), `<em>b</em>`, () => []),
         () => { for (let i = 0; i < _rsubs_b8.length; i++) _rsubs_b8[i](); },
       ];
     }));
-    _subs.push(__bindIfExpr(r, [mode], () => !(mode()), 'b1', `<div id="b1"><ol><template id="b11"></template></ol></div>`, () => {
+    _subs.push(__bindIfExpr(_wm_b0, _we_b0, [mode], () => !(mode()), `<div><ol><!----></ol></div>`, (_c) => {
+      const _a_b11 = _c.lastChild.lastChild;
       const _rsubs_b11 = [];
       { const _subs = _rsubs_b11;
       const _tc_b11 = __tpl_b11.content.firstElementChild;
-      const _a_b11 = _gid('b11');
       const _ct_b11 = _a_b11.parentNode;
       const _bind_b11 = (_el, item, _idx) => {
           const _e0 = _el;
@@ -331,7 +337,7 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template><template id="b1"></template>`);
+  const __tpl = _T(`<!----><!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
@@ -339,92 +345,100 @@
   const __tpl_b11 = _T(`<li></li>`);
 === nested: whenElse inside a whenElse branch inside a when ===
 --- template
-<template id="b0"></template>
+<!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><template id="b1"></template><template id="b2"></template></div>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
+      const _ws_b1 = _c.firstChild;
+      const _wm_b1 = _ws_b1.nextSibling;
+      const _we_b1 = _c.lastChild;
       return [
-        __bindIfExpr(r, [b], () => b(), 'b1', `<div id="b1"><template id="b3"></template><template id="b4"></template></div>`, () => {
+        __bindIfExpr(_ws_b1, _wm_b1, [b], () => b(), `<div><!----><!----><!----></div>`, (_c) => {
+      const _ws_b3 = _c.firstChild;
+      const _wm_b3 = _ws_b3.nextSibling;
+      const _we_b3 = _c.lastChild;
       return [
-        __bindIfExpr(r, [c], () => c(), 'b3', `<b id="b3"><!--b5--> <!----></b>`, () => {
-      const _wcm = _fcm(r);
-      const b5 = _wcm['b5'];
-      b5.nextSibling.data = t() ?? '';
+        __bindIfExpr(_ws_b3, _wm_b3, [c], () => c(), `<b><!----> <!----></b>`, (_c) => {
+      const b5 = _c.firstChild.nextSibling;
+      b5.data = t() ?? '';
       return [
-        t.subscribe(v => { b5.nextSibling.data = v ?? ''; }, true),
+        t.subscribe(v => { b5.data = v ?? ''; }, true),
       ];
     }),
-        __bindIfExpr(r, [c], () => !(c()), 'b4', `<i id="b4">x</i>`, () => {
-      _gid('b4')?.addEventListener('click', go);
+        __bindIfExpr(_wm_b3, _we_b3, [c], () => !(c()), `<i>x</i>`, (_c) => {
+      const b6 = _c;
+      b6.addEventListener('click', go);
       return [
       ];
     }),
       ];
     }),
-        __bindIfExpr(r, [b], () => !(b()), 'b2', `<p id="b2">n</p>`, () => []),
+        __bindIfExpr(_wm_b1, _we_b1, [b], () => !(b()), `<p>n</p>`, () => []),
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template>`);
+  const __tpl = _T(`<!----><!---->`);
 === walkers: text only in a whenElse nested in a when (comment factory without _cm) ===
 --- template
-<template id="b0"></template>
+<!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><template id="b1"></template><template id="b2"></template></div>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
+      const _ws_b1 = _c.firstChild;
+      const _wm_b1 = _ws_b1.nextSibling;
+      const _we_b1 = _c.lastChild;
       return [
-        __bindIfExpr(r, [b], () => b(), 'b1', `<b id="b1"><!--b3--> <!----></b>`, () => {
-      const _wcm = _fcm(r);
-      const b3 = _wcm['b3'];
-      b3.nextSibling.data = t() ?? '';
+        __bindIfExpr(_ws_b1, _wm_b1, [b], () => b(), `<b><!----> <!----></b>`, (_c) => {
+      const b3 = _c.firstChild.nextSibling;
+      b3.data = t() ?? '';
       return [
-        t.subscribe(v => { b3.nextSibling.data = v ?? ''; }, true),
+        t.subscribe(v => { b3.data = v ?? ''; }, true),
       ];
     }),
-        __bindIfExpr(r, [b], () => !(b()), 'b2', `<i id="b2">x</i>`, () => []),
+        __bindIfExpr(_wm_b1, _we_b1, [b], () => !(b()), `<i>x</i>`, () => []),
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template>`);
+  const __tpl = _T(`<!----><!---->`);
 === walkers: text only in a row-level when inside a when (no comment factory) ===
 --- template
-<template id="b0"></template>
+<!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><ul><template id="b1"></template></ul></div>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><ul><!----></ul></div>`, (_c) => {
+      const _a_b1 = _c.lastChild.lastChild;
       const _rsubs_b1 = [];
       { const _subs = _rsubs_b1;
       const _tc_b1 = __tpl_b1.content.firstElementChild;
-      const _a_b1 = _gid('b1');
       const _ct_b1 = _a_b1.parentNode;
       const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
         (item, _idx, _ref) => {
           const _el = _cloneNode.call(_tc_b1, true);
+          const _ws_b2 = _el.firstChild;
+          const _we_b2 = _el.lastChild;
           ;
           _insertBefore.call(_ct_b1, _el, _ref);
           const _cleanups = [];
-          const _cond_b2 = _el.firstElementChild;
-          _cleanups.push(__bindIf(r, on, 'b2', `<span id="b2"><!--b3--> <!----></span>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
-  const _rcm = {}; { const _w = document.createTreeWalker(_c || document, 128); let _n; while (_n = _w.nextNode()) _rcm[_n.data] = _n; }
-  const _n_b3 = _rcm['b3'];
-  if (_n_b3) _n_b3.nextSibling.data = lbl() ?? '';
+          _cleanups.push(__bindIf(_ws_b2, _we_b2, on, `<span><!----> <!----></span>`, (_c) => {
+  const _n_b3 = _c.firstChild.nextSibling;
+  _n_b3.data = lbl() ?? '';
   const _nsubs = [];
-  _nsubs.push(lbl.subscribe(v => { if (_n_b3) _n_b3.nextSibling.data = v ?? ''; }, true));
+  _nsubs.push(lbl.subscribe(v => { _n_b3.data = v ?? ''; }, true));
   return _nsubs;
-}, _cond_b2));
+}));
           return { el: _el, cleanups: _cleanups, value: item,
             update: (item) => { ; } };
         },
@@ -442,38 +456,40 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template>`);
+  const __tpl = _T(`<!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b1 = _T(`<li><template></template></li>`);
+  const __tpl_b1 = _T(`<li><!----><!----></li>`);
 === walkers: text only inside a whenElse branch list (no comment factory) ===
 --- template
-<template id="b0"></template><template id="b1"></template>
+<!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    _subs.push(__bindIfExpr(r, [a], () => a(), 'b0', `<ul id="b0"><template id="b2"></template></ul>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _wm_b0 = _ws_b0.nextSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [a], () => a(), `<ul><!----></ul>`, (_c) => {
+      const _a_b2 = _c.lastChild;
       const _rsubs_b2 = [];
       { const _subs = _rsubs_b2;
       const _tc_b2 = __tpl_b2.content.firstElementChild;
-      const _a_b2 = _gid('b2');
       const _ct_b2 = _a_b2.parentNode;
       const _rc_b2 = createKeyedReconciler(_ct_b2, _a_b2,
         (item, _idx, _ref) => {
           const _el = _cloneNode.call(_tc_b2, true);
-          const _icm = {}; { const _tw = document.createTreeWalker(_el, 128); let _cn; while (_cn = _tw.nextNode()) _icm[_cn.data] = _cn; };
-          const _c0 = _icm['i4']?.nextSibling;
+          const _c0 = _el.firstChild.nextSibling;
+          const _st0 = _el.lastChild.previousSibling;
           let _p0;
           ;
-          if (_c0) _c0.data = (_p0 = item) ?? '';
-          if (_icm['b3']) _icm['b3'].nextSibling.data = sig() ?? '';
+          _c0.data = (_p0 = item) ?? '';
+          _st0.data = sig() ?? '';
           _insertBefore.call(_ct_b2, _el, _ref);
           const _cleanups = [];
-          _cleanups.push(sig.subscribe(() => { if (_icm['b3']) _icm['b3'].nextSibling.data = sig() ?? ''; }, true));
+          _cleanups.push(sig.subscribe(() => { _st0.data = sig() ?? ''; }, true));
           return { el: _el, cleanups: _cleanups, value: item,
-            update: (item) => { if (_c0) if (_p0 !== (_p0 = item)) _c0.data = (_p0) ?? ''; } };
+            update: (item) => { if (_p0 !== (_p0 = item)) _c0.data = (_p0) ?? ''; } };
         },
       (_, i) => i);
       const _items_b2 = () => xs();
@@ -486,120 +502,137 @@
         () => { for (let i = 0; i < _rsubs_b2.length; i++) _rsubs_b2[i](); },
       ];
     }));
-    _subs.push(__bindIfExpr(r, [a], () => !(a()), 'b1', `<p id="b1">none</p>`, () => []));
+    _subs.push(__bindIfExpr(_wm_b0, _we_b0, [a], () => !(a()), `<p>none</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template><template id="b1"></template>`);
+  const __tpl = _T(`<!----><!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b2 = _T(`<li><!--i4--> <!----><!--b3--> <!----></li>`);
+  const __tpl_b2 = _T(`<li><!----> <!----><!----> <!----></li>`);
 === walkers: events in a when, in a whenElse inside a when, and in rows ===
 --- template
-<template id="b0"></template><ul><template id="b8"></template></ul><template id="b6"></template><template id="b7"></template>
+<!--b0(--><!--b0)--><ul><!--b12.--></ul><!--b9(--><!--b9|--><!--b9)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><button id="b5">1</button><template id="b1"></template><template id="b2"></template><ul><template id="b3"></template></ul></div>`, () => {
-      _gid('b5')?.addEventListener('click', one);
-      const _rsubs_b3 = [];
-      { const _subs = _rsubs_b3;
-      const _tc_b3 = __tpl_b3.content.firstElementChild;
-      const _a_b3 = _gid('b3');
-      const _ct_b3 = _a_b3.parentNode;
-      const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
+    const _ws_b0 = _ns[0].previousSibling.previousSibling;
+    const _we_b0 = _ws_b0.nextSibling;
+    const _ws_b9 = _ns[0].nextSibling;
+    const _wm_b9 = _ws_b9.nextSibling;
+    const _we_b9 = r.lastChild;
+    const _a_b12 = _ns[0].lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><button>1</button><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
+      const b8 = _c.firstElementChild;
+      const _a_b5 = _c.lastChild.lastChild;
+      const _ws_b1 = b8.nextSibling;
+      const _wm_b1 = _ws_b1.nextSibling;
+      const _we_b1 = _wm_b1.nextSibling;
+      b8.addEventListener('click', one);
+      const _rsubs_b5 = [];
+      { const _subs = _rsubs_b5;
+      const _tc_b5 = __tpl_b5.content.firstElementChild;
+      const _ct_b5 = _a_b5.parentNode;
+      const _rc_b5 = createKeyedReconciler(_ct_b5, _a_b5,
         (item, _idx, _ref) => {
-          const _el = _cloneNode.call(_tc_b3, true);
+          const _el = _cloneNode.call(_tc_b5, true);
+          const _ws_b6 = _el.firstChild;
+          const _we_b6 = _el.lastChild;
           ;
-          _insertBefore.call(_ct_b3, _el, _ref);
+          _insertBefore.call(_ct_b5, _el, _ref);
           const _cleanups = [];
-          const _cond_b4 = _el.firstElementChild;
-          _cleanups.push(__bindIf(r, on, 'b4', `<button id="b4">b</button>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
+          _cleanups.push(__bindIf(_ws_b6, _we_b6, on, `<button>b</button>`, (_c) => {
+  const _n_b7 = _c;
   const _nsubs = [];
-  _q('b4')?.addEventListener('click', go);
+  _n_b7.addEventListener('click', go);
   return _nsubs;
-}, _cond_b4));
+}));
           return { el: _el, cleanups: _cleanups, value: item,
             update: (item) => { ; } };
         },
       (_, i) => i);
-      const _items_b3 = () => xs();
-      _rc_b3.reconcile(_items_b3());
-      const _rsrc_b3_0 = xs;
-      _subs.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
-      _subs.push(() => _rc_b3.clearAll());
+      const _items_b5 = () => xs();
+      _rc_b5.reconcile(_items_b5());
+      const _rsrc_b5_0 = xs;
+      _subs.push(typeof _rsrc_b5_0?.subscribe === 'function' ? _rsrc_b5_0.subscribe(() => { _rc_b5.reconcile(_items_b5()); }, true) : () => {});
+      _subs.push(() => _rc_b5.clearAll());
       }
       return [
-        __bindIfExpr(r, [b], () => b(), 'b1', `<b id="b1">2</b>`, () => {
-      _gid('b1')?.addEventListener('click', two);
+        __bindIfExpr(_ws_b1, _wm_b1, [b], () => b(), `<b>2</b>`, (_c) => {
+      const b3 = _c;
+      b3.addEventListener('click', two);
       return [
       ];
     }),
-        __bindIfExpr(r, [b], () => !(b()), 'b2', `<i id="b2">3</i>`, () => {
-      _gid('b2')?.addEventListener('click', three);
+        __bindIfExpr(_wm_b1, _we_b1, [b], () => !(b()), `<i>3</i>`, (_c) => {
+      const b4 = _c;
+      b4.addEventListener('click', three);
       return [
       ];
     }),
-        () => { for (let i = 0; i < _rsubs_b3.length; i++) _rsubs_b3[i](); },
+        () => { for (let i = 0; i < _rsubs_b5.length; i++) _rsubs_b5[i](); },
       ];
     }));
-    _subs.push(__bindIfExpr(r, [c], () => c(), 'b6', `<u id="b6">5</u>`, () => {
-      _gid('b6')?.addEventListener('click', five);
+    _subs.push(__bindIfExpr(_ws_b9, _wm_b9, [c], () => c(), `<u>5</u>`, (_c) => {
+      const b11 = _c;
+      b11.addEventListener('click', five);
       return [
       ];
     }));
-    _subs.push(__bindIfExpr(r, [c], () => !(c()), 'b7', `<s id="b7">6</s>`, () => []));
-    const _tc_b8 = __tpl_b8.content.firstElementChild;
-    const _a_b8 = _gid('b8');
-    const _ct_b8 = _a_b8.parentNode;
-    const _rc_b8 = createKeyedReconciler(_ct_b8, _a_b8,
+    _subs.push(__bindIfExpr(_wm_b9, _we_b9, [c], () => !(c()), `<s>6</s>`, () => []));
+    const _tc_b12 = __tpl_b12.content.firstElementChild;
+    const _ct_b12 = _a_b12.parentNode;
+    const _rc_b12 = createKeyedReconciler(_ct_b12, _a_b12,
       (item, _idx, _ref) => {
-        const _el = _cloneNode.call(_tc_b8, true);
+        const _el = _cloneNode.call(_tc_b12, true);
+        const _ws_b13 = _el.firstChild;
+        const _we_b13 = _el.lastChild;
         ;
-        _insertBefore.call(_ct_b8, _el, _ref);
+        _insertBefore.call(_ct_b12, _el, _ref);
         const _cleanups = [];
-        const _cond_b9 = _el.firstElementChild;
-        _cleanups.push(__bindIf(r, on, 'b9', `<p id="b9"><button id="b10">4</button></p>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
+        _cleanups.push(__bindIf(_ws_b13, _we_b13, on, `<p><button>4</button></p>`, (_c) => {
+  const _n_b14 = _c.lastElementChild;
   const _nsubs = [];
-  _q('b10')?.addEventListener('click', four);
+  _n_b14.addEventListener('click', four);
   return _nsubs;
-}, _cond_b9));
+}));
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { ; } };
       },
     (_, i) => i);
-    const _items_b8 = () => ys();
-    _rc_b8.reconcile(_items_b8());
-    const _rsrc_b8_0 = ys;
-    _subs.push(typeof _rsrc_b8_0?.subscribe === 'function' ? _rsrc_b8_0.subscribe(() => { _rc_b8.reconcile(_items_b8()); }, true) : () => {});
-    _subs.push(() => _rc_b8.clearAll());
+    const _items_b12 = () => ys();
+    _rc_b12.reconcile(_items_b12());
+    const _rsrc_b12_0 = ys;
+    _subs.push(typeof _rsrc_b12_0?.subscribe === 'function' ? _rsrc_b12_0.subscribe(() => { _rc_b12.reconcile(_items_b12()); }, true) : () => {});
+    _subs.push(() => _rc_b12.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template><ul><template id="b8"></template></ul><template id="b6"></template><template id="b7"></template>`);
+  const __tpl = _T(`<!----><!----><ul><!----></ul><!----><!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b3 = _T(`<li><template></template></li>`);
-  const __tpl_b8 = _T(`<li><template></template></li>`);
+  const __tpl_b5 = _T(`<li><!----><!----></li>`);
+  const __tpl_b12 = _T(`<li><!----><!----></li>`);
 === walkers: a list only inside a whenElse inside a when (prototype caches) ===
 --- template
-<template id="b0"></template>
+<!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><template id="b1"></template><template id="b2"></template></div>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
+      const _ws_b1 = _c.firstChild;
+      const _wm_b1 = _ws_b1.nextSibling;
+      const _we_b1 = _c.lastChild;
       return [
-        __bindIfExpr(r, [b], () => b(), 'b1', `<ul id="b1"><template id="b3"></template></ul>`, () => {
+        __bindIfExpr(_ws_b1, _wm_b1, [b], () => b(), `<ul><!----></ul>`, (_c) => {
+      const _a_b3 = _c.lastChild;
       const _rsubs_b3 = [];
       { const _subs = _rsubs_b3;
       const _tc_b3 = __tpl_b3.content.firstElementChild;
-      const _a_b3 = _gid('b3');
       const _ct_b3 = _a_b3.parentNode;
       const _bind_b3 = (_el, item, _idx) => {
           const _e0 = _el;
@@ -624,31 +657,35 @@
         () => { for (let i = 0; i < _rsubs_b3.length; i++) _rsubs_b3[i](); },
       ];
     }),
-        __bindIfExpr(r, [b], () => !(b()), 'b2', `<p id="b2">n</p>`, () => []),
+        __bindIfExpr(_wm_b1, _we_b1, [b], () => !(b()), `<p>n</p>`, () => []),
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template>`);
+  const __tpl = _T(`<!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b3 = _T(`<li></li>`);
 === walkers: a list only inside a when inside a whenElse (prototype caches) ===
 --- template
-<template id="b0"></template><template id="b1"></template>
+<!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    _subs.push(__bindIfExpr(r, [b], () => b(), 'b0', `<div id="b0"><template id="b2"></template></div>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _wm_b0 = _ws_b0.nextSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [b], () => b(), `<div><!----><!----></div>`, (_c) => {
+      const _ws_b2 = _c.firstChild;
+      const _we_b2 = _c.lastChild;
       return [
-        __bindIf(r, a, 'b2', `<div id="b2"><ul><template id="b3"></template></ul></div>`, () => {
+        __bindIf(_ws_b2, _we_b2, a, `<div><ul><!----></ul></div>`, (_c) => {
+      const _a_b3 = _c.lastChild.lastChild;
       const _rsubs_b3 = [];
       { const _subs = _rsubs_b3;
       const _tc_b3 = __tpl_b3.content.firstElementChild;
-      const _a_b3 = _gid('b3');
       const _ct_b3 = _a_b3.parentNode;
       const _bind_b3 = (_el, item, _idx) => {
           const _e0 = _el;
@@ -675,48 +712,48 @@
     }),
       ];
     }));
-    _subs.push(__bindIfExpr(r, [b], () => !(b()), 'b1', `<p id="b1">n</p>`, () => []));
+    _subs.push(__bindIfExpr(_wm_b0, _we_b0, [b], () => !(b()), `<p>n</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template><template id="b1"></template>`);
+  const __tpl = _T(`<!----><!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b3 = _T(`<li></li>`);
 === walkers: no list anywhere (no prototype caches) ===
 --- template
-<template id="b0"></template>
+<!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><template id="b1"></template><template id="b2"></template></div>`, () => {
+    const _ws_b0 = r.lastChild.previousSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
+      const _ws_b1 = _c.firstChild;
+      const _wm_b1 = _ws_b1.nextSibling;
+      const _we_b1 = _c.lastChild;
       return [
-        __bindIfExpr(r, [b], () => b(), 'b1', `<b id="b1"><!--b3--> <!----></b>`, () => {
-      const _wcm = _fcm(r);
-      const b3 = _wcm['b3'];
-      b3.nextSibling.data = t() ?? '';
+        __bindIfExpr(_ws_b1, _wm_b1, [b], () => b(), `<b><!----> <!----></b>`, (_c) => {
+      const b3 = _c.firstChild.nextSibling;
+      b3.data = t() ?? '';
       return [
-        t.subscribe(v => { b3.nextSibling.data = v ?? ''; }, true),
+        t.subscribe(v => { b3.data = v ?? ''; }, true),
       ];
     }),
-        __bindIfExpr(r, [b], () => !(b()), 'b2', `<i id="b2">x</i>`, () => []),
+        __bindIfExpr(_wm_b1, _we_b1, [b], () => !(b()), `<i>x</i>`, () => []),
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template>`);
+  const __tpl = _T(`<!----><!---->`);
 === rows: direct child component, no empty template, key property ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _a_b0 = _gid('b0');
+    const _a_b0 = _ns[0].lastChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
@@ -733,18 +770,16 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
 === rows: direct child component with index, empty template and key function ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _a_b0 = _gid('b0');
+    const _a_b0 = _ns[0].lastChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, n, _ref) => {
@@ -764,18 +799,16 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
 === rows: direct child component over a derived source ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _a_b0 = _gid('b0');
+    const _a_b0 = _ns[0].lastChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
@@ -794,19 +827,17 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
 === rows: template rows, no key, empty template ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _bind_b0 = (_el, item, _idx) => {
         const _e0 = _el;
@@ -832,20 +863,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li></li>`);
 === rows: template rows over a derived source with an empty template and key property ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _bind_b0 = (_el, item, _idx) => {
         const _e0 = _el;
@@ -873,20 +902,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li></li>`);
 === rows: template rows over a member source ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _bind_b0 = (_el, item, _idx) => {
         const _e0 = _el;
@@ -909,20 +936,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li title=""></li>`);
 === rows: no bindings, no key, no empty template ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
@@ -939,20 +964,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li>static</li>`);
 === rows: no bindings, empty template and key property ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
@@ -972,20 +995,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li>static</li>`);
 === rows: no bindings over a derived source, key function ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
@@ -1004,28 +1025,24 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li>static</li>`);
 === rows: no bindings with a child mount and a named index ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, i, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
+        const _cm0 = _el.lastElementChild;
         _insertBefore.call(_ct_b0, _el, _ref);
-        const _cm0 = document.createElement('x-kid');
-        const _cma0 = (_el.id === 'b900' ? _el : _el.querySelector('#b900'));
-        if (_cma0) _cma0.replaceWith(_cm0);
         return { el: _el, cleanups: [__dc(Kid.__f(_cm0, { label: item.name, i }))], value: item, update: () => {} };
       },
     (_, i) => i);
@@ -1037,28 +1054,24 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><template id="b900"></template></li>`);
+  const __tpl_b0 = _T(`<li><x-kid></x-kid></li>`);
 === rows: no bindings with a child mount, empty template ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
+        const _cm0 = _el.lastElementChild;
         _insertBefore.call(_ct_b0, _el, _ref);
-        const _cm0 = document.createElement('x-kid');
-        const _cma0 = (_el.id === 'b900' ? _el : _el.querySelector('#b900'));
-        if (_cma0) _cma0.replaceWith(_cm0);
         return { el: _el, cleanups: [__dc(Kid.__f(_cm0, { it: item }))], value: item, update: () => {} };
       },
     (_, i) => i);
@@ -1073,34 +1086,28 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><template id="b900"></template></li>`);
+  const __tpl_b0 = _T(`<li><x-kid></x-kid></li>`);
 === rows: bindings with two child mounts ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
+        const _cm0 = _el.firstElementChild.nextElementSibling;
+        const _cm1 = _el.lastElementChild;
         let _p0;
         _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
         _insertBefore.call(_ct_b0, _el, _ref);
-        const _cm0 = document.createElement('x-kid');
-        const _cma0 = (_el.id === 'b900' ? _el : _el.querySelector('#b900'));
-        if (_cma0) _cma0.replaceWith(_cm0);
-        const _cm1 = document.createElement('x-other');
-        const _cma1 = (_el.id === 'b901' ? _el : _el.querySelector('#b901'));
-        if (_cma1) _cma1.replaceWith(_cm1);
         const _cleanups = [];
         _cleanups.push(__dc(Kid.__f(_cm0, { it: item })));
         _cleanups.push(__dc(Other.__f(_cm1, {})));
@@ -1116,64 +1123,80 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><span></span><template id="b900"></template><template id="b901"></template></li>`);
+  const __tpl_b0 = _T(`<li><span></span><x-kid></x-kid><x-other></x-other></li>`);
 === mounts: child mount inside a when ===
 --- template
-<template id="b0"></template>
+<!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><template id="b900"></template><b><!--b1--> <!----></b></div>`, () => {
-      const _wcm = _fcm(r);
-      const b1 = _wcm['b1'];
-      b1.nextSibling.data = t() ?? '';
-      const _cm0 = document.createElement('x-kid');
-      const _cma0 = _gid('b900');
-      if (_cma0) _cma0.replaceWith(_cm0);
+    const _ws_b0 = r.lastChild.previousSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><x-kid></x-kid><b><!----> <!----></b></div>`, (_c) => {
+      const _cm0 = _c.firstElementChild;
+      const b1 = _c.lastChild.firstChild.nextSibling;
+      b1.data = t() ?? '';
       return [
-        t.subscribe(v => { b1.nextSibling.data = v ?? ''; }, true),
+        t.subscribe(v => { b1.data = v ?? ''; }, true),
         __dc(Kid.__f(_cm0, { x: t() })),
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template>`);
+  const __tpl = _T(`<!----><!---->`);
+=== mounts: child hosts in the template, and comment anchors where the parser keeps no element ===
+--- template
+<div><p><x-kid data-thane-ref="b900"></x-kid></p><table><tr><td><!--b0--> <!----></td><!--b901.--></tr></table><svg><!--b902.--></svg></div>
+--- binding function body
+    const _subs = [];
+    const b0 = _ns[6].firstChild.nextSibling;
+    const _cma1 = _ns[5].lastChild;
+    const _cma2 = _ns[7].lastChild;
+    b0.data = t() ?? '';
+    _subs.push(t.subscribe(v => { b0.data = v ?? ''; }, true));
+    _subs.push(__dc(Kid.__f(_ns[2], { x: t() })));
+    const _cm1 = document.createElement('x-cell');
+    _cma1.replaceWith(_cm1);
+    _subs.push(__dc(Cell.__f(_cm1, {})));
+    const _cm2 = document.createElement('x-icon');
+    _cma2.replaceWith(_cm2);
+    _subs.push(__dc(Icon.__f(_cm2, {})));
+    return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
+--- static templates
+  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
+  const __tpl = _T(`<div><p><x-kid></x-kid></p><table><tr><td><!----> <!----></td><!----></tr></table><svg><!----></svg></div>`);
 === mounts: child mount inside a whenElse branch ===
 --- template
-<template id="b0"></template><template id="b1"></template>
+<!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    _subs.push(__bindIfExpr(r, [a], () => a(), 'b0', `<div id="b0"><template id="b900"></template></div>`, () => {
-      const _cm0 = document.createElement('x-kid');
-      const _cma0 = _gid('b900');
-      if (_cma0) _cma0.replaceWith(_cm0);
+    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _wm_b0 = _ws_b0.nextSibling;
+    const _we_b0 = r.lastChild;
+    _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [a], () => a(), `<div><x-kid></x-kid></div>`, (_c) => {
+      const _cm0 = _c.lastElementChild;
       return [
         __dc(Kid.__f(_cm0, {})),
       ];
     }));
-    _subs.push(__bindIfExpr(r, [a], () => !(a()), 'b1', `<p id="b1">n</p>`, () => []));
+    _subs.push(__bindIfExpr(_wm_b0, _we_b0, [a], () => !(a()), `<p>n</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<template id="b0"></template><template id="b1"></template>`);
+  const __tpl = _T(`<!----><!----><!---->`);
 === rows: lean batch rows with sole-content text, attrs and a key property ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _bind_b0 = (_el, item, _idx) => {
         const _e0 = _el;
@@ -1198,34 +1221,31 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li class="" data-id=""><a></a><span></span></li>`);
 === rows: comment-marker item bindings ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _bind_b0 = (_el, item, _idx) => {
         const _e0 = _el.firstElementChild;
-        const _icm = {}; { const _tw = document.createTreeWalker(_el, 128); let _cn; while (_cn = _tw.nextNode()) _icm[_cn.data] = _cn; };
-        const _c0 = _icm['i1']?.nextSibling;
-        const _c1 = _icm['i2']?.nextSibling;
+        const _c0 = _el.firstChild.nextSibling;
+        const _c1 = _c0.nextSibling.nextSibling.nextSibling.nextSibling;
         let _p0, _p1, _p2;
         _e0.textContent = (_p0 = item.c) ?? ''; let _t0;
-        if (_c0) _c0.data = (_p1 = item.a) ?? ''; if (_c1) _c1.data = (_p2 = item.b) ?? '';
+        _c0.data = (_p1 = item.a) ?? ''; _c1.data = (_p2 = item.b) ?? '';
         return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, t0: undefined, c0: _c0, c1: _c1 };
     };
     const _update_b0 = (_m, item, _idx) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.c)) (_m.t0 ??= _el.firstElementChild.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.firstElementChild.textContent = _m.p0 ?? ''); if (_m.c0) if (_m.p1 !== (_m.p1 = item.a)) _m.c0.data = (_m.p1) ?? ''; if (_m.c1) if (_m.p2 !== (_m.p2 = item.b)) _m.c1.data = (_m.p2) ?? '';
+      if (_m.p0 !== (_m.p0 = item.c)) (_m.t0 ??= _el.firstElementChild.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.firstElementChild.textContent = _m.p0 ?? ''); if (_m.p1 !== (_m.p1 = item.a)) _m.c0.data = (_m.p1) ?? ''; if (_m.p2 !== (_m.p2 = item.b)) _m.c1.data = (_m.p2) ?? '';
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
@@ -1238,20 +1258,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><!--i1--> <!----> and <!--i2--> <!----><b></b> tail</li>`);
+  const __tpl_b0 = _T(`<li><!----> <!----> and <!----> <!----><b></b> tail</li>`);
 === rows: delegated and non-delegatable events ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _bind_b0 = (_el, item, i) => {
         _el.__d = item;
@@ -1278,20 +1296,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li><a></a><button>x</button><input></li>`);
 === rows: non-delegatable events on elements without bindings ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _bind_b0 = (_el, item, _idx) => {
         const _ev0 = _el.firstElementChild;
@@ -1315,34 +1331,31 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li><em>e</em><i>k</i></li>`);
 === rows: index bindings ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _bind_b0 = (_el, item, i) => {
         const _e0 = _el;
-        const _icm = {}; { const _tw = document.createTreeWalker(_el, 128); let _cn; while (_cn = _tw.nextNode()) _icm[_cn.data] = _cn; };
-        const _c0 = _icm['i1']?.nextSibling;
-        const _c1 = _icm['i2']?.nextSibling;
+        const _c0 = _el.firstChild.nextSibling;
+        const _c1 = _el.lastChild.previousSibling;
         let _p0, _p1, _p2;
         if ((_p0 = i) !== '') _e0.setAttribute('data-i', _p0);
-        if (_c0) _c0.data = (_p1 = i) ?? ''; if (_c1) _c1.data = (_p2 = item) ?? '';
+        _c0.data = (_p1 = i) ?? ''; _c1.data = (_p2 = item) ?? '';
         return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, c0: _c0, c1: _c1 };
     };
     const _update_b0 = (_m, item, i) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = i)) _el.setAttribute('data-i', _m.p0); if (_m.c0) if (_m.p1 !== (_m.p1 = i)) _m.c0.data = (_m.p1) ?? ''; if (_m.c1) if (_m.p2 !== (_m.p2 = item)) _m.c1.data = (_m.p2) ?? '';
+      if (_m.p0 !== (_m.p0 = i)) _el.setAttribute('data-i', _m.p0); if (_m.p1 !== (_m.p1 = i)) _m.c0.data = (_m.p1) ?? ''; if (_m.p2 !== (_m.p2 = item)) _m.c1.data = (_m.p2) ?? '';
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, i, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, i); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
@@ -1355,20 +1368,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li data-i=""><!--i1--> <!---->: <!--i2--> <!----></li>`);
+  const __tpl_b0 = _T(`<li data-i=""><!----> <!---->: <!----> <!----></li>`);
 === rows: selection binding and mixed signal-item bindings ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
@@ -1399,40 +1410,38 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li class=""><span></span><b title=""></b></li>`);
 === rows: signal attr, style and text bindings next to item comment bindings ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
-        const _icm = {}; { const _tw = document.createTreeWalker(_el, 128); let _cn; while (_cn = _tw.nextNode()) _icm[_cn.data] = _cn; };
-        const _c0 = _icm['i5']?.nextSibling;
+        const _c0 = _el.firstChild.nextSibling.nextSibling.nextSibling;
+        const _st0 = _el.lastChild.previousSibling;
         const _s0 = _el;
         const _s1 = _el;
         let _p0, _p1;
         _e0.textContent = (_p0 = item.x) ?? ''; let _t0;
-        if (_c0) _c0.data = (_p1 = item.y) ?? '';
-        _s0.setAttribute('title', tip()); _s1.style.setProperty('color', col()); if (_icm['b3']) _icm['b3'].nextSibling.data = sel() ?? '';
+        _c0.data = (_p1 = item.y) ?? '';
+        _s0.setAttribute('title', tip()); _s1.style.setProperty('color', col()); _st0.data = sel() ?? '';
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         _cleanups.push(tip.subscribe(() => { _s0.setAttribute('title', tip()); }, true));
         _cleanups.push(col.subscribe(() => { _s1.style.setProperty('color', col()); }, true));
-        _cleanups.push(sel.subscribe(() => { if (_icm['b3']) _icm['b3'].nextSibling.data = sel() ?? ''; }, true));
+        _cleanups.push(sel.subscribe(() => { _st0.data = sel() ?? ''; }, true));
         return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); if (_c0) if (_p1 !== (_p1 = item.y)) _c0.data = (_p1) ?? ''; } };
+          update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); if (_p1 !== (_p1 = item.y)) _c0.data = (_p1) ?? ''; } };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1443,33 +1452,32 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li title="" style="color: "><b></b> and <!--i5--> <!----><!--b3--> <!----></li>`);
+  const __tpl_b0 = _T(`<li title="" style="color: "><b></b> and <!----> <!----><!----> <!----></li>`);
 === rows: signal text binding without item comment bindings ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
-        const _icm = {}; { const _tw = document.createTreeWalker(_el, 128); let _cn; while (_cn = _tw.nextNode()) _icm[_cn.data] = _cn; };
+        const _st0 = _el.lastElementChild.firstChild.nextSibling;
+        const _st1 = _el.lastChild.previousSibling;
         let _p0;
         _e0.textContent = (_p0 = item.x) ?? ''; let _t0;
-        if (_icm['b1']) _icm['b1'].nextSibling.data = sel() ?? ''; if (_icm['b2']) _icm['b2'].nextSibling.data = other() ?? '';
+        _st0.data = sel() ?? ''; _st1.data = other() ?? '';
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        _cleanups.push(sel.subscribe(() => { if (_icm['b1']) _icm['b1'].nextSibling.data = sel() ?? ''; }, true));
-        _cleanups.push(other.subscribe(() => { if (_icm['b2']) _icm['b2'].nextSibling.data = other() ?? ''; }, true));
+        _cleanups.push(sel.subscribe(() => { _st0.data = sel() ?? ''; }, true));
+        _cleanups.push(other.subscribe(() => { _st1.data = other() ?? ''; }, true));
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
       },
@@ -1482,39 +1490,38 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><b></b><i><!--b1--> <!----></i><!--b2--> <!----></li>`);
+  const __tpl_b0 = _T(`<li><b></b><i><!----> <!----></i><!----> <!----></li>`);
 === rows: expression signal bindings over several signals ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
-        const _icm = {}; { const _tw = document.createTreeWalker(_el, 128); let _cn; while (_cn = _tw.nextNode()) _icm[_cn.data] = _cn; };
+        const _st0 = _el.lastChild.firstChild.nextSibling;
+        const _st1 = _el.lastChild.lastChild.previousSibling;
         const _s0 = _el;
         const _s1 = _el;
         let _p0;
         _e0.textContent = (_p0 = item.x) ?? ''; let _t0;
-        _s0.setAttribute('title', `${a()}-${b()}`); _s1.style.setProperty('height', `${h() + 1}px`); if (_icm['b3']) _icm['b3'].nextSibling.data = user().name ?? ''; if (_icm['b4']) _icm['b4'].nextSibling.data = a() + b() ?? '';
+        _s0.setAttribute('title', `${a()}-${b()}`); _s1.style.setProperty('height', `${h() + 1}px`); _st0.data = user().name ?? ''; _st1.data = a() + b() ?? '';
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         _cleanups.push(a.subscribe(() => { _s0.setAttribute('title', `${a()}-${b()}`); }, true));
         _cleanups.push(b.subscribe(() => { _s0.setAttribute('title', `${a()}-${b()}`); }, true));
         _cleanups.push(h.subscribe(() => { _s1.style.setProperty('height', `${h() + 1}px`); }, true));
-        _cleanups.push(user.subscribe(() => { if (_icm['b3']) _icm['b3'].nextSibling.data = user().name ?? ''; }, true));
-        _cleanups.push(a.subscribe(() => { if (_icm['b4']) _icm['b4'].nextSibling.data = a() + b() ?? ''; }, true));
-        _cleanups.push(b.subscribe(() => { if (_icm['b4']) _icm['b4'].nextSibling.data = a() + b() ?? ''; }, true));
+        _cleanups.push(user.subscribe(() => { _st0.data = user().name ?? ''; }, true));
+        _cleanups.push(a.subscribe(() => { _st1.data = a() + b() ?? ''; }, true));
+        _cleanups.push(b.subscribe(() => { _st1.data = a() + b() ?? ''; }, true));
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
       },
@@ -1527,20 +1534,18 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li title="-" style="height: px"><b></b><i><!--b3--> <!----><!--b4--> <!----></i></li>`);
+  const __tpl_b0 = _T(`<li title="-" style="height: px"><b></b><i><!----> <!----><!----> <!----></i></li>`);
 === rows: signal bindings on the row element itself ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
@@ -1567,76 +1572,69 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
   const __tpl_b0 = _T(`<li class="" style="top: "></li>`);
 === rows: when simple and expression, whenElse, with row signals ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, i, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const it$ = __sig(item);
         const i$ = __sig(i);
+        const _ws_b1 = _el.firstChild;
+        const _we_b1 = _ws_b1.nextSibling;
+        const _ws_b3 = _we_b1.nextSibling;
+        const _we_b3 = _ws_b3.nextSibling;
+        const _ws_b6 = _we_b3.nextSibling;
+        const _wm_b6 = _ws_b6.nextSibling;
+        const _we_b6 = _el.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _cond_b1 = _el.firstElementChild;
-        _cleanups.push(__bindIf(r, show, 'b1', `<b id="b1"><!--b2--> <!----></b>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
-  const _rcm = {}; { const _w = document.createTreeWalker(_c || document, 128); let _n; while (_n = _w.nextNode()) _rcm[_n.data] = _n; }
-  const _n_b2 = _rcm['b2'];
-  if (_n_b2) _n_b2.nextSibling.data = lbl() ?? '';
+        _cleanups.push(__bindIf(_ws_b1, _we_b1, show, `<b><!----> <!----></b>`, (_c) => {
+  const _n_b2 = _c.firstChild.nextSibling;
+  _n_b2.data = lbl() ?? '';
   const _nsubs = [];
-  _nsubs.push(lbl.subscribe(v => { if (_n_b2) _n_b2.nextSibling.data = v ?? ''; }, true));
+  _nsubs.push(lbl.subscribe(v => { _n_b2.data = v ?? ''; }, true));
   return _nsubs;
-}, _cond_b1));
-        const _cond_b3 = _el.firstElementChild.nextElementSibling;
-        _cleanups.push(__bindIfExpr(r, [flag, it$], () => it$().on && flag(), 'b3', `<i id="b3" title=""><!--b4--> <!----></i>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
-  const _rcm = {}; { const _w = document.createTreeWalker(_c || document, 128); let _n; while (_n = _w.nextNode()) _rcm[_n.data] = _n; }
-  const _n_b3 = _q('b3');
-  const _n_b4 = _rcm['b4'];
-  let _pv_b3; if (_n_b3) _n_b3.setAttribute('title', _pv_b3 = it$().t);
-  let _pv_b4; if (_n_b4) _n_b4.nextSibling.data = (_pv_b4 = it$().name) ?? '';
+}));
+        _cleanups.push(__bindIfExpr(_ws_b3, _we_b3, [flag, it$], () => it$().on && flag(), `<i title=""><!----> <!----></i>`, (_c) => {
+  const _n_b4 = _c;
+  const _n_b5 = _c.firstChild.nextSibling;
+  let _pv_b4; _n_b4.setAttribute('title', _pv_b4 = it$().t);
+  let _pv_b5; _n_b5.data = (_pv_b5 = it$().name) ?? '';
   const _nsubs = [];
-  _nsubs.push(it$.subscribe(() => { if (_n_b3) if (_pv_b3 !== (_pv_b3 = it$().t)) _n_b3.setAttribute('title', _pv_b3); }, true));
-  _nsubs.push(it$.subscribe(() => { if (_n_b4) if (_pv_b4 !== (_pv_b4 = it$().name)) _n_b4.nextSibling.data = (_pv_b4) ?? ''; }, true));
-  _q('b3')?.addEventListener('click', go);
+  _nsubs.push(it$.subscribe(() => { if (_pv_b4 !== (_pv_b4 = it$().t)) _n_b4.setAttribute('title', _pv_b4); }, true));
+  _nsubs.push(it$.subscribe(() => { if (_pv_b5 !== (_pv_b5 = it$().name)) _n_b5.data = (_pv_b5) ?? ''; }, true));
+  _n_b4.addEventListener('click', go);
   return _nsubs;
-}, _cond_b3));
-        const _cond_b5 = _el.firstElementChild.nextElementSibling.nextElementSibling;
-        const _cond_b6 = _el.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
-        _cleanups.push(__bindIfExpr(r, [it$], () => it$().done, 'b5', `<s id="b5"><!--b7--> <!----></s>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
-  const _rcm = {}; { const _w = document.createTreeWalker(_c || document, 128); let _n; while (_n = _w.nextNode()) _rcm[_n.data] = _n; }
-  const _n_b7 = _rcm['b7'];
-  let _pv_b7; if (_n_b7) _n_b7.nextSibling.data = (_pv_b7 = it$().name) ?? '';
+}));
+        _cleanups.push(__bindIfExpr(_ws_b6, _wm_b6, [it$], () => it$().done, `<s><!----> <!----></s>`, (_c) => {
+  const _n_b8 = _c.firstChild.nextSibling;
+  let _pv_b8; _n_b8.data = (_pv_b8 = it$().name) ?? '';
   const _nsubs = [];
-  _nsubs.push(it$.subscribe(() => { if (_n_b7) if (_pv_b7 !== (_pv_b7 = it$().name)) _n_b7.nextSibling.data = (_pv_b7) ?? ''; }, true));
+  _nsubs.push(it$.subscribe(() => { if (_pv_b8 !== (_pv_b8 = it$().name)) _n_b8.data = (_pv_b8) ?? ''; }, true));
   return _nsubs;
-}, _cond_b5));
-        _cleanups.push(__bindIfExpr(r, [it$], () => !(it$().done), 'b6', `<u id="b6" style="color: "><!--b8--> <!----></u>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
-  const _rcm = {}; { const _w = document.createTreeWalker(_c || document, 128); let _n; while (_n = _w.nextNode()) _rcm[_n.data] = _n; }
-  const _n_b6 = _q('b6');
-  const _n_b8 = _rcm['b8'];
-  if (_n_b6) _n_b6.style.setProperty('color', col());
-  let _pv_b8; if (_n_b8) _n_b8.nextSibling.data = (_pv_b8 = i$()) ?? '';
+}));
+        _cleanups.push(__bindIfExpr(_wm_b6, _we_b6, [it$], () => !(it$().done), `<u style="color: "><!----> <!----></u>`, (_c) => {
+  const _n_b9 = _c;
+  const _n_b10 = _c.firstChild.nextSibling;
+  _n_b9.style.setProperty('color', col());
+  let _pv_b10; _n_b10.data = (_pv_b10 = i$()) ?? '';
   const _nsubs = [];
-  _nsubs.push(col.subscribe(v => { if (_n_b6) _n_b6.style.setProperty('color', v); }, true));
-  _nsubs.push(i$.subscribe(() => { if (_n_b8) if (_pv_b8 !== (_pv_b8 = i$())) _n_b8.nextSibling.data = (_pv_b8) ?? ''; }, true));
+  _nsubs.push(col.subscribe(v => { _n_b9.style.setProperty('color', v); }, true));
+  _nsubs.push(i$.subscribe(() => { if (_pv_b10 !== (_pv_b10 = i$())) _n_b10.data = (_pv_b10) ?? ''; }, true));
   return _nsubs;
-}, _cond_b6));
+}));
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item, i) => { it$(item); i$(i); } };
       },
@@ -1649,40 +1647,85 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><template></template><template></template><template></template><template></template></li>`);
-=== rows: row-level when with several bindings on one signal ===
+  const __tpl_b0 = _T(`<li><!----><!----><!----><!----><!----><!----><!----></li>`);
+=== rows: delegated events and a selection binding after row directives ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
+        _el.__d = item;
+        _el.__e0 = _el.firstElementChild;
+        _el.__e1 = _el.firstElementChild.nextElementSibling;
+        const it$ = __sig(item);
+        const _ws_b1 = _el.firstChild;
+        const _we_b1 = _ws_b1.nextSibling;
+        const _ws_b2 = _we_b1.nextSibling;
+        const _wm_b2 = _ws_b2.nextSibling;
+        const _we_b2 = _wm_b2.nextSibling;
+        const _m0 = _el.firstElementChild.nextElementSibling;
+        let _p0;
+        ;
+        if ((_p0 = sel() === item.id ? 'on' : '') !== '') _m0.className = _p0;
+        _insertBefore.call(_ct_b0, _el, _ref);
+        const _cleanups = [];
+        _cleanups.push(sel.subscribe(() => { if (_p0 !== (_p0 = sel() === item.id ? 'on' : '')) _m0.className = _p0; }, true));
+        _cleanups.push(__bindIfExpr(_ws_b1, _we_b1, [it$], () => it$().on, `<b>b</b>`, () => []));
+        _cleanups.push(__bindIfExpr(_ws_b2, _wm_b2, [it$], () => it$().done, `<s>s</s>`, () => []));
+        _cleanups.push(__bindIfExpr(_wm_b2, _we_b2, [it$], () => !(it$().done), `<u>u</u>`, () => []));
+        return { el: _el, cleanups: _cleanups, value: item,
+          update: (item) => { if (_p0 !== (_p0 = sel() === item.id ? 'on' : '')) _m0.className = _p0; _el.__d = item; it$(item); } };
+      },
+    'id');
+    const _items_b0 = () => items();
+    _rc_b0.reconcile(_items_b0());
+    const _rsrc_b0_0 = items;
+    _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
+    _ct_b0.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; if (_row.__e0.contains(e.target)) { go(item.id); return; } if (_row.__e1.contains(e.target)) { go(e); return; } });
+    return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
+--- static templates
+  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
+  const __tpl = _T(`<ul><!----></ul>`);
+  const _cloneNode = Node.prototype.cloneNode;
+  const _insertBefore = Node.prototype.insertBefore;
+  const _nc = [];
+  const __tpl_b0 = _T(`<li><!----><!----><!----><!----><!----><a>go</a><i class="">i</i></li>`);
+=== rows: row-level when with several bindings on one signal ===
+--- template
+<ul><!--b0.--></ul>
+--- binding function body
+    const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
+    const _tc_b0 = __tpl_b0.content.firstElementChild;
+    const _ct_b0 = _a_b0.parentNode;
+    const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
+      (item, _idx, _ref) => {
+        const _el = _cloneNode.call(_tc_b0, true);
+        const _ws_b1 = _el.firstChild;
+        const _we_b1 = _el.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _cond_b1 = _el.firstElementChild;
-        _cleanups.push(__bindIf(r, show, 'b1', `<b id="b1" style="color: " title=""><!--b2--> <!----></b>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
-  const _rcm = {}; { const _w = document.createTreeWalker(_c || document, 128); let _n; while (_n = _w.nextNode()) _rcm[_n.data] = _n; }
-  const _n_b1 = _q('b1');
-  const _n_b2 = _rcm['b2'];
-  if (_n_b1) _n_b1.style.setProperty('color', col());
-  if (_n_b1) _n_b1.setAttribute('title', col());
-  if (_n_b2) _n_b2.nextSibling.data = col() ?? '';
+        _cleanups.push(__bindIf(_ws_b1, _we_b1, show, `<b style="color: " title=""><!----> <!----></b>`, (_c) => {
+  const _n_b2 = _c;
+  const _n_b3 = _c.firstChild.nextSibling;
+  _n_b2.style.setProperty('color', col());
+  _n_b2.setAttribute('title', col());
+  _n_b3.data = col() ?? '';
   const _nsubs = [];
-  _nsubs.push(col.subscribe(v => { if (_n_b1) _n_b1.style.setProperty('color', v); if (_n_b1) _n_b1.setAttribute('title', v); if (_n_b2) _n_b2.nextSibling.data = v ?? ''; }, true));
+  _nsubs.push(col.subscribe(v => { _n_b2.style.setProperty('color', v); _n_b2.setAttribute('title', v); _n_b3.data = v ?? ''; }, true));
   return _nsubs;
-}, _cond_b1));
+}));
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { ; } };
       },
@@ -1695,53 +1738,52 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><template></template></li>`);
+  const __tpl_b0 = _T(`<li><!----><!----></li>`);
 === nested rows: element, comment and signal bindings ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
         const _e0 = _el.firstElementChild;
+        const _nrA_b1 = _el.lastChild.lastChild;
         let _p0;
         _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrA_b1 = _el.firstElementChild.nextElementSibling.firstElementChild;
         const _nrC_b1 = _nrA_b1.parentNode;
         const _nrTc_b1 = __tpl_b1.content.firstElementChild;
         const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
           (_nrItem, _idx, _nrRef) => {
             const _nrEl = _cloneNode.call(_nrTc_b1, true);
+            const _nrc0 = _nrEl.lastChild.previousSibling.previousSibling;
+            const _nrst0 = _nrEl.lastChild.firstChild.nextSibling;
             const _nre0 = _nrEl;
             const _nre1 = _nrEl.firstElementChild;
             let _nrp0, _nrp1;
             if ((_nrp0 = _nrItem.cls) !== '') _nre0.className = _nrp0;
             _nre1.textContent = (_nrp1 = _nrItem.label) ?? ''; let _nrt1;
-            const _nricm = {}; { const _tw = document.createTreeWalker(_nrEl, 128); let _cn; while (_cn = _tw.nextNode()) _nricm[_cn.data] = _cn; };
-            if (_nricm['i6']) _nricm['i6'].nextSibling.data = (_nrItem.n) ?? '';
+            _nrc0.data = (_nrItem.n) ?? '';
             _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
             const _nrs0 = _nrEl.firstElementChild.nextElementSibling;
             const _nrs1 = _nrEl.firstElementChild.nextElementSibling;
-            _nrs0.setAttribute('title', tip()); _nrs1.style.setProperty('color', col()); if (_nricm['b4']) _nricm['b4'].nextSibling.data = sel() ?? '';
+            _nrs0.setAttribute('title', tip()); _nrs1.style.setProperty('color', col()); _nrst0.data = sel() ?? '';
             const _nrCleanups = [];
             _nrCleanups.push(tip.subscribe(() => { _nrs0.setAttribute('title', tip()); }, true));
             _nrCleanups.push(col.subscribe(() => { _nrs1.style.setProperty('color', col()); }, true));
-            _nrCleanups.push(sel.subscribe(() => { if (_nricm['b4']) _nricm['b4'].nextSibling.data = sel() ?? ''; }, true));
+            _nrCleanups.push(sel.subscribe(() => { _nrst0.data = sel() ?? ''; }, true));
             return { el: _nrEl, cleanups: _nrCleanups, value: _nrItem,
-              update: (_nrItem) => { if (_nrp0 !== (_nrp0 = _nrItem.cls)) _nre0.className = _nrp0; if (_nrp1 !== (_nrp1 = _nrItem.label)) (_nrt1 ??= _nre1.firstChild) ? (_nrt1.nodeValue = _nrp1 ?? '') : (_nre1.textContent = _nrp1 ?? ''); if (_nricm['i6']) _nricm['i6'].nextSibling.data = (_nrItem.n) ?? ''; } };
+              update: (_nrItem) => { if (_nrp0 !== (_nrp0 = _nrItem.cls)) _nre0.className = _nrp0; if (_nrp1 !== (_nrp1 = _nrItem.label)) (_nrt1 ??= _nre1.firstChild) ? (_nrt1.nodeValue = _nrp1 ?? '') : (_nre1.textContent = _nrp1 ?? ''); _nrc0.data = (_nrItem.n) ?? ''; } };
           },
         (_, i) => i);
         _nrRc_b1.reconcile(g$().items);
@@ -1759,44 +1801,43 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><span></span><ol><template></template></ol></li>`);
-  const __tpl_b1 = _T(`<li class=""><b></b> x <!--i6--> <!----><i title="" style="color: "><!--b4--> <!----></i></li>`);
+  const __tpl_b0 = _T(`<li><span></span><ol><!----></ol></li>`);
+  const __tpl_b1 = _T(`<li class=""><b></b> x <!----> <!----><i title="" style="color: "><!----> <!----></i></li>`);
 === nested rows: signal text without item comment bindings, key property ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
+        const _nrA_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrA_b1 = _el.firstElementChild.firstElementChild;
         const _nrC_b1 = _nrA_b1.parentNode;
         const _nrTc_b1 = __tpl_b1.content.firstElementChild;
         const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
           (_nrItem, _idx, _nrRef) => {
             const _nrEl = _cloneNode.call(_nrTc_b1, true);
+            const _nrst0 = _nrEl.lastElementChild.firstChild.nextSibling;
+            const _nrst1 = _nrEl.lastChild.previousSibling;
             const _nre0 = _nrEl.firstElementChild;
             let _nrp0;
             _nre0.textContent = (_nrp0 = _nrItem.label) ?? ''; let _nrt0;
             _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
-            const _nricm = {}; { const _tw = document.createTreeWalker(_nrEl, 128); let _cn; while (_cn = _tw.nextNode()) _nricm[_cn.data] = _cn; };
-            if (_nricm['b2']) _nricm['b2'].nextSibling.data = sel() ?? ''; if (_nricm['b3']) _nricm['b3'].nextSibling.data = other() ?? '';
+            _nrst0.data = sel() ?? ''; _nrst1.data = other() ?? '';
             const _nrCleanups = [];
-            _nrCleanups.push(sel.subscribe(() => { if (_nricm['b2']) _nricm['b2'].nextSibling.data = sel() ?? ''; }, true));
-            _nrCleanups.push(other.subscribe(() => { if (_nricm['b3']) _nricm['b3'].nextSibling.data = other() ?? ''; }, true));
+            _nrCleanups.push(sel.subscribe(() => { _nrst0.data = sel() ?? ''; }, true));
+            _nrCleanups.push(other.subscribe(() => { _nrst1.data = other() ?? ''; }, true));
             return { el: _nrEl, cleanups: _nrCleanups, value: _nrItem,
               update: (_nrItem) => { if (_nrp0 !== (_nrp0 = _nrItem.label)) (_nrt0 ??= _nre0.firstChild) ? (_nrt0.nodeValue = _nrp0 ?? '') : (_nre0.textContent = _nrp0 ?? ''); } };
           },
@@ -1816,45 +1857,43 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><ol><template></template></ol></li>`);
-  const __tpl_b1 = _T(`<li><b></b><i><!--b2--> <!----></i><!--b3--> <!----></li>`);
+  const __tpl_b0 = _T(`<li><ol><!----></ol></li>`);
+  const __tpl_b1 = _T(`<li><b></b><i><!----> <!----></i><!----> <!----></li>`);
 === nested rows: expression signal bindings and bindings on the inner row element ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
+        const _nrA_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrA_b1 = _el.firstElementChild.firstElementChild;
         const _nrC_b1 = _nrA_b1.parentNode;
         const _nrTc_b1 = __tpl_b1.content.firstElementChild;
         const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
           (_nrItem, j, _nrRef) => {
             const _nrEl = _cloneNode.call(_nrTc_b1, true);
+            const _nrst0 = _nrEl.lastChild.firstChild.nextSibling;
             _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
             const _nrs0 = _nrEl;
             const _nrs1 = _nrEl;
-            const _nricm = {}; { const _tw = document.createTreeWalker(_nrEl, 128); let _cn; while (_cn = _tw.nextNode()) _nricm[_cn.data] = _cn; };
-            _nrs0.setAttribute('title', `${a()}-${b()}`); _nrs1.style.setProperty('left', x()); if (_nricm['b4']) _nricm['b4'].nextSibling.data = user().name ?? '';
+            _nrs0.setAttribute('title', `${a()}-${b()}`); _nrs1.style.setProperty('left', x()); _nrst0.data = user().name ?? '';
             const _nrCleanups = [];
             _nrCleanups.push(a.subscribe(() => { _nrs0.setAttribute('title', `${a()}-${b()}`); }, true));
             _nrCleanups.push(b.subscribe(() => { _nrs0.setAttribute('title', `${a()}-${b()}`); }, true));
             _nrCleanups.push(x.subscribe(() => { _nrs1.style.setProperty('left', x()); }, true));
-            _nrCleanups.push(user.subscribe(() => { if (_nricm['b4']) _nricm['b4'].nextSibling.data = user().name ?? ''; }, true));
+            _nrCleanups.push(user.subscribe(() => { _nrst0.data = user().name ?? ''; }, true));
             return { el: _nrEl, cleanups: _nrCleanups, value: _nrItem,
               update: (_nrItem) => {  } };
           },
@@ -1874,31 +1913,29 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><ol><template></template></ol></li>`);
-  const __tpl_b1 = _T(`<li title="-" style="left: "><i><!--b4--> <!----></i></li>`);
+  const __tpl_b0 = _T(`<li><ol><!----></ol></li>`);
+  const __tpl_b1 = _T(`<li title="-" style="left: "><i><!----> <!----></i></li>`);
 === nested rows: no bindings, driven by a component signal ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
+        const _nrA_b1 = _el.lastChild.lastChild;
         let _p0;
         _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrA_b1 = _el.firstElementChild.nextElementSibling.firstElementChild;
         const _nrC_b1 = _nrA_b1.parentNode;
         const _nrTc_b1 = __tpl_b1.content.firstElementChild;
         const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
@@ -1924,40 +1961,39 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><span></span><ol><template></template></ol></li>`);
+  const __tpl_b0 = _T(`<li><span></span><ol><!----></ol></li>`);
   const __tpl_b1 = _T(`<li>static</li>`);
 === nested rows: only comment-marker item bindings ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
+        const _nrA_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrA_b1 = _el.firstElementChild.firstElementChild;
         const _nrC_b1 = _nrA_b1.parentNode;
         const _nrTc_b1 = __tpl_b1.content.firstElementChild;
         const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
           (_nrItem, _idx, _nrRef) => {
             const _nrEl = _cloneNode.call(_nrTc_b1, true);
-            const _nricm = {}; { const _tw = document.createTreeWalker(_nrEl, 128); let _cn; while (_cn = _tw.nextNode()) _nricm[_cn.data] = _cn; };
-            if (_nricm['i2']) _nricm['i2'].nextSibling.data = (_nrItem.a) ?? ''; if (_nricm['i3']) _nricm['i3'].nextSibling.data = (_nrItem.b) ?? '';
+            const _nrc0 = _nrEl.firstChild.nextSibling;
+            const _nrc1 = _nrEl.lastChild.previousSibling;
+            _nrc0.data = (_nrItem.a) ?? ''; _nrc1.data = (_nrItem.b) ?? '';
             _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
             return { el: _nrEl, cleanups: [], value: _nrItem,
-              update: (_nrItem) => { if (_nricm['i2']) _nricm['i2'].nextSibling.data = (_nrItem.a) ?? ''; if (_nricm['i3']) _nricm['i3'].nextSibling.data = (_nrItem.b) ?? ''; } };
+              update: (_nrItem) => { _nrc0.data = (_nrItem.a) ?? ''; _nrc1.data = (_nrItem.b) ?? ''; } };
           },
         (_, i) => i);
         _nrRc_b1.reconcile(g$().items);
@@ -1975,39 +2011,38 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li><ol><template></template></ol></li>`);
-  const __tpl_b1 = _T(`<li><!--i2--> <!----> and <!--i3--> <!----></li>`);
+  const __tpl_b0 = _T(`<li><ol><!----></ol></li>`);
+  const __tpl_b1 = _T(`<li><!----> <!----> and <!----> <!----></li>`);
 === escaping: backslash, backtick and newline in row, branch and main templates (dev) ===
 --- template
-<p title="a\b">`q` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>
+<p title="a\b">`q` <!--b4--> <!----></p><ul><!--b1.--></ul><ol><!--b3.--></ol><!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    const _cm = _fcm(r);
-    const b4 = _cm['b4'];
-    b4.nextSibling.data = t() ?? '';
-    _subs.push(t.subscribe(v => { b4.nextSibling.data = v ?? ''; }, true));
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><i>\`w\`\</i></div>`, () => []));
+    const b4 = _ns[0].lastChild.previousSibling;
+    const _ws_b0 = _ns[2].nextSibling;
+    const _we_b0 = r.lastChild;
+    const _a_b1 = _ns[1].lastChild;
+    const _a_b3 = _ns[2].lastChild;
+    b4.data = t() ?? '';
+    _subs.push(t.subscribe(v => { b4.data = v ?? ''; }, true));
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><i>\`w\`\</i></div>`, () => []));
     const _tc_b1 = __tpl_b1.content.firstElementChild;
-    const _a_b1 = _gid('b1');
     const _ct_b1 = _a_b1.parentNode;
     const _bind_b1 = (_el, item, _idx) => {
-        const _icm = {}; { const _tw = document.createTreeWalker(_el, 128); let _cn; while (_cn = _tw.nextNode()) _icm[_cn.data] = _cn; };
-        const _c0 = _icm['i2']?.nextSibling;
+        const _c0 = _el.firstChild.nextSibling;
         let _p0;
         ;
-        if (_c0) _c0.data = (_p0 = item.x) ?? '';
+        _c0.data = (_p0 = item.x) ?? '';
         return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, c0: _c0 };
     };
     const _update_b1 = (_m, item, _idx) => {
       const _el = _m.el;
-      if (_m.c0) if (_m.p0 !== (_m.p0 = item.x)) _m.c0.data = (_m.p0) ?? '';
+      if (_m.p0 !== (_m.p0 = item.x)) _m.c0.data = (_m.p0) ?? '';
     };
     const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, item, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
@@ -2021,7 +2056,6 @@
     _subs.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { const items = _items_b1(); _rc_b1.reconcile(items); _syncEmpty_b1(items); }, true) : () => {});
     _subs.push(() => _rc_b1.clearAll());
     const _tc_b3 = __tpl_b3.content.firstElementChild;
-    const _a_b3 = _gid('b3');
     const _ct_b3 = _a_b3.parentNode;
     const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
       (item, _idx, _ref) => {
@@ -2038,39 +2072,38 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<p title="a\b">\`q\` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>`);
+  const __tpl = _T(`<p title="a\b">\`q\` <!----> <!----></p><ul><!----></ul><ol><!----></ol><!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b1 = _T(`<li title="c\d"><!--i2--> <!----> e\f</li>`);
+  const __tpl_b1 = _T(`<li title="c\d"><!----> <!----> e\f</li>`);
   const __tpl_b3 = _T(`<li>s\t</li>`);
 === escaping: the same templates, production ===
 --- template
-<p title="a\b">`q` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>
+<p title="a\b">`q` <!--b4--> <!----></p><ul><!--b1.--></ul><ol><!--b3.--></ol><!--b0(--><!--b0)-->
 --- binding function body
     const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
-    const _fcm = (root) => { const m = {}; const w = document.createTreeWalker(root, 128); let n; while (n = w.nextNode()) m[n.data] = n; return m; };
-    const _cm = _fcm(r);
-    const b4 = _cm['b4'];
-    b4.nextSibling.data = t() ?? '';
-    _subs.push(t.subscribe(v => { b4.nextSibling.data = v ?? ''; }, true));
-    _subs.push(__bindIf(r, a, 'b0', `<div id="b0"><i>\`w\`\</i></div>`, () => []));
+    const b4 = _ns[0].lastChild.previousSibling;
+    const _ws_b0 = _ns[2].nextSibling;
+    const _we_b0 = r.lastChild;
+    const _a_b1 = _ns[1].lastChild;
+    const _a_b3 = _ns[2].lastChild;
+    b4.data = t() ?? '';
+    _subs.push(t.subscribe(v => { b4.data = v ?? ''; }, true));
+    _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><i>\`w\`\</i></div>`, () => []));
     const _tc_b1 = __tpl_b1.content.firstElementChild;
-    const _a_b1 = _gid('b1');
     const _ct_b1 = _a_b1.parentNode;
     const _bind_b1 = (_el, item, _idx) => {
-        const _icm = {}; { const _tw = document.createTreeWalker(_el, 128); let _cn; while (_cn = _tw.nextNode()) _icm[_cn.data] = _cn; };
-        const _c0 = _icm['i2']?.nextSibling;
+        const _c0 = _el.firstChild.nextSibling;
         let _p0;
         ;
-        if (_c0) _c0.data = (_p0 = item.x) ?? '';
+        _c0.data = (_p0 = item.x) ?? '';
         return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, c0: _c0 };
     };
     const _update_b1 = (_m, item, _idx) => {
       const _el = _m.el;
-      if (_m.c0) if (_m.p0 !== (_m.p0 = item.x)) _m.c0.data = (_m.p0) ?? '';
+      if (_m.p0 !== (_m.p0 = item.x)) _m.c0.data = (_m.p0) ?? '';
     };
     const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, item, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
@@ -2084,7 +2117,6 @@
     _subs.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { const items = _items_b1(); _rc_b1.reconcile(items); _syncEmpty_b1(items); }, true) : () => {});
     _subs.push(() => _rc_b1.clearAll());
     const _tc_b3 = __tpl_b3.content.firstElementChild;
-    const _a_b3 = _gid('b3');
     const _ct_b3 = _a_b3.parentNode;
     const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
       (item, _idx, _ref) => {
@@ -2101,44 +2133,39 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<p title="a\b">\`q\` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>`);
+  const __tpl = _T(`<p title="a\b">\`q\` <!----> <!----></p><ul><!----></ul><ol><!----></ol><!----><!---->`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b1 = _T(`<li title="c\d"><!--i2--> <!----> e\f</li>`);
+  const __tpl_b1 = _T(`<li title="c\d"><!----> <!----> e\f</li>`);
   const __tpl_b3 = _T(`<li>s\t</li>`);
 === production: nested rows, row directives and a child mount ===
 --- template
-<ul><template id="b0"></template></ul>
+<ul><!--b0.--></ul>
 --- binding function body
-    const r = ctx.root;
-    const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
+    const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
-    const _a_b0 = _gid('b0');
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
+        const _cm0 = _el.lastElementChild;
+        const _ws_b1 = _el.firstChild;
+        const _we_b1 = _ws_b1.nextSibling;
+        const _nrA_b3 = _we_b1.nextSibling.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
-        const _cm0 = document.createElement('m-5');
-        const _cma0 = (_el.id === 'b900' ? _el : _el.querySelector('#b900'));
-        if (_cma0) _cma0.replaceWith(_cm0);
         const _cleanups = [];
         _cleanups.push(__dc(Kid.__f(_cm0, { g: item })));
-        const _cond_b1 = _el.firstElementChild;
-        _cleanups.push(__bindIf(r, on, 'b1', `<b id="b1"><!--b2--> <!----></b>`, (_c) => {
-  const _q = (id) => _c ? (_c.id === id ? _c : _c.querySelector('#' + id)) : _gid(id);
-  const _rcm = {}; { const _w = document.createTreeWalker(_c || document, 128); let _n; while (_n = _w.nextNode()) _rcm[_n.data] = _n; }
-  const _n_b2 = _rcm['b2'];
-  if (_n_b2) _n_b2.nextSibling.data = lbl() ?? '';
+        _cleanups.push(__bindIf(_ws_b1, _we_b1, on, `<b><!----> <!----></b>`, (_c) => {
+  const _n_b2 = _c.firstChild.nextSibling;
+  _n_b2.data = lbl() ?? '';
   const _nsubs = [];
-  _nsubs.push(lbl.subscribe(v => { if (_n_b2) _n_b2.nextSibling.data = v ?? ''; }, true));
+  _nsubs.push(lbl.subscribe(v => { _n_b2.data = v ?? ''; }, true));
   return _nsubs;
-}, _cond_b1));
-        const _nrA_b3 = _el.firstElementChild.nextElementSibling.firstElementChild;
+}));
         const _nrC_b3 = _nrA_b3.parentNode;
         const _nrTc_b3 = __tpl_b3.content.firstElementChild;
         const _nrRc_b3 = createKeyedReconciler(_nrC_b3, _nrA_b3,
@@ -2167,9 +2194,9 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><template id="b0"></template></ul>`);
+  const __tpl = _T(`<ul><!----></ul>`);
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b0 = _T(`<li class="row"><template id="b900"></template><ol><template></template></ol><template></template></li>`);
+  const __tpl_b0 = _T(`<li class="row"><!----><!----><ol><!----></ol><m-5></m-5></li>`);
   const __tpl_b3 = _T(`<li></li>`);

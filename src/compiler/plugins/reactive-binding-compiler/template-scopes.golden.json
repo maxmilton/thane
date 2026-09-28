@@ -1,6 +1,6 @@
 {
   "component: events come before other bindings in the markup": {
-    "processedContent": "<div><button id=\"b3\">Go</button><span id=\"b0\" title=\"\"><!--b1--> <!----></span><input id=\"b2\"></div>",
+    "processedContent": "<div><button data-thane-ref=\"b3\">Go</button><span data-thane-ref=\"b0\" title=\"\"><!--b1--> <!----></span><input data-thane-ref=\"b2\"></div>",
     "bindings": [
       {
         "id": "b0",
@@ -50,7 +50,7 @@
     "nextId": 4
   },
   "component: event on an element with its own id, and with an empty id": {
-    "processedContent": "<button id=\"save\">S</button><button id=\"\">D</button><p><!--b0--> <!----></p>",
+    "processedContent": "<button data-thane-ref=\"b1\" id=\"save\">S</button><button data-thane-ref=\"b2\" id=\"\">D</button><p><!--b0--> <!----></p>",
     "bindings": [
       {
         "id": "b0",
@@ -68,7 +68,7 @@
         "eventName": "click",
         "modifiers": [],
         "handlerExpression": "s",
-        "elementId": "save",
+        "elementId": "b1",
         "startIndex": 18,
         "endIndex": 29
       },
@@ -77,12 +77,12 @@
         "eventName": "click",
         "modifiers": [],
         "handlerExpression": "d",
-        "elementId": "",
+        "elementId": "b2",
         "startIndex": 54,
         "endIndex": 65
       }
     ],
-    "nextId": 1
+    "nextId": 3
   },
   "component: an event attribute without a name": {
     "processedContent": "<button @=${f}>x</button><i><!--b0--> <!----></i>",
@@ -101,10 +101,10 @@
     "nextId": 1
   },
   "component: pre-rendered when() with property-bound attributes, on a void element and inside": {
-    "processedContent": "<div><input id=\"b0\"><p id=\"b1\"><input id=\"b2\"></p></div>",
+    "processedContent": "<div><!--b0(--><input data-thane-ref=\"b1\"><!--b0)--><!--b2(--><p><input data-thane-ref=\"b3\"></p><!--b2)--></div>",
     "bindings": [
       {
-        "id": "b0",
+        "id": "b1",
         "signalName": "c",
         "type": "attr",
         "property": "checked",
@@ -113,13 +113,13 @@
         "conditionalId": "b0"
       },
       {
-        "id": "b2",
+        "id": "b3",
         "signalName": "v",
         "type": "attr",
         "property": "value",
         "domProperty": "value",
         "isInsideConditional": true,
-        "conditionalId": "b1"
+        "conditionalId": "b2"
       }
     ],
     "conditionals": [
@@ -131,10 +131,10 @@
         "initialValue": true,
         "startIndex": 5,
         "endIndex": 48,
-        "templateContent": "<input id=\"b0\" checked>",
+        "templateContent": "<input data-thane-ref=\"b1\" checked>",
         "nestedBindings": [
           {
-            "id": "b0",
+            "id": "b1",
             "signalName": "c",
             "type": "attr",
             "property": "checked",
@@ -149,23 +149,23 @@
         "nestedEventBindings": []
       },
       {
-        "id": "b1",
+        "id": "b2",
         "signalName": "s",
         "signalNames": ["s"],
         "jsExpression": "s()",
         "initialValue": true,
         "startIndex": 48,
         "endIndex": 88,
-        "templateContent": "<p id=\"b1\"><input id=\"b2\"></p>",
+        "templateContent": "<p><input data-thane-ref=\"b3\"></p>",
         "nestedBindings": [
           {
-            "id": "b2",
+            "id": "b3",
             "signalName": "v",
             "type": "attr",
             "property": "value",
             "domProperty": "value",
             "isInsideConditional": true,
-            "conditionalId": "b1"
+            "conditionalId": "b2"
           }
         ],
         "nestedConditionals": [],
@@ -177,10 +177,10 @@
     "whenElseBlocks": [],
     "repeatBlocks": [],
     "eventBindings": [],
-    "nextId": 3
+    "nextId": 4
   },
   "component: pre-rendered when() on a non-void element with a duplicated property-bound attribute": {
-    "processedContent": "<div><button id=\"b0\" disabled disabled=${d()}>B</button><b><!--b1--> <!----></b></div>",
+    "processedContent": "<div><!--b0(--><button disabled disabled=${d()}>B</button><!--b0)--><b><!--b1--> <!----></b></div>",
     "bindings": [
       {
         "id": "b1",
@@ -198,7 +198,7 @@
         "initialValue": true,
         "startIndex": 5,
         "endIndex": 61,
-        "templateContent": "<button id=\"b0\" disabled disabled=${d()}>B</button>",
+        "templateContent": "<button disabled disabled=${d()}>B</button>",
         "nestedBindings": [],
         "nestedConditionals": [],
         "nestedWhenElse": [],
@@ -212,10 +212,10 @@
     "nextId": 2
   },
   "component: pre-rendered when() on a non-void element with a duplicated property-bound attribute, bound first": {
-    "processedContent": "<div><button id=\"b0\">B</button><b><!--b1--> <!----></b></div>",
+    "processedContent": "<div><!--b0(--><button data-thane-ref=\"b1\">B</button><!--b0)--><b><!--b2--> <!----></b></div>",
     "bindings": [
       {
-        "id": "b0",
+        "id": "b1",
         "signalName": "d",
         "type": "attr",
         "property": "disabled",
@@ -224,7 +224,7 @@
         "conditionalId": "b0"
       },
       {
-        "id": "b1",
+        "id": "b2",
         "signalName": "n",
         "type": "text",
         "isInsideConditional": false
@@ -239,10 +239,10 @@
         "initialValue": true,
         "startIndex": 5,
         "endIndex": 61,
-        "templateContent": "<button id=\"b0\" disabled>B</button>",
+        "templateContent": "<button data-thane-ref=\"b1\" disabled>B</button>",
         "nestedBindings": [
           {
-            "id": "b0",
+            "id": "b1",
             "signalName": "d",
             "type": "attr",
             "property": "disabled",
@@ -260,13 +260,13 @@
     "whenElseBlocks": [],
     "repeatBlocks": [],
     "eventBindings": [],
-    "nextId": 2
+    "nextId": 3
   },
   "component: whenElse with events, a repeat with row events, then more bindings": {
-    "processedContent": "<section><p id=\"b0\"><!--b2--> <!----></p><template id=\"b1\"></template><ul><template id=\"b3\"></template></ul><em id=\"b7\"><!--b6--> <!----></em></section>",
+    "processedContent": "<section><!--b0(--><p data-thane-ref=\"b2\"><!--b3--> <!----></p><!--b0|--><!--b0)--><ul><!--b4.--></ul><em data-thane-ref=\"b8\"><!--b7--> <!----></em></section>",
     "bindings": [
       {
-        "id": "b6",
+        "id": "b7",
         "signalName": "m",
         "type": "text",
         "isInsideConditional": false
@@ -281,13 +281,13 @@
         "signalNames": ["f"],
         "jsExpression": "f()",
         "initialValue": true,
-        "thenTemplate": "<p id=\"b0\"><!--b2--> <!----></p>",
+        "thenTemplate": "<p data-thane-ref=\"b2\"><!--b3--> <!----></p>",
         "elseTemplate": "<p>else</p>",
         "startIndex": 9,
         "endIndex": 77,
         "thenBindings": [
           {
-            "id": "b2",
+            "id": "b3",
             "signalName": "n",
             "type": "text",
             "isInsideConditional": true,
@@ -303,7 +303,7 @@
             "eventName": "click",
             "modifiers": [],
             "handlerExpression": "a",
-            "elementId": "b0",
+            "elementId": "b2",
             "startIndex": 3,
             "endIndex": 14
           }
@@ -317,17 +317,17 @@
     ],
     "repeatBlocks": [
       {
-        "id": "b3",
+        "id": "b4",
         "signalName": "items",
         "signalNames": ["items"],
         "itemsExpression": "items()",
         "itemVar": "it",
-        "itemTemplate": "<li id=\"b4\">${it.name}</li>",
+        "itemTemplate": "<li data-thane-ref=\"b5\">${it.name}</li>",
         "startIndex": 81,
         "endIndex": 159,
         "itemBindings": [
           {
-            "elementId": "b4",
+            "elementId": "b5",
             "type": "text",
             "expression": "it.name",
             "textBindingMode": "textNode"
@@ -336,7 +336,7 @@
         "itemEvents": [
           {
             "eventId": "ie0",
-            "elementId": "b4",
+            "elementId": "b5",
             "eventName": "click",
             "modifiers": [],
             "handlerExpression": "() => pick(it)"
@@ -355,18 +355,18 @@
         "eventName": "click",
         "modifiers": [],
         "handlerExpression": "z",
-        "elementId": "b7",
+        "elementId": "b8",
         "startIndex": 168,
         "endIndex": 179
       }
     ],
-    "nextId": 8
+    "nextId": 9
   },
   "component: nested when() with events and attributes": {
-    "processedContent": "<div id=\"b0\"><template id=\"b1\"></template><i id=\"b3\" title=\"\">x</i></div><b><!--b4--> <!----></b>",
+    "processedContent": "<!--b0(--><div><!--b1(--><!--b1)--><i data-thane-ref=\"b4\" title=\"\">x</i></div><!--b0)--><b><!--b5--> <!----></b>",
     "bindings": [
       {
-        "id": "b3",
+        "id": "b4",
         "signalName": "t",
         "type": "attr",
         "property": "title",
@@ -374,7 +374,7 @@
         "conditionalId": "b0"
       },
       {
-        "id": "b4",
+        "id": "b5",
         "signalName": "n",
         "type": "text",
         "isInsideConditional": false
@@ -389,10 +389,10 @@
         "initialValue": true,
         "startIndex": 0,
         "endIndex": 101,
-        "templateContent": "<div id=\"b0\"><template id=\"b1\"></template><i id=\"b3\" title=\"\">x</i></div>",
+        "templateContent": "<div><!--b1(--><!--b1)--><i data-thane-ref=\"b4\" title=\"\">x</i></div>",
         "nestedBindings": [
           {
-            "id": "b3",
+            "id": "b4",
             "signalName": "t",
             "type": "attr",
             "property": "title",
@@ -409,10 +409,10 @@
             "initialValue": false,
             "startIndex": 6,
             "endIndex": 50,
-            "templateContent": "<span id=\"b1\"><!--b2--> <!----></span>",
+            "templateContent": "<span data-thane-ref=\"b2\"><!--b3--> <!----></span>",
             "nestedBindings": [
               {
-                "id": "b2",
+                "id": "b3",
                 "signalName": "n",
                 "type": "text",
                 "isInsideConditional": true,
@@ -428,7 +428,7 @@
                 "eventName": "click",
                 "modifiers": [],
                 "handlerExpression": "h",
-                "elementId": "b1",
+                "elementId": "b2",
                 "startIndex": 7,
                 "endIndex": 18
               }
@@ -443,7 +443,7 @@
             "eventName": "click",
             "modifiers": [],
             "handlerExpression": "k",
-            "elementId": "b3",
+            "elementId": "b4",
             "startIndex": 66,
             "endIndex": 77
           }
@@ -453,10 +453,10 @@
     "whenElseBlocks": [],
     "repeatBlocks": [],
     "eventBindings": [],
-    "nextId": 5
+    "nextId": 6
   },
   "component: expression bindings and unquoted attribute values": {
-    "processedContent": "<a id=\"b0\" href=\"\" class=\"\" style=\"width: \"><!--b1--> <!----></a><img id=\"b2\" src=\"\" alt=\"\">",
+    "processedContent": "<a data-thane-ref=\"b0\" href=\"\" class=\"\" style=\"width: \"><!--b1--> <!----></a><img data-thane-ref=\"b2\" src=\"\" alt=\"\">",
     "bindings": [
       {
         "id": "b0",
@@ -515,54 +515,17 @@
     "nextId": 3
   },
   "sub: the first root element takes the parent id": {
-    "processedContent": "<div id=\"parent\"><span><!--b0--> <!----></span><b id=\"b1\" title=\"\">x</b></div>",
+    "processedContent": "<div data-thane-ref=\"b0\"><span><!--b1--> <!----></span><b data-thane-ref=\"b2\" title=\"\">x</b></div>",
     "bindings": [
       {
-        "id": "b0",
+        "id": "b1",
         "signalName": "n",
         "type": "text",
         "isInsideConditional": true,
         "conditionalId": "parent"
       },
       {
-        "id": "b1",
-        "signalName": "t",
-        "type": "attr",
-        "property": "title",
-        "isInsideConditional": true,
-        "conditionalId": "parent"
-      }
-    ],
-    "conditionals": [],
-    "whenElseBlocks": [],
-    "repeatBlocks": [],
-    "eventBindings": [
-      {
-        "id": "e0",
-        "eventName": "click",
-        "modifiers": [],
-        "handlerExpression": "a",
-        "elementId": "parent",
-        "startIndex": 5,
-        "endIndex": 16
-      },
-      {
-        "id": "e1",
-        "eventName": "click",
-        "modifiers": [],
-        "handlerExpression": "b",
-        "elementId": "b1",
-        "startIndex": 52,
-        "endIndex": 63
-      }
-    ],
-    "nextId": 2
-  },
-  "sub: first root with its own id, events in document order": {
-    "processedContent": "<div id=\"parent\" id=\"own\" title=\"\"><button id=\"b0\">A</button><button id=\"b1\" id=\"\">B</button></div>",
-    "bindings": [
-      {
-        "id": "parent",
+        "id": "b2",
         "signalName": "t",
         "type": "attr",
         "property": "title",
@@ -580,6 +543,43 @@
         "modifiers": [],
         "handlerExpression": "a",
         "elementId": "b0",
+        "startIndex": 5,
+        "endIndex": 16
+      },
+      {
+        "id": "e1",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "b",
+        "elementId": "b2",
+        "startIndex": 52,
+        "endIndex": 63
+      }
+    ],
+    "nextId": 3
+  },
+  "sub: first root with its own id, events in document order": {
+    "processedContent": "<div data-thane-ref=\"b0\" id=\"own\" title=\"\"><button data-thane-ref=\"b1\">A</button><button data-thane-ref=\"b2\" id=\"\">B</button></div>",
+    "bindings": [
+      {
+        "id": "b0",
+        "signalName": "t",
+        "type": "attr",
+        "property": "title",
+        "isInsideConditional": true,
+        "conditionalId": "parent"
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [
+      {
+        "id": "e0",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "a",
+        "elementId": "b1",
         "startIndex": 35,
         "endIndex": 46
       },
@@ -588,15 +588,15 @@
         "eventName": "click",
         "modifiers": [],
         "handlerExpression": "b",
-        "elementId": "b1",
+        "elementId": "b2",
         "startIndex": 71,
         "endIndex": 82
       }
     ],
-    "nextId": 2
+    "nextId": 3
   },
   "sub: an event attribute without a name": {
-    "processedContent": "<div><i id=\"b0\" @=${f}>x</i><!--b1--> <!----></div>",
+    "processedContent": "<div><i data-thane-ref=\"b0\" @=${f}>x</i><!--b1--> <!----></div>",
     "bindings": [
       {
         "id": "b1",
@@ -613,7 +613,7 @@
     "nextId": 2
   },
   "sub: nested whenElse and when() with events": {
-    "processedContent": "<div><template id=\"b2\"></template><p id=\"b3\"><!--b5--> <!----></p><em id=\"b0\"><!--b1--> <!----></em><u id=\"b6\">u</u></div>",
+    "processedContent": "<div><!--b3(--><!--b3|--><p><!--b7--> <!----></p><!--b3)--><!--b0(--><em data-thane-ref=\"b1\"><!--b2--> <!----></em><!--b0)--><u data-thane-ref=\"b8\">u</u></div>",
     "bindings": [],
     "conditionals": [
       {
@@ -624,10 +624,10 @@
         "initialValue": true,
         "startIndex": 75,
         "endIndex": 115,
-        "templateContent": "<em id=\"b0\"><!--b1--> <!----></em>",
+        "templateContent": "<em data-thane-ref=\"b1\"><!--b2--> <!----></em>",
         "nestedBindings": [
           {
-            "id": "b1",
+            "id": "b2",
             "signalName": "m",
             "type": "text",
             "isInsideConditional": true,
@@ -643,7 +643,7 @@
             "eventName": "click",
             "modifiers": [],
             "handlerExpression": "z",
-            "elementId": "b0",
+            "elementId": "b1",
             "startIndex": 5,
             "endIndex": 16
           }
@@ -652,32 +652,32 @@
     ],
     "whenElseBlocks": [
       {
-        "thenId": "b2",
-        "elseId": "b3",
+        "thenId": "b3",
+        "elseId": "b4",
         "signalName": "f",
         "signalNames": ["f"],
         "jsExpression": "f()",
         "initialValue": false,
-        "thenTemplate": "<p id=\"b2\"><!--b4--> <!----></p>",
-        "elseTemplate": "<p><!--b5--> <!----></p>",
+        "thenTemplate": "<p data-thane-ref=\"b5\"><!--b6--> <!----></p>",
+        "elseTemplate": "<p><!--b7--> <!----></p>",
         "startIndex": 5,
         "endIndex": 75,
         "thenBindings": [
           {
-            "id": "b4",
+            "id": "b6",
             "signalName": "n",
             "type": "text",
             "isInsideConditional": true,
-            "conditionalId": "b2"
+            "conditionalId": "b3"
           }
         ],
         "elseBindings": [
           {
-            "id": "b5",
+            "id": "b7",
             "signalName": "m",
             "type": "text",
             "isInsideConditional": true,
-            "conditionalId": "b3"
+            "conditionalId": "b4"
           }
         ],
         "thenRepeats": [],
@@ -688,7 +688,7 @@
             "eventName": "click",
             "modifiers": [],
             "handlerExpression": "a",
-            "elementId": "b2",
+            "elementId": "b5",
             "startIndex": 3,
             "endIndex": 14
           }
@@ -707,11 +707,11 @@
         "eventName": "click",
         "modifiers": [],
         "handlerExpression": "y",
-        "elementId": "b6",
+        "elementId": "b8",
         "startIndex": 118,
         "endIndex": 129
       }
     ],
-    "nextId": 7
+    "nextId": 9
   }
 }

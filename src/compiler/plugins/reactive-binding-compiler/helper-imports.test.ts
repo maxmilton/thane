@@ -66,10 +66,10 @@ describe('runtime helper imports follow the emitted code', () => {
       'child-component rows at the top level',
       'return { template: html`<ul>${repeat(items(), (i) => Card({ i }))}</ul>` };',
     ],
-    ['a top-level child mount', 'return { template: html`<div><template id="b0"></template></div>` };', [card('b0')]],
+    ['a top-level child mount', 'return { template: html`<div><!--b0.--></div>` };', [card('b0')]],
     [
       'a child mount inside a when()',
-      'return { template: html`<div ${when(show())}><template id="b0"></template></div>` };',
+      'return { template: html`<div ${when(show())}><!--b0.--></div>` };',
       [card('b0')],
     ],
     ['styles', 'return { template: html`<p>${n()}</p>`, styles: css`p { color: red; }` };'],

@@ -227,6 +227,7 @@ export const ChildCard = defineComponent(() => ({
 }));
 `;
 
+  // The child's host element is in the parent's template (A1-4), so host creation is the template's tag
   test('component selectors are renamed consistently in registration, host creation and CSS', async () => {
     const js = await prod(
       `
@@ -243,7 +244,7 @@ mount({ component: ParentPage });
     );
     expect(js).not.toContain('child-card');
     expect(js).not.toContain('parent-page');
-    const host = js.match(/createElement\("([a-z]+-[a-z]+)"\)/)?.[1];
+    const host = js.match(/<([a-z]+-[a-z]+)><\/\1>/)?.[1];
     expect(host).toBeDefined();
     // the parent's stylesheet addresses the child's host class under its new name
     expect(js).toContain(`.${host!}{margin:1px}`);
@@ -263,7 +264,7 @@ mount({ component: ParentPage });
 `,
       { 'src/child.ts': CHILD },
     );
-    expect(js).toContain('createElement("child-card")');
+    expect(js).toContain('<child-card></child-card>');
     expect(js).toContain('/child-card/details');
     expect(js).not.toContain('parent-page');
   });
@@ -284,8 +285,8 @@ mount({ component: ParentPage });
       { 'src/child.ts': CHILD, ...FAKE_LIB },
     );
     // the component is renamed; the library's own 'child-card' string is not the component
-    expect(js).not.toContain('createElement("child-card")');
-    expect(js).toMatch(/createElement\("[a-z]+-[a-z]+"\)/);
+    expect(js).not.toContain('<child-card>');
+    expect(js).toMatch(/<([a-z]+-[a-z]+)><\/\1>/);
     expect(js).toContain('"child-card"');
   });
 
@@ -305,7 +306,7 @@ mount({ component: ParentPage });
 `,
       { 'src/child.ts': CHILD, 'src/page.css': '.child-card {\n  margin: 1px;\n}\n', ...FAKE_LIB },
     );
-    const host = js.match(/createElement\("([a-z]+-[a-z]+)"\)/)?.[1];
+    const host = js.match(/<([a-z]+-[a-z]+)><\/\1>/)?.[1];
     expect(host).toBeDefined();
     expect(host).not.toBe('child-card');
     expect(js).toContain(`.${host!}{margin:1px}`);
@@ -325,7 +326,7 @@ mount({ component: ParentPage });
 `,
       { 'src/child.ts': CHILD, 'src/assets/site.css': '.child-card { outline: 1px solid; }' },
     );
-    expect(js).toContain('createElement("child-card")');
+    expect(js).toContain('<child-card></child-card>');
   });
 
   test('the root tag in index.html follows the rename, the rest of the document does not', async () => {

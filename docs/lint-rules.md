@@ -12,7 +12,6 @@ Thane includes 12 compile-time lint rules (THANE400–THANE411) that catch patte
 | THANE403 | [require-const-tagged-templates](#thane403--require-const-tagged-templates) | Error    |
 | THANE404 | [no-nested-html-tags](#thane404--no-nested-html-tags)                       | Error    |
 | THANE405 | [no-conditional-template-init](#thane405--no-conditional-template-init)     | Warning  |
-| THANE406 | [no-element-id](#thane406--no-element-id)                                   | Warning  |
 | THANE407 | [single-component-per-file](#thane407--single-component-per-file)           | Error    |
 | THANE408 | [component-const-declaration](#thane408--component-const-declaration)       | Error    |
 | THANE409 | [no-aliased-component-export](#thane409--no-aliased-component-export)       | Error    |
@@ -175,21 +174,11 @@ template: html`<div>${whenElse(isAdmin(), html`<p>Admin</p>`, html`<p>User</p>`)
 
 ---
 
-## THANE406 — no-element-id
+## THANE406 — retired
 
-**Severity:** Warning
-
-User-defined element IDs must not match the compiler-reserved pattern: `b` followed by digits (`b0`, `b1`, `b12`, etc.). The compiler generates these IDs for binding anchors.
-
-```typescript
-// ❌ BAD — conflicts with compiler-generated IDs
-html`<div id="b0">...</div>`;
-html`<div id="b12">...</div>`;
-
-// ✅ GOOD
-html`<div id="main">...</div>`;
-html`<button id="run">...</button>`;
-```
+THANE406 (no-element-id) reported element ids of the form `b` followed by digits, which could collide
+with the ids the compiler generated. Compiled code no longer uses ids to find anything, so any id is
+the developer's own. The code is not reused.
 
 ---
 

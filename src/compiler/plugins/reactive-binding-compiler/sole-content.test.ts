@@ -2,7 +2,7 @@
  * Characterisation of sole-content analysis for row text bindings (F0-2 item 9, before TA-7).
  *
  * A row text binding that is the only content of its element is rendered through that
- * element's text node (`textNode`, the element gets the id); otherwise a comment marker is
+ * element's text node (`textNode`, the element gets the mark); otherwise a comment marker is
  * placed before it (`commentMarker`). Until TA-7 the decision was made by
  * `analyzeTextBindingContext`, which scanned the raw row template; since TA-7 it is read from
  * the parse tree (`soleContentParent`, repeat-analysis.ts). The table pins, for each row
@@ -46,25 +46,25 @@ describe('sole content: text node', () => {
     [
       'sole content',
       '<li>${item.name}</li>',
-      '<li id="i1">${item.name}</li>',
+      '<li data-thane-ref="i1">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
       'surrounded by whitespace',
       '<li>  ${item.name}  </li>',
-      '<li id="i1"> ${item.name} </li>',
+      '<li data-thane-ref="i1"> ${item.name} </li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
       'sole content of a nested element',
       '<div><span>${item.name}</span></div>',
-      '<div><span id="i1">${item.name}</span></div>',
+      '<div><span data-thane-ref="i1">${item.name}</span></div>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
       'one binding per cell',
       '<tr><td>${item.a}</td><td>${item.b}</td></tr>',
-      '<tr><td id="i1">${item.a}</td><td id="i2">${item.b}</td></tr>',
+      '<tr><td data-thane-ref="i1">${item.a}</td><td data-thane-ref="i2">${item.b}</td></tr>',
       [
         ['i1', 'text', 'item.a', 'textNode'],
         ['i2', 'text', 'item.b', 'textNode'],
@@ -73,19 +73,19 @@ describe('sole content: text node', () => {
     [
       '< and > inside the expression',
       '<li>${item.a < 2 ? "<" : ">"}</li>',
-      '<li id="i1">${item.a < 2 ? "<" : ">"}</li>',
+      '<li data-thane-ref="i1">${item.a < 2 ? "<" : ">"}</li>',
       [['i1', 'text', 'item.a < 2 ? "<" : ">"', 'textNode']],
     ],
     [
       '> inside an attribute expression of the parent (the parent already has an id)',
       '<li title="${x() > 1}">${item.name}</li>',
-      '<li id="b1" title="${x()> 1}">${item.name}</li>',
+      '<li data-thane-ref="b1" title="${x()> 1}">${item.name}</li>',
       [['b1', 'text', 'item.name', 'textNode']],
     ],
     [
       'the parent also has an item attribute binding',
       '<li title=${item.t}>${item.name}</li>',
-      '<li id="i2" title="${item.t}">${item.name}</li>',
+      '<li data-thane-ref="i2" title="${item.t}">${item.name}</li>',
       [
         ['i2', 'text', 'item.name', 'textNode'],
         ['i2', 'attr', 'item.t', null],
@@ -94,7 +94,7 @@ describe('sole content: text node', () => {
     [
       'an element with its own sole binding next to a mixed one',
       '<li><span>${item.a}</span>${item.b}</li>',
-      '<li><span id="i1">${item.a}</span><!--i2-->${item.b}</li>',
+      '<li><span data-thane-ref="i1">${item.a}</span><!--i2-->${item.b}</li>',
       [
         ['i1', 'text', 'item.a', 'textNode'],
         ['i2', 'text', 'item.b', 'commentMarker'],
@@ -195,19 +195,19 @@ describe('sole content: defects pinned as they are', () => {
       // was left as row text (K3)
       'H-12: nested braces in the expression',
       '<li>${fmt({ a: item.a })}</li>',
-      '<li id="i1">${fmt({ a: item.a })}</li>',
+      '<li data-thane-ref="i1">${fmt({ a: item.a })}</li>',
       [['i1', 'text', 'fmt({ a: item.a })', 'textNode']],
     ],
     [
       'H-12: a nested template literal in the expression',
       '<li>${`x${item.a}`}</li>',
-      '<li id="i1">${`x${item.a}`}</li>',
+      '<li data-thane-ref="i1">${`x${item.a}`}</li>',
       [['i1', 'text', '`x${item.a}`', 'textNode']],
     ],
     [
       'H-12: a brace in a string in the expression, and two levels of braces',
       "<li>${item.on ? '}' : fmt({ a: { b: item.a } })}</li>",
-      '<li id="i1">${item.on ? \'}\' : fmt({ a: { b: item.a } })}</li>',
+      '<li data-thane-ref="i1">${item.on ? \'}\' : fmt({ a: { b: item.a } })}</li>',
       [['i1', 'text', "item.on ? '}' : fmt({ a: { b: item.a } })", 'textNode']],
     ],
   ]);
@@ -221,13 +221,13 @@ describe('sole content: the parent tag as the parser reads it', () => {
       // Before TA-7 the scan for the end of the open tag stopped at the `>` in the value: comment marker
       'TA-7: a > in a quoted attribute value of the parent',
       '<li title="a>b">${item.name}</li>',
-      '<li id="i1" title="a>b">${item.name}</li>',
+      '<li data-thane-ref="i1" title="a>b">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
       'TA-7: a /> in a quoted attribute value of the parent',
       '<li title="a/>">${item.name}</li>',
-      '<li id="i1" title="a/>">${item.name}</li>',
+      '<li data-thane-ref="i1" title="a/>">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
@@ -235,21 +235,21 @@ describe('sole content: the parent tag as the parser reads it', () => {
       // build failed in generateStaticRepeatTemplate (THANE202, element path)
       'TA-7: a < in a quoted attribute value of the parent',
       '<li title="a<b">${item.name}</li>',
-      '<li id="i1" title="a<b">${item.name}</li>',
+      '<li data-thane-ref="i1" title="a<b">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
       // The same with the < inside an attribute expression; the li's id comes from that binding
       'TA-7: a < in an attribute expression of the parent',
       '<li title="${a() < 1}">${item.name}</li>',
-      '<li id="b1" title="${a() < 1}">${item.name}</li>',
+      '<li data-thane-ref="b1" title="${a() < 1}">${item.name}</li>',
       [['b1', 'text', 'item.name', 'textNode']],
     ],
     [
       // Before TA-7 the forward scan only accepted `</name>`: comment marker
       'TA-7: whitespace in the closing tag',
       '<li>${item.name}</li >',
-      '<li id="i1">${item.name}</li>',
+      '<li data-thane-ref="i1">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
   ]);

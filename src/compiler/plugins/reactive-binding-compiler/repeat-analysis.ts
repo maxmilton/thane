@@ -33,7 +33,9 @@ import {
   collectWhenElseBlocks,
   buildConditionalEdits,
   buildWhenElseEdits,
-  buildElementIdEdits,
+  buildBoundMarkEdits,
+  anchorMark,
+  BOUND_MARK,
   applyTemplateEdits,
   stripPropertyBoundAttributes,
   toRepeatBlock,
@@ -87,15 +89,14 @@ const createRowRefRewriter = (itemVar: string, indexVar: string | undefined) => 
 };
 
 /**
- * The id used to locate a bound element inside a row template. A developer-supplied id is
- * reused as-is (so it survives in the row and nothing else has to be injected); otherwise a
- * generated one is assigned. Either way the element is registered in elementIdMap, which is
- * what gets the id attribute injected and lets generateStaticRepeatTemplate compute its path.
+ * The binding id of a bound element inside a row template. Registering the element in
+ * elementIdMap is what marks it (BOUND_MARK), which lets generateStaticRepeatTemplate compute its
+ * path; a developer's id is left alone.
  */
 const ensureRowElementId = (el: HtmlElement, state: IdState, prefix: 'b' | 'i'): string => {
   let id = state.elementIdMap.get(el);
   if (!id) {
-    id = el.attributes.get('id')?.value || `${prefix}${state.idCounter++}`;
+    id = `${prefix}${state.idCounter++}`;
     state.elementIdMap.set(el, id);
   }
   return id;
@@ -115,7 +116,6 @@ export const generateStaticRepeatTemplate = (
   itemBindings: ItemBinding[],
   itemEvents?: ItemEventBinding[],
   signalBindings?: SimpleBinding[],
-  directiveAnchorIds?: string[],
 ): StaticTemplateInfo => {
   // Parse the template to get element structure
   const parsed = parseHtmlTemplate(itemTemplate);
@@ -123,12 +123,12 @@ export const generateStaticRepeatTemplate = (
   // Rows are cloned from one element and reconciled by that element, so a row template is
   // exactly one root element; anything else is reported rather than rendered another way.
   if (parsed.roots.length !== 1) {
-    // A row that is only a when()/whenElse() parses as its anchor elements.
-    const onlyDirectives = parsed.roots.length > 0 && parsed.roots.every((r) => r.tagName === 'template');
+    // A row that is only directives is only their anchor comments (A1-3, A1-4).
+    const onlyDirectives = parsed.roots.length === 0 && /<!--[ib]\d+[(|).]-->/.test(itemTemplate);
     throw new Error(
       `${ErrorCode.REPEAT_ROW_ROOT}: a repeat() row template must have exactly one root element` +
         (onlyDirectives
-          ? '; this row is only a when()/whenElse() directive. Wrap it in an element such as <li>.'
+          ? '; this row is only a directive (when(), whenElse() or repeat()). Wrap it in an element such as <li>.'
           : ` (found ${parsed.roots.length}). Wrap the row's content in a single element.`),
     );
   }
@@ -137,13 +137,13 @@ export const generateStaticRepeatTemplate = (
 
   // Build a map of element ID to bindings (only element-navigable bindings)
   // Comment-marker bindings (textBindingMode === 'commentMarker') are handled
-  // separately via TreeWalker and are not included here.
+  // separately, by the path to the text node after their marker, and are not included here.
   // Mixed signal+item bindings (outerSignalNames set) are handled via the
   // dedicated mixedSignalItemBindings path and excluded from regular element bindings.
   const bindingsByElement = new Map<string, ItemBinding[]>();
   const mixedItemBindings: ItemBinding[] = [];
   for (const binding of itemBindings) {
-    if (binding.textBindingMode === 'commentMarker') continue; // handled via TreeWalker
+    if (binding.textBindingMode === 'commentMarker') continue; // reached through its marker
     if (binding.outerSignalNames && binding.outerSignalNames.length > 0) {
       mixedItemBindings.push(binding); // handled via per-item signal subscription
       continue;
@@ -157,23 +157,16 @@ export const generateStaticRepeatTemplate = (
   // Compute path for each element with bindings
   const elementPaths = new Map<string, number[]>();
 
+  // A bound element is found by its mark
   const findElementPath = (el: HtmlElement, targetId: string, currentPath: number[]): number[] | null => {
-    // Check if this element has the target ID
-    const elId = el.attributes.get('id')?.value;
-    if (elId === targetId) {
-      return currentPath;
-    }
-
-    // Search children
+    if (el.attributes.get(BOUND_MARK)?.value === targetId) return currentPath;
     for (let i = 0; i < el.children.length; i++) {
-      const child = el.children[i]!;
-      const childPath = findElementPath(child, targetId, [...currentPath, i]);
+      const childPath = findElementPath(el.children[i]!, targetId, [...currentPath, i]);
       if (childPath) return childPath;
     }
-
     return null;
   };
-  // The root's own id resolves to [] (findElementPath checks the element before its children)
+  // The root's own mark resolves to [] (findElementPath checks the element before its children)
   const pathOf = (id: string): number[] | null => findElementPath(rootEl, id, []);
   const pathError = (): Error =>
     new Error(
@@ -201,9 +194,8 @@ export const generateStaticRepeatTemplate = (
   // Property-bound attributes (checked, disabled, value, …) must not ship in the template
   staticHtml = stripPropertyBoundAttributes(staticHtml, itemBindings);
 
-  // Remove inline id attributes that were only added for bindings
-  // These follow the pattern id="i0", id="i1", id="b0", id="b1", etc.
-  staticHtml = staticHtml.replace(/\s*id="[ib]\d+"/g, '');
+  // The marks stay: the row's code finds its text markers, anchors and child hosts by them in the
+  // template as emitted, which is written without them (A1-4)
 
   // Aggressively strip whitespace BEFORE inserting comment marker placeholders.
   // - Collapse runs to single space
@@ -216,8 +208,8 @@ export const generateStaticRepeatTemplate = (
   );
 
   // Insert comment marker placeholders AFTER stripping (so they survive intact).
-  // Mixed-content text bindings need: <!--iN--> + text node + <!----> boundary
-  // for commentNode.nextSibling.data to work at runtime.
+  // Mixed-content text bindings need: <!--iN--> + text node + <!----> boundary, so that the
+  // binding's text node exists on its own for the row's path to reach it.
   staticHtml = staticHtml.replace(/(<!--[ib]\d+-->)/g, '$1 <!---->');
 
   // Build element bindings array (sorted by path for consistent indexing)
@@ -295,16 +287,6 @@ export const generateStaticRepeatTemplate = (
     }
   }
 
-  // Compute paths for directive anchors: conditional/repeat anchors (Step 14/15)
-  let directiveAnchorPaths: Map<string, number[]> | undefined;
-  if (directiveAnchorIds && directiveAnchorIds.length > 0) {
-    directiveAnchorPaths = new Map();
-    for (const anchorId of directiveAnchorIds) {
-      const path = pathOf(anchorId);
-      if (path) directiveAnchorPaths.set(anchorId, path);
-    }
-  }
-
   // Compute paths for mixed signal+item bindings (Step 13c)
   let mixedSignalItemBindings: StaticTemplateInfo['mixedSignalItemBindings'];
   if (mixedItemBindings.length > 0) {
@@ -332,7 +314,6 @@ export const generateStaticRepeatTemplate = (
     eventElementPaths,
     ...(signalElementBindings ? { signalElementBindings } : {}),
     ...(signalCommentBindings && signalCommentBindings.length > 0 ? { signalCommentBindings } : {}),
-    ...(directiveAnchorPaths ? { directiveAnchorPaths } : {}),
     ...(mixedSignalItemBindings && mixedSignalItemBindings.length > 0 ? { mixedSignalItemBindings } : {}),
   };
 };
@@ -587,7 +568,7 @@ const collectItemAttrBindings = (
 
         // One id per element, shared by every item attribute on it and by any event handler
         // or sole-content text binding already assigned to it. Registering the element in
-        // elementIdMap is what gets `id="…"` injected into the template, which is how
+        // elementIdMap is what marks it in the template, which is how
         // generateStaticRepeatTemplate finds the element's navigation path.
         const id = ensureRowElementId(el, state, 'i');
 
@@ -765,7 +746,7 @@ export const processItemTemplate = (
 
   const edits: TemplateEdit[] = [...buildConditionalEdits(conditionals), ...buildWhenElseEdits(whenElseBlocks)];
   for (const rep of repeatBlocks) {
-    edits.push({ start: rep.startIndex, end: rep.endIndex, replacement: `<template id="${rep.id}"></template>` });
+    edits.push({ start: rep.startIndex, end: rep.endIndex, replacement: anchorMark(rep.id, '.') });
   }
   // Inject comment markers for signal text bindings (AST-driven, no regex)
   for (const [exprPos, { spanId, exprEnd }] of textBindingSpans) {
@@ -805,10 +786,10 @@ export const processItemTemplate = (
   }
 
   // The parent of a sole-content text binding is a bound element like any other: register it
-  // so it shares one id with any attribute or event binding on it, and so buildElementIdEdits
-  // injects the id attribute (or leaves a developer-supplied id in place).
+  // so it shares one id with any attribute or event binding on it, and so buildBoundMarkEdits
+  // marks it.
   for (const [parentEl, id] of parentElementIds) {
-    const elementId = elementIdMap.get(parentEl) ?? (parentEl.attributes.get('id')?.value || id);
+    const elementId = elementIdMap.get(parentEl) ?? id;
     elementIdMap.set(parentEl, elementId);
     if (elementId === id) continue;
     for (const binding of itemBindings) {
@@ -822,7 +803,7 @@ export const processItemTemplate = (
       replacement: `${attrName}="\${${expr}}"`,
     });
   }
-  edits.push(...buildElementIdEdits(elementIdMap, allRanges));
+  edits.push(...buildBoundMarkEdits(elementIdMap, allRanges));
   for (const binding of parsed.bindings) {
     if (binding.type === 'event') {
       const alreadyEdited = edits.some((e) => e.start <= binding.expressionStart && e.end >= binding.expressionEnd);

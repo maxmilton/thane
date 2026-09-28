@@ -11,8 +11,6 @@ import {
   findElementsWithWhenDirective,
   walkElements,
   getElementHtml,
-  injectIdIntoFirstElement,
-  firstElementId,
   escapeRawTemplateLiteral,
   type HtmlElement,
   type ParsedTemplate,
@@ -35,6 +33,28 @@ export interface IdState {
   elementIdMap: Map<HtmlElement, string>;
 }
 
+/**
+ * The attribute that marks a bound element while its template is compiled (A1-2): the element's
+ * position in the emitted template is computed from it, and the emitted HTML carries none. It is
+ * never the developer's `id`, which stays on its element and is not used to find it.
+ */
+export const BOUND_MARK = 'data-thane-ref';
+
+/**
+ * The comment that marks an anchor while its template is compiled: a `when()` sits between `(` and
+ * `)`, a `whenElse()` has `(` then-branch `|` else-branch `)` (A1-3), and `.` is a single anchor, the
+ * end of a list or the place of a child component (A1-4), each with the directive's id. A text
+ * binding's marker is the id alone (`<!--b3-->`, the text node after it is the binding's). The
+ * emitted HTML carries the same comments without data (`<!---->`).
+ */
+export const anchorMark = (id: string, kind: '(' | '|' | ')' | '.'): string => `<!--${id}${kind}-->`;
+
+/** A template without its bound-element marks. */
+export const stripBoundMarks = (html: string): string => html.replace(/ data-thane-ref="[^"]*"/g, '');
+
+/** A template without its compile-time marks: the HTML that is emitted, which holds no id (A1-4). */
+export const stripMarks = (html: string): string => stripBoundMarks(html).replace(/<!--[ib]\d+[(|).]?-->/g, '<!---->');
+
 export interface TemplateEdit {
   start: number;
   end: number;
@@ -55,10 +75,7 @@ export interface SubTemplateResult {
   nextId: number;
 }
 
-/**
- * Processes a directive sub-template. `parentId` is the id the sub-template's
- * root element must carry so the runtime can locate it.
- */
+/** Processes a directive sub-template; `parentId` is the directive's (or branch's) id. */
 export type SubTemplateProcessor = (template: string, parentId: string) => SubTemplateResult;
 
 // ============================================================================
@@ -159,9 +176,8 @@ export const collectConditionalBlocks = (
     const signalNames = [
       ...new Set([...(whenBinding.signalNames || [whenBinding.signalName]), ...(rewritten?.extraSignals ?? [])]),
     ].filter((s) => s !== '');
-    // Reuse user-defined ID if the element already has one, otherwise generate a compiler ID
-    const existingId = condEl.attributes.get('id');
-    const conditionalId = existingId ? existingId.value : `b${state.idCounter++}`;
+    // The directive's id is the compiler's: a developer's id stays on the element (A1-3)
+    const conditionalId = `b${state.idCounter++}`;
     state.elementIdMap.set(condEl, conditionalId);
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
     const base = {
@@ -181,7 +197,7 @@ export const collectConditionalBlocks = (
     state.idCounter = processed.nextId;
     conditionals.push({
       ...base,
-      templateContent: injectIdIntoFirstElement(processed.processedContent, conditionalId),
+      templateContent: processed.processedContent,
       nestedBindings: processed.bindings,
       nestedConditionals: processed.conditionals,
       nestedWhenElse: processed.whenElseBlocks,
@@ -220,9 +236,9 @@ export const collectWhenElseBlocks = (
     const signalNames = [
       ...new Set([...(binding.signalNames || [binding.signalName]), ...(rewritten?.extraSignals ?? [])]),
     ].filter((s) => s !== '');
-    // A branch root's own id is the branch id: nothing is injected and the id survives
-    const thenId = firstElementId(binding.thenTemplate) ?? `b${state.idCounter++}`;
-    const elseId = firstElementId(binding.elseTemplate) ?? `b${state.idCounter++}`;
+    // The branches' ids are the compiler's; a branch's root keeps any id of its own (A1-3)
+    const thenId = `b${state.idCounter++}`;
+    const elseId = `b${state.idCounter++}`;
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
 
     const thenProcessed = processSubTemplate(binding.thenTemplate, thenId);
@@ -342,11 +358,16 @@ export const applyTemplateEdits = (source: string, edits: TemplateEdit[]): strin
   for (const edit of edits) {
     result = result.substring(0, edit.start) + edit.replacement + result.substring(edit.end);
   }
-  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style> (H-03)
+  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style> (H-03).
+  // Between a tag and an anchor comment it goes as it does between two tags: anchors stand where
+  // `<template>` placeholders stood before A1, and a list's container must hold only its rows and
+  // its anchor for a clear to empty it at once (H-05). A text marker keeps the whitespace before it,
+  // which is text.
   return outsideVerbatim(result, (html) =>
     html
       .replace(/\s+/g, ' ')
       .replace(/>\s+<(?![!-])/g, '><')
+      .replace(/>\s+(?=<!--[ib]\d+[(|).]-->)/g, '>')
       .replace(/(<!--[ib]\d+-->)(<!---->)/g, '$1 $2')
       .replace(/\s+>/g, '>')
       .trim(),
@@ -354,41 +375,36 @@ export const applyTemplateEdits = (source: string, edits: TemplateEdit[]): strin
 };
 
 /**
- * Build standard edits from conditionals: replace with rendered content or hidden template.
- * A condition that could not be resolved at compile time (initialValue undefined)
- * is deferred: the runtime evaluates it at mount and shows the content if needed.
+ * Build standard edits from conditionals: the content between the directive's two anchors,
+ * pre-rendered when the condition is true at compile time, otherwise nothing between them. A
+ * condition that could not be resolved at compile time (initialValue undefined) is deferred: the
+ * runtime evaluates it at mount and shows the content if needed.
  */
 export const buildConditionalEdits = (conditionals: ConditionalBlock[]): TemplateEdit[] => {
   return conditionals.map((cond) => ({
     start: cond.startIndex,
     end: cond.endIndex,
-    replacement: cond.initialValue === true ? cond.templateContent : `<template id="${cond.id}"></template>`,
+    replacement:
+      anchorMark(cond.id, '(') + (cond.initialValue === true ? cond.templateContent : '') + anchorMark(cond.id, ')'),
   }));
 };
 
 /**
- * Build standard edits from whenElse blocks. A pre-rendered branch carries its branch id on its
- * first element, so the runtime can find it and toggle it.
+ * Build standard edits from whenElse blocks: three anchors, the then-branch between the first two
+ * and the else-branch between the last two, the branch the compile-time value selects pre-rendered.
+ * An unresolved condition (initialValue undefined) pre-renders neither; the runtime decides at mount.
  */
 export const buildWhenElseEdits = (whenElseBlocks: WhenElseBlock[]): TemplateEdit[] => {
-  return whenElseBlocks.map((we) => {
-    // initialValue === true  → pre-render then, defer else
-    // initialValue === false → pre-render else, defer then
-    // initialValue === undefined (not statically resolvable) → defer both; runtime evaluates at mount
-    const thenReplacement =
-      we.initialValue === true
-        ? injectIdIntoFirstElement(we.thenTemplate, we.thenId)
-        : `<template id="${we.thenId}"></template>`;
-    const elseReplacement =
-      we.initialValue === false
-        ? injectIdIntoFirstElement(we.elseTemplate, we.elseId)
-        : `<template id="${we.elseId}"></template>`;
-    return {
-      start: we.startIndex,
-      end: we.endIndex,
-      replacement: thenReplacement + elseReplacement,
-    };
-  });
+  return whenElseBlocks.map((we) => ({
+    start: we.startIndex,
+    end: we.endIndex,
+    replacement:
+      anchorMark(we.thenId, '(') +
+      (we.initialValue === true ? we.thenTemplate : '') +
+      anchorMark(we.thenId, '|') +
+      (we.initialValue === false ? we.elseTemplate : '') +
+      anchorMark(we.thenId, ')'),
+  }));
 };
 
 /**
@@ -409,28 +425,25 @@ export const stripPropertyBoundAttributes = (
     const id = b.id ?? b.elementId;
     if (!id) continue;
     const attr = `\\s${esc(b.property)}(?:="[^"]*"|='[^']*'|(?=[\\s/>]))`;
-    out = out.replace(new RegExp(`(<[^>]*\\bid="${esc(id)}"[^>]*?)${attr}`), '$1');
-    out = out.replace(new RegExp(`(<[^>]*?)${attr}([^>]*\\bid="${esc(id)}")`), '$1$2');
+    const mark = `\\b${BOUND_MARK}="${esc(id)}"`;
+    out = out.replace(new RegExp(`(<[^>]*${mark}[^>]*?)${attr}`), '$1');
+    out = out.replace(new RegExp(`(<[^>]*?)${attr}([^>]*${mark})`), '$1$2');
   }
   return out;
 };
 
-/**
- * Build edits to inject element IDs into non-conditional elements that have bindings.
- * Elements whose user-supplied id was reused as the binding id are left untouched.
- */
-export const buildElementIdEdits = (elementIdMap: Map<HtmlElement, string>, allRanges: Range[]): TemplateEdit[] => {
+/** Build edits that mark each bound element outside the directive ranges with its binding id (BOUND_MARK). */
+export const buildBoundMarkEdits = (elementIdMap: Map<HtmlElement, string>, allRanges: Range[]): TemplateEdit[] => {
   const isInsideRange = buildRangeOverlapChecker(allRanges);
   const edits: TemplateEdit[] = [];
 
   for (const [element, id] of elementIdMap) {
     if (isInsideRange(element.tagStart)) continue;
-    if (element.attributes.get('id')?.value === id) continue;
 
     edits.push({
       start: element.tagNameEnd,
       end: element.tagNameEnd,
-      replacement: ` id="${id}"`,
+      replacement: ` ${BOUND_MARK}="${id}"`,
     });
   }
 

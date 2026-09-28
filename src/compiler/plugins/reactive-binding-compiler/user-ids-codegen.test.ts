@@ -19,26 +19,27 @@ mount(App);
 
 const componentTemplate = (js: string): string => js.match(/__tpl = _T\(`([^`]*)`\)/)?.[1] ?? '';
 
-describe('Developer ids are kept on bound elements', () => {
-  test('an attribute-bound element keeps its id and is looked up by it', async () => {
+// A1-2: a bound element is reached by its position in the template (`_ns[i]`, the template's
+// elements in document order); its developer id stays on it and is not used to find it.
+describe('Developer ids are kept on bound elements and not used to find them', () => {
+  test('an attribute-bound element keeps its id and is reached by position', async () => {
     const js = await buildAndReadJs(app('<p id="panel" title=${kind()}>x</p>'));
     expect(componentTemplate(js)).toMatch(/<p id="panel" title="[^"]*">x<\/p>/);
-    expect(componentTemplate(js)).not.toMatch(/id="b\d+"/);
-    expect(js).toMatch(/const _u_panel = _gid\("panel"\)/);
-    expect(js).toMatch(/_u_panel\.setAttribute\("title", /);
+    expect(componentTemplate(js)).not.toMatch(/id="b\d+"|data-thane-ref/);
+    // <div> is element 0, <p> element 1
+    expect(js).toMatch(/const (b\d+) = _ns\[1\];\s+\1\.setAttribute\("title", /);
+    expect(js).not.toMatch(/querySelector\("#|_gid|_u_panel/);
   });
 
-  test('an id that is not a JavaScript identifier still works', async () => {
+  test('an id that is not a JavaScript identifier is left alone', async () => {
     const js = await buildAndReadJs(app('<p id="my-box" style="color: ${kind()}">x</p>'));
     expect(componentTemplate(js)).toMatch(/<p id="my-box" style="[^"]*">x<\/p>/);
-    expect(js).toMatch(/const _u_my\$2dbox = _gid\("my-box"\)/);
-    expect(js).toMatch(/_u_my\$2dbox\.style\.color = /);
+    expect(js).toMatch(/const (b\d+) = _ns\[1\];\s+\1\.style\.color = /);
   });
 
   test('an id equal to a component variable does not shadow it', async () => {
     const js = await buildAndReadJs(app('<p id="kind" title=${kind()}>x</p>'));
-    expect(js).toMatch(/const _u_kind = _gid\("kind"\)/);
-    expect(js).not.toMatch(/const kind = _gid/);
+    expect(js).not.toMatch(/const kind = _ns/);
     expect(js).toMatch(/kind\.subscribe\(/);
   });
 
@@ -46,29 +47,52 @@ describe('Developer ids are kept on bound elements', () => {
     const js = await buildAndReadJs(app('<label for="name">N</label><input id="name" value=${kind()} />'));
     // `value` is written as a property, so the static template ships no attribute for it
     expect(componentTemplate(js)).toMatch(/<input id="name" \/?>/);
-    expect(js).toMatch(/_u_name\.value = /);
+    expect(js).toMatch(/const (b\d+) = _ns\[2\];\s+\1\.value = /);
   });
 
-  test('whenElse() branch roots keep their ids and the directive uses them', async () => {
+  test('an empty id attribute is left alone and does not break the lookup (K14, H-45)', async () => {
+    const js = await buildAndReadJs(app('<button id="" @click=${() => kind("x")}>b</button>'));
+    expect(componentTemplate(js)).toMatch(/<button id="">b<\/button>/);
+    expect(js).toMatch(/_ns\[1\]\.addEventListener\("click", /);
+    expect(js).not.toMatch(/querySelector\("#/);
+  });
+
+  test('whenElse() branch roots keep their ids; the directive does not use them (A1-3)', async () => {
     const js = await buildAndReadJs(
       app('${whenElse(show(), html`<div id="on-panel">${kind()}</div>`, html`<div id="off-panel">off</div>`)}'),
     );
-    // `show` is statically true: the then-branch is pre-rendered with its id, the else-branch deferred
-    expect(componentTemplate(js)).toMatch(/<div id="on-panel">/);
-    expect(componentTemplate(js)).toMatch(/<template id="off-panel"><\/template>/);
-    expect(componentTemplate(js)).not.toMatch(/id="b\d+"/);
-    expect(js).toMatch(/__bindIfExpr\(r, \[show\], \(\) => show\(\), "on-panel", /);
-    expect(js).toMatch(/__bindIfExpr\(r, \[show\], \(\) => !show\(\), "off-panel", /);
+    // `show` is statically true: the then-branch is pre-rendered between the first two anchors, and
+    // the else-branch leaves nothing between the last two
+    expect(componentTemplate(js)).toMatch(
+      /^<div><!----><div id="on-panel"><!---->on<!----><\/div><!----><!----><\/div>$/,
+    );
+    expect(js).toMatch(/__bindIfExpr\(_ws_(b\d+), _wm_\1, \[show\], \(\) => show\(\), `<div id="on-panel">/);
+    expect(js).toMatch(
+      /__bindIfExpr\(_wm_(b\d+), _we_\1, \[show\], \(\) => !show\(\), `<div id="off-panel">off<\/div>`/,
+    );
   });
 
-  test('a whenElse() inside a row keeps branch-root ids', async () => {
+  test('an id of the compiler form is a developer id like any other (THANE406 retired, A1-5)', async () => {
+    const js = await buildAndReadJs(app('<p id="b0" title=${kind()}>x</p><i id="b1">${kind()}</i>'));
+    expect(componentTemplate(js)).toMatch(/^<div><p id="b0" title="on">x<\/p><i id="b1"><!---->on<!----><\/i><\/div>$/);
+    expect(js).toMatch(/\.setAttribute\("title", /);
+  });
+
+  test("a comment written in the form of the compiler's markers is reported, not taken for one (A1-5)", async () => {
+    // Ids count from 0 in every file, so the first text binding's marker is <!--b0--> too
+    await expect(buildAndReadJs(app('<!--b0--><p>${kind()}</p>'))).rejects.toThrow(
+      /THANE009: a comment in this template/,
+    );
+  });
+
+  test('a whenElse() inside a row keeps branch-root ids in its branch templates', async () => {
     const js = await buildAndReadJs(
       app(
         '<ul>${repeat(rows(), (item) => html`<li>${whenElse(show(), html`<b id="row-on">${item.label}</b>`, html`<i id="row-off">off</i>`)}</li>`, null, (item) => item.id)}</ul>',
       ),
     );
-    expect(js).toMatch(/"row-on"/);
-    expect(js).toMatch(/"row-off"/);
-    expect(js).toMatch(/_cond_(_u_)?row\$2don/);
+    expect(js).toMatch(/`<b id="row-on">/);
+    expect(js).toMatch(/`<i id="row-off">off<\/i>`/);
+    expect(js).not.toMatch(/_u_row|querySelector\("#row/);
   });
 });

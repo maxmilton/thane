@@ -227,8 +227,8 @@ describe('attribute ordering and completeness', () => {
   test('static-dynamic-static: all attrs present in original order', () => {
     const { processedContent } = process('<div class="card" title=${label()} data-testid="item">${label()}</div>');
     const names = attrNames(processedContent);
-    // id is injected first by the compiler
-    expect(names[0]).toBe('id');
+    // the bound element's mark (stripped when the template is emitted) is injected first by the compiler
+    expect(names[0]).toBe('data-thane-ref');
     expect(names).toContain('class');
     expect(names).toContain('title');
     expect(names).toContain('data-testid');

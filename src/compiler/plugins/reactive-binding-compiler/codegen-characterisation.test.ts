@@ -6,7 +6,8 @@
  * signal-binding sections of outer and nested rows (the nested-row paths had no test before).
  *
  * The analysis runs for real (`processHtmlTemplateWithConditionals`, ids from 0); child mounts are
- * given the way `transformDefineComponentSource` partitions them. The output is compared with
+ * given the way `transformDefineComponentSource` partitions them, and their hosts placed as it
+ * places them. The output is compared with
  * `codegen-characterisation.golden.txt`, one `=== <case> ===` section per case.
  *
  * To regenerate after an intended change: `UPDATE_GOLDEN=1 bun test <this file>`, and review the diff.
@@ -16,6 +17,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
 import { generateInitBindingsFunction, generateStaticTemplate } from './codegen.js';
+import { placeChildHosts } from './child-hosts.js';
 import type { ConditionalBlock, EmitOptions, WhenElseBlock } from './types.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
 import { minifyHTML } from '../minification/template-minifier.js';
@@ -29,12 +31,12 @@ const DEV: EmitOptions = { html: (template) => template, selector: (name) => nam
 const PROD: EmitOptions = { html: minifyHTML, selector: (name) => `m-${name.length}` };
 
 interface Mount {
-  /** Anchor id written into the template as `<template id="…"></template>` */
+  /** The id of the placeholder the precompiler writes into the template, `<!--b900.-->` (A1-4) */
   anchorId: string;
   componentName: string;
   propsExpression: string;
-  /** Which directive owns the mount, by the directive's position in the analysis result */
-  owner: (r: ReturnType<typeof processHtmlTemplateWithConditionals>) => string;
+  /** Which directive owns the mount, by the directive's position in the analysis result (null: none) */
+  owner: (r: ReturnType<typeof processHtmlTemplateWithConditionals>) => string | null;
 }
 
 interface Case {
@@ -47,6 +49,7 @@ interface Case {
 
 const firstRepeat: Mount['owner'] = (r) => r.repeatBlocks[0]!.id;
 const firstCond: Mount['owner'] = (r) => r.conditionals[0]!.id;
+const topLevel: Mount['owner'] = () => null;
 
 const cases: Case[] = [
   // ── Top level: simple and expression bindings, events ──
@@ -171,19 +174,17 @@ const cases: Case[] = [
   },
   {
     name: 'rows: no bindings with a child mount and a named index',
-    template: '<ul>${repeat(items(), (it, i) => html`<li><template id="b900"></template></li>`)}</ul>',
+    template: '<ul>${repeat(items(), (it, i) => html`<li><!--b900.--></li>`)}</ul>',
     mounts: [{ anchorId: 'b900', componentName: 'Kid', propsExpression: '{ label: it.name, i }', owner: firstRepeat }],
   },
   {
     name: 'rows: no bindings with a child mount, empty template',
-    template:
-      '<ul>${repeat(items(), (it) => html`<li><template id="b900"></template></li>`, html`<li>none</li>`)}</ul>',
+    template: '<ul>${repeat(items(), (it) => html`<li><!--b900.--></li>`, html`<li>none</li>`)}</ul>',
     mounts: [{ anchorId: 'b900', componentName: 'Kid', propsExpression: '{ it }', owner: firstRepeat }],
   },
   {
     name: 'rows: bindings with two child mounts',
-    template:
-      '<ul>${repeat(items(), (it) => html`<li><span>${it.name}</span><template id="b900"></template><template id="b901"></template></li>`)}</ul>',
+    template: '<ul>${repeat(items(), (it) => html`<li><span>${it.name}</span><!--b900.--><!--b901.--></li>`)}</ul>',
     mounts: [
       { anchorId: 'b900', componentName: 'Kid', propsExpression: '{ it }', owner: firstRepeat },
       { anchorId: 'b901', componentName: 'Other', propsExpression: '{}', owner: firstRepeat },
@@ -191,12 +192,24 @@ const cases: Case[] = [
   },
   {
     name: 'mounts: child mount inside a when',
-    template: '<div ${when(a())}><template id="b900"></template><b>${t()}</b></div>',
+    template: '<div ${when(a())}><!--b900.--><b>${t()}</b></div>',
     mounts: [{ anchorId: 'b900', componentName: 'Kid', propsExpression: '{ x: t() }', owner: firstCond }],
   },
   {
+    // A1-4: the host goes into the template where the parser keeps an element; in a table row and
+    // in svg it would not, so those keep a comment anchor that the host replaces
+    name: 'mounts: child hosts in the template, and comment anchors where the parser keeps no element',
+    template:
+      '<div><p><!--b900.--></p><table><tr><td>${t()}</td><!--b901.--></tr></table><svg><!--b902.--></svg></div>',
+    mounts: [
+      { anchorId: 'b900', componentName: 'Kid', propsExpression: '{ x: t() }', owner: topLevel },
+      { anchorId: 'b901', componentName: 'Cell', propsExpression: '{}', owner: topLevel },
+      { anchorId: 'b902', componentName: 'Icon', propsExpression: '{}', owner: topLevel },
+    ],
+  },
+  {
     name: 'mounts: child mount inside a whenElse branch',
-    template: '${whenElse(a(), html`<div><template id="b900"></template></div>`, html`<p>n</p>`)}',
+    template: '${whenElse(a(), html`<div><!--b900.--></div>`, html`<p>n</p>`)}',
     mounts: [
       {
         anchorId: 'b900',
@@ -261,6 +274,13 @@ const cases: Case[] = [
       '<ul>${repeat(items(), (it, i) => html`<li><b ${when(show())}>${lbl()}</b><i ${when(it.on && flag())} title="${it.t}" @click=${go}>${it.name}</i>${whenElse(it.done, html`<s>${it.name}</s>`, html`<u style="color: ${col()}">${i}</u>`)}</li>`)}</ul>',
   },
   {
+    // A1-3: a row whose when()/whenElse() content comes and goes keeps its delegated elements on the
+    // row (`_el.__eN`), and its selection binding stays per row
+    name: 'rows: delegated events and a selection binding after row directives',
+    template:
+      "<ul>${repeat(items(), (it) => html`<li><b ${when(it.on)}>b</b>${whenElse(it.done, html`<s>s</s>`, html`<u>u</u>`)}<a @click=${() => go(it.id)}>go</a><i class=${sel() === it.id ? 'on' : ''} @click=${go}>i</i></li>`, null, (it) => it.id)}</ul>",
+  },
+  {
     name: 'rows: row-level when with several bindings on one signal',
     template:
       '<ul>${repeat(items(), (it) => html`<li><b ${when(show())} style="color: ${col()}" title="${col()}">${col()}</b></li>`)}</ul>',
@@ -306,7 +326,7 @@ const cases: Case[] = [
   {
     name: 'production: nested rows, row directives and a child mount',
     template:
-      '<ul>${repeat(groups(), (g) => html`<li class="row">  <b ${when(on())}>${lbl()}</b>  <ol>${repeat(g.items, (it) => html`<li>  ${it.label}  </li>`)}</ol><template id="b900"></template></li>`)}</ul>',
+      '<ul>${repeat(groups(), (g) => html`<li class="row">  <b ${when(on())}>${lbl()}</b>  <ol>${repeat(g.items, (it) => html`<li>  ${it.label}  </li>`)}</ol><!--b900.--></li>`)}</ul>',
     emit: PROD,
     mounts: [{ anchorId: 'b900', componentName: 'Kid', propsExpression: '{ g }', owner: firstRepeat }],
   },
@@ -316,6 +336,8 @@ const render = (c: Case): string => {
   const emit = c.emit ?? DEV;
   const r = processHtmlTemplateWithConditionals(c.template, new Map(c.initializers ?? []), 0);
   let mounts: Map<string, { cm: ChildMountInfo; globalIndex: number }[]> | undefined;
+  const topLevelMounts: { cm: ChildMountInfo; globalIndex: number }[] = [];
+  const cms: ChildMountInfo[] = [];
   if (c.mounts) {
     mounts = new Map();
     c.mounts.forEach((m, globalIndex) => {
@@ -326,9 +348,19 @@ const render = (c: Case): string => {
         propsExpression: m.propsExpression,
         anchorId: m.anchorId,
       };
-      mounts!.set(owner, [...(mounts!.get(owner) ?? []), { cm, globalIndex }]);
+      cms.push(cm);
+      if (owner === null) topLevelMounts.push({ cm, globalIndex });
+      else mounts!.set(owner, [...(mounts!.get(owner) ?? []), { cm, globalIndex }]);
     });
   }
+  // The hosts go into the templates as transformDefineComponentSource puts them (A1-4)
+  const component = { template: r.processedContent };
+  const hosts = placeChildHosts(
+    cms,
+    component,
+    { conditionals: r.conditionals, whenElse: r.whenElseBlocks, repeats: r.repeatBlocks },
+    emit,
+  );
   const out = generateInitBindingsFunction(
     r.bindings,
     r.conditionals as ConditionalBlock[],
@@ -337,14 +369,17 @@ const render = (c: Case): string => {
     r.eventBindings,
     emit,
     mounts,
+    topLevelMounts,
+    component.template,
+    hosts,
   );
   return [
     '--- template',
-    r.processedContent,
+    component.template,
     '--- binding function body',
     out.code,
     '--- static templates',
-    generateStaticTemplate(r.processedContent, emit).replace(/^\n/, ''),
+    generateStaticTemplate(component.template, emit).replace(/^\n/, ''),
     ...(out.staticTemplates ?? []),
   ].join('\n');
 };

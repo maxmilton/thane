@@ -151,8 +151,8 @@ export interface SimpleBinding extends BindingBase {
 /**
  * An expression text binding referencing one or more signals.
  * The full JS expression is evaluated on each signal change.
- * Text bindings are rendered via comment markers: `<!--bN-->value`.
- * Updates target `commentNode.nextSibling.data` (the text node after the comment).
+ * Text bindings are rendered after a marker comment (`<!--bN-->value<!---->` while compiled, the
+ * marker emitted without its id); updates write the text node after it, reached by path.
  */
 export interface ExpressionBinding extends BindingBase {
   signalNames: string[];
@@ -212,8 +212,6 @@ export interface StaticTemplateInfo {
     commentId: string;
     signalName: string;
   }>;
-  /** Navigation paths for directive anchors: conditional/repeat anchors inside item template (Step 14/15) */
-  directiveAnchorPaths?: Map<string, number[]>;
   /** Item bindings that also reference outer signals — need per-item subscriptions */
   mixedSignalItemBindings?: Array<{
     path: number[];

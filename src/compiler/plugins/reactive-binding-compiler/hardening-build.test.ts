@@ -45,12 +45,12 @@ describe('H-02 template text reads back as the source means it', () => {
     const js = await buildAndReadJs(app(body), DEV);
     const main = cooked(new RegExp(`\\b__tpl = _T\\(${LITERAL}\\)`).exec(js)?.[1]);
     expect(main).toMatch(
-      /^<div><p>C:\\dir \$\{notExpr\} `q`<\/p><b id="b\d+">w\\x<\/b><i><!--b\d+-->v\\1 `2` \$\{3\}<!----><\/i><ul>/,
+      /^<div><p>C:\\dir \$\{notExpr\} `q`<\/p><!----><b>w\\x<\/b><!----><i><!---->v\\1 `2` \$\{3\}<!----><\/i><ul>/,
     );
-    const whenContent = cooked(new RegExp(`__bindIf\\(r, on, "b\\d+", ${LITERAL}`).exec(js)?.[1]);
-    expect(whenContent).toMatch(/^<b id="b\d+">w\\x<\/b>$/);
+    const whenContent = cooked(new RegExp(`__bindIf\\(_ws_b\\d+, _we_b\\d+, on, ${LITERAL}`).exec(js)?.[1]);
+    expect(whenContent).toMatch(/^<b>w\\x<\/b>$/);
     expect(cooked(new RegExp(`__tpl_b\\d+ = _T\\(${LITERAL}\\)`).exec(js)?.[1])).toMatch(
-      /^<li>r\\s <!--i\d+--> <!----><\/li>$/,
+      /^<li>r\\s <!----> <!----><\/li>$/,
     );
     expect(cooked(new RegExp(`\\?\\?= _T\\(${LITERAL}\\)`).exec(js)?.[1])).toBe('<li>e\\q</li>');
     // `notExpr` is text, not a binding: nothing reads it
@@ -75,8 +75,8 @@ describe('H-03 whitespace inside verbatim elements', () => {
       for (const kept of ['<pre>p 1\n    p 2</pre>', '<textarea>t 1\n  t 2</textarea>', '<pre>x 1\n  x 2</pre>']) {
         expect(all).toContain(kept);
       }
-      expect(all).toMatch(/<pre id="b\d+">w 1\n {2}w 2<\/pre>/);
-      expect(all).toMatch(/<pre>r 1\n {2}<!--i\d+--> <!----><\/pre>/);
+      expect(all).toMatch(/<pre>w 1\n {2}w 2<\/pre>/);
+      expect(all).toMatch(/<pre>r 1\n {2}<!----> <!----><\/pre>/);
       // whitespace between other elements still collapses
       expect(all).toContain('<ul>');
       expect(all).not.toMatch(/<\/p>\s+<ul>|<ul>\s+</);
@@ -100,9 +100,9 @@ describe('H-12 quote-aware expression scanning', () => {
     expect(js).toMatch(/item\.on \? ["']\}["'] : ["']\{["']/);
     expect(js).toContain('fmt({ a: { b: item.a } })');
     const branch = cooked(
-      new RegExp(`__bindIfExpr\\(r, \\[on\\], \\(\\) => on\\(\\), "b\\d+", ${LITERAL}`).exec(js)?.[1],
+      new RegExp(`__bindIfExpr\\(_ws_b\\d+, _wm_b\\d+, \\[on\\], \\(\\) => on\\(\\), ${LITERAL}`).exec(js)?.[1],
     );
-    expect(branch).toMatch(/^<i id="b\d+">`<\/i>$/);
+    expect(branch).toMatch(/^<i>`<\/i>$/);
     expect(js).not.toMatch(/\bwhenElse\(/);
   });
 });
@@ -128,9 +128,12 @@ describe('H-40 child components in the rows of a list inside a directive', () =>
   ] as const) {
     test(`inside ${shape}: the row factory mounts the child with the row's item`, async () => {
       const js = await buildAndReadJs(withKid(template), { ...DEV, extraFiles: { 'src/kid.ts': kid } });
-      // The mount is in the row factory (the row element `_el` holds the anchor) and reads the row's item
-      expect(js).toMatch(/_el\.querySelector\("#b\d+"\)/);
-      expect(js).toMatch(/H40Kid\.__f\(_cm\d+, \{ label: item\.n \}\)/);
+      // The mount is in the row factory (the row element `_el` holds the child's host, reached by
+      // path, A1-4) and reads the row's item
+      expect(js).toMatch(
+        /const (_cm\d+) = _el\.(?:first|last)ElementChild;[\s\S]*H40Kid\.__f\(\1, \{ label: item\.n \}\)/,
+      );
+      expect(js).not.toMatch(/querySelector\("#/);
       // and nothing looks for the anchor at component level
       expect(js).not.toMatch(/_gid\("b\d+"\)\.replaceWith/);
     });
@@ -188,9 +191,7 @@ describe('H-46 duplicate attributes', () => {
     expect(js).toMatch(/\.checked = c\(\)/);
     expect(js).not.toMatch(/\.disabled = /);
     const main = cooked(new RegExp(`\\b__tpl = _T\\(${LITERAL}\\)`).exec(js)?.[1]);
-    expect(main).toMatch(
-      /^<div><input id="b\d+" class="k" checked><button disabled disabled=\$\{d\(\)\}>b<\/button><\/div>$/,
-    );
+    expect(main).toMatch(/^<div><input class="k" checked><button disabled disabled=\$\{d\(\)\}>b<\/button><\/div>$/);
   });
 });
 
@@ -203,7 +204,26 @@ describe('H-42 a literal < in template text', () => {
       DEV,
     );
     expect(componentTemplate(js)).toMatch(
-      /^<div><p>1 < 2 <!--b\d+-->5<!----><\/p><b>a <= b is <!--b\d+--> <!----> ok<\/b><\/div>$/,
+      /^<div><p>1 < 2 <!---->5<!----><\/p><b>a <= b is <!----> <!----> ok<\/b><\/div>$/,
     );
   });
+});
+
+describe('A1-4 whitespace between a tag and an anchor comment', () => {
+  // Anchors stand where <template> placeholders stood: the whitespace between a tag and an anchor goes
+  // as it does between two tags, so a list's container holds only its rows and its anchor (the
+  // reconciler then clears it at once, H-05). Whitespace before a text marker is text and stays.
+  const body =
+    "  const on = signal(true);\n  const t = signal('t');\n  const items = signal(['a']);\n" +
+    '  return { template: html`<div>\n  <table><tbody>\n    ${repeat(items(), (it) => html`<tr><td>${it}</td></tr>`)}\n  </tbody></table>\n' +
+    '  <span>a</span> <i ${when(on())}>w</i> <b>b</b> ${whenElse(on(), html`<u>y</u>`, html`<s>n</s>`)} text ${t()}\n</div>` };';
+  for (const mode of ['dev', 'prod'] as const) {
+    test(`a list, a when() and a whenElse() after tags; a text binding after text (${mode})`, async () => {
+      const js = await buildAndReadJs(app(body), { ...DEV, config: { ...DEV.config, isProd: mode === 'prod' } });
+      // the component template, as emitted (no quote or backslash in it, so the same in both modes)
+      expect(js).toContain(
+        '<div><table><tbody><!----></tbody></table><span>a</span><!----><i>w</i><!----><b>b</b><!----><u>y</u><!----><!----> text <!---->t<!----></div>',
+      );
+    });
+  }
 });

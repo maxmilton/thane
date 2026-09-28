@@ -28,7 +28,6 @@ export {
   hasHtmlTemplates,
   toCamelCase,
   pascalToKebab,
-  generateComponentHTML,
   renameIdentifierInExpression,
   expressionReferencesIdentifier,
   parseArrowFunction,

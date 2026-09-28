@@ -24,12 +24,12 @@ const rowTemplate = (js: string): string | undefined => /__tpl_b\d+ = _T\(`([^`]
 describe('sole content through the build (TA-7)', () => {
   test('a void sibling before: comment marker, the void element gets no id', async () => {
     const js = await buildAndReadJs(app('<li><img src="x">${item.name}</li>'));
-    expect(rowTemplate(js)).toMatch(/^<li><img src="x"><!--i\d+--> <!----><\/li>$/);
+    expect(rowTemplate(js)).toBe('<li><img src="x"><!----> <!----></li>');
   });
 
   test('a comment before: comment marker', async () => {
     const js = await buildAndReadJs(app('<li><!-- c -->${item.name}</li>'));
-    expect(rowTemplate(js)).toMatch(/^<li><!-- c --><!--i\d+--> <!----><\/li>$/);
+    expect(rowTemplate(js)).toBe('<li><!-- c --><!----> <!----></li>');
   });
 
   test('a < in an attribute value of the parent builds (it failed with THANE202 before TA-7)', async () => {

@@ -25,8 +25,6 @@ export {
   findElementsWithWhenDirective,
   getElementHtml,
   attributeDomProperty,
-  injectIdIntoFirstElement,
-  firstElementId,
   escapeTemplateLiteral,
   escapeRawTemplateLiteral,
 } from './html-utils.js';

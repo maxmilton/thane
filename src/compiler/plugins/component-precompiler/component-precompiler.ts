@@ -9,11 +9,11 @@ import {
   FN,
   createLoaderResult,
   extendsComponentQuick,
-  generateComponentHTML,
   createBuildContext,
   applyEdits,
 } from '../../utils/index.js';
 import { transformDefineComponentSource } from '../reactive-binding-compiler/index.js';
+import { anchorMark } from '../reactive-binding-compiler/template-utils.js';
 import type { CompileOptions } from '../reactive-binding-compiler/index.js';
 import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
 import { ErrorCode, createError } from '../../errors.js';
@@ -29,7 +29,7 @@ export interface ChildMountInfo {
   selector: string;
   /** Raw source text of the props argument, e.g. "{ color: myColor }" */
   propsExpression: string;
-  /** Pre-allocated anchor ID from the CTFE counter: "b0", "b1", … */
+  /** Pre-allocated id from the CTFE counter ("b0", "b1", …): the child's placeholder is `<!--b0.-->` */
   anchorId: string;
 }
 
@@ -320,8 +320,9 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           const componentCalls = findComponentCallsCTFE(source, sourceFile, componentDefinitions);
 
           if (componentCalls.length > 0) {
-            // CTFE counter — allocates b0, b1, … for child component anchors.
-            // The binding compiler starts its idCounter at this offset.
+            // CTFE counter — allocates b0, b1, … for child component placeholders, comments the
+            // binding compiler turns into the child's host element or anchor (A1-4). It starts its
+            // own ids after these.
             let childIdCounter = 0;
             const mounts: ChildMountInfo[] = [];
 
@@ -331,7 +332,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
               const componentDef = componentDefinitions.get(call.componentName);
               if (componentDef) {
                 const anchorId = `b${childIdCounter++}`;
-                const compiledHTML = generateComponentHTML(anchorId);
+                const compiledHTML = anchorMark(anchorId, '.');
 
                 modifiedSource =
                   modifiedSource.substring(0, call.startIndex) + compiledHTML + modifiedSource.substring(call.endIndex);

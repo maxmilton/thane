@@ -20,7 +20,6 @@ import {
   requireConstTaggedTemplates,
   noNestedHtmlTags,
   noConditionalTemplateInit,
-  noElementId,
   singleComponentPerFile,
   componentConstDeclaration,
   noAliasedComponentExport,
@@ -235,44 +234,6 @@ describe('THANE405 — no-conditional-template-init', () => {
     const d = noConditionalTemplateInit.check(parse(src), 'test.ts');
     expect(d).toHaveLength(1);
     expect(codes(d)).toEqual([ErrorCode.NO_CONDITIONAL_TEMPLATE_INIT]);
-  });
-});
-
-// ============================================================================
-// THANE406 — no-element-id
-// ============================================================================
-
-describe('THANE406 — no-element-id', () => {
-  test('passes with user-defined IDs that do not match b0 pattern', () => {
-    const src = `export const A = defineComponent(() => ({
-      template: html\`<div id="main">content</div>\`,
-    }));`;
-    expect(noElementId.check(parse(src), 'test.ts')).toEqual([]);
-  });
-
-  test('fails with compiler-reserved ID b0', () => {
-    const src = `export const A = defineComponent(() => ({
-      template: html\`<div id="b0">content</div>\`,
-    }));`;
-    const d = noElementId.check(parse(src), 'test.ts');
-    expect(d).toHaveLength(1);
-    expect(codes(d)).toEqual([ErrorCode.NO_ELEMENT_ID]);
-  });
-
-  test('fails with compiler-reserved ID b12', () => {
-    const src = `export const A = defineComponent(() => ({
-      template: html\`<span id="b12">test</span>\`,
-    }));`;
-    const d = noElementId.check(parse(src), 'test.ts');
-    expect(d).toHaveLength(1);
-    expect(codes(d)).toEqual([ErrorCode.NO_ELEMENT_ID]);
-  });
-
-  test('passes with non-reserved ID that starts with b', () => {
-    const src = `export const A = defineComponent(() => ({
-      template: html\`<table id="tbody">test</table>\`,
-    }));`;
-    expect(noElementId.check(parse(src), 'test.ts')).toEqual([]);
   });
 });
 

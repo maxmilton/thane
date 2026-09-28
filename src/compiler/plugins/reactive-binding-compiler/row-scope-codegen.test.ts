@@ -30,10 +30,11 @@ describe('Nested directives inside rows read the row through row-scoped signals'
     expect(js).toMatch(/const row\$ = (?:__sig|signal)\(item\);/);
     expect(js).toMatch(/row\$\(item2?\);/);
     // The condition reads it and is subscribed to it
-    expect(js).toMatch(/__bindIfExpr\(r, \[row\$\], \(\) => row\$\(\)\.on,/);
-    // Bound elements inside the content are resolved inside the content, not at the root
-    expect(js).toMatch(/const _q = \(id\) => _c \? _c\.id === id \? _c : _c\.querySelector\("#" \+ id\) : _gid\(id\);/);
-    expect(js).toMatch(/_q\("b\d+"\)/);
+    expect(js).toMatch(/__bindIfExpr\(_w[se]_b\d+, _w[me]_b\d+, \[row\$\], \(\) => row\$\(\)\.on,/);
+    // Bound elements inside the content are reached by path from the content's root (A1-2): here the
+    // bound element is the root itself
+    expect(js).toMatch(/\(_c\) => \{\s+const _n_b\d+ = _c;/);
+    expect(js).not.toMatch(/_q\(/);
     // The host attribute is a guarded expression binding on the row signal
     expect(js).toMatch(/setAttribute\("title", _pv_b\d+ = row\$\(\)\.name\)/);
     expect(js).toMatch(/row\$\.subscribe\(/);
@@ -45,9 +46,9 @@ describe('Nested directives inside rows read the row through row-scoped signals'
       app('<li>${whenElse(row.on, html`<b>${row.name}</b>`, html`<i>${row.name}!</i>`)}</li>'),
     );
     expect(js).toMatch(/const row\$ = (?:__sig|signal)\(item\);/);
-    expect(js).toMatch(/__bindIfExpr\(r, \[row\$\], \(\) => row\$\(\)\.on,/);
-    expect(js).toMatch(/__bindIfExpr\(r, \[row\$\], \(\) => !row\$\(\)\.on,/);
-    expect(js).toMatch(/\.nextSibling\.data = \(_pv_b\d+ = row\$\(\)\.name\) \?\? ""/);
+    expect(js).toMatch(/__bindIfExpr\(_w[se]_b\d+, _w[me]_b\d+, \[row\$\], \(\) => row\$\(\)\.on,/);
+    expect(js).toMatch(/__bindIfExpr\(_wm_b\d+, _we_b\d+, \[row\$\], \(\) => !row\$\(\)\.on,/);
+    expect(js).toMatch(/_n_b\d+\.data = \(_pv_b\d+ = row\$\(\)\.name\) \?\? ""/);
   });
 
   test('a nested repeat over item data re-reconciles on row update and its rows read the outer item', async () => {
@@ -57,7 +58,7 @@ describe('Nested directives inside rows read the row through row-scoped signals'
     expect(js).toMatch(/_nrRc_b\d+\.reconcile\(row\$\(\)\.tags\);/);
     expect(js).toMatch(/row\$\.subscribe\(\(\) => \{\s*_nrRc_b\d+\.reconcile\(row\$\(\)\.tags\);/);
     // Inner rows write the member, not the object, and subscribe to the row signal
-    expect(js).toMatch(/\.nextSibling\.data = row\$\(\)\.name/);
+    expect(js).toMatch(/_nrst\d+\.data = row\$\(\)\.name/);
     expect(js).toMatch(/_nrCleanups\.push\(row\$\.subscribe\(/);
   });
 
@@ -67,7 +68,7 @@ describe('Nested directives inside rows read the row through row-scoped signals'
     // the update takes the row's current index (esbuild renames the shadowing parameter)
     expect(js).toMatch(/update: \(item2?, i2?\) => \{/);
     expect(js).toMatch(/i\$\(i2?\);/);
-    expect(js).toMatch(/__bindIfExpr\(r, \[i\$\], \(\) => i\$\(\) > 0,/);
+    expect(js).toMatch(/__bindIfExpr\(_ws_b\d+, _we_b\d+, \[i\$\], \(\) => i\$\(\) > 0,/);
   });
 
   test('rows without nested directives declare no row signal', async () => {
@@ -77,7 +78,7 @@ describe('Nested directives inside rows read the row through row-scoped signals'
 
   test('a component signal read with a member access inside a row writes the member', async () => {
     const js = await buildAndReadJs(app('<li>${row.name} <em title=${user().name}>${user().name}</em></li>'));
-    expect(js).toMatch(/\.nextSibling\.data = user\(\)\.name/);
+    expect(js).toMatch(/_st\d+\.data = user\(\)\.name/);
     expect(js).toMatch(/setAttribute\("title", user\(\)\.name\)/);
     expect(js).not.toMatch(/\.data = user\(\)[;\s]/);
   });

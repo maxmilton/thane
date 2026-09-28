@@ -40,7 +40,7 @@ describe('One attribute grammar', () => {
     // both signals drive the one binding
     expect(js).toMatch(/kind\.subscribe\(/);
     expect(js).toMatch(/size\.subscribe\(/);
-    expect(componentTemplate(js)).toMatch(/<p id="b\d+" class="">x<\/p>/);
+    expect(componentTemplate(js)).toMatch(/<p class="">x<\/p>/);
   });
 
   test('style=${expr} writes cssText; style="prop: ${expr}" binds the property', async () => {

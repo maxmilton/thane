@@ -156,10 +156,11 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    // Mixed-content should use TreeWalker for comment markers
-    expect(js).toContain('createTreeWalker');
-    // The text node after the marker is resolved once per row and written through `.data`
-    expect(js).toMatch(/\?\.nextSibling/);
+    // The text node after the marker is reached by path once per row (A1-4), no TreeWalker, and
+    // written through `.data`
+    expect(js).not.toContain('createTreeWalker');
+    expect(js).toContain('<li>Name: <!----> <!----></li>');
+    expect(js).toMatch(/\.lastChild\.previousSibling/);
     expect(js).toMatch(/\.data\s*=/);
   });
 
@@ -180,8 +181,9 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    // Two comment markers means two resolved text nodes, each written in fill and update
-    expect(js.match(/\?\.nextSibling/g)!.length).toBe(2);
+    // Two comment markers means two text nodes, each written in fill and update
+    expect(js).toContain('<li><!----> <!----><!----> <!----></li>');
+    expect(js).not.toContain('createTreeWalker');
     const dataWrites = js.match(/\.data\s*=/g);
     expect(dataWrites).toBeTruthy();
     // At minimum: 2 fill + 2 update = 4
@@ -206,8 +208,8 @@ mount(App);
 `;
     const js = await buildAndReadJs(source);
     // Both bindings need comment markers since they share an element with multiple bindings
-    expect(js).toContain('createTreeWalker');
-    expect(js.match(/\?\.nextSibling/g)!.length).toBe(2);
+    expect(js).toContain('<li><!----> <!----><!----> <!----></li>');
+    expect(js).not.toContain('createTreeWalker');
     const dataWrites = js.match(/\.data\s*=/g);
     expect(dataWrites).toBeTruthy();
     expect(dataWrites!.length).toBeGreaterThan(3);
@@ -437,7 +439,7 @@ mount(App);
     // The #${item.id} is mixed-content in the <li>, should use comment markers
     expect(js).toMatch(/\.nodeValue\s*=/);
     expect(js).toMatch(/<strong><\/strong>/);
-    expect(js).toContain('createTreeWalker');
+    expect(js).not.toContain('createTreeWalker');
   });
 });
 
@@ -463,14 +465,11 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    // The comment markers <!--bN--> and <!----> should survive in the template
-    // Look for the comment marker pattern in the compiled template string
-    expect(js).toMatch(/<!--b\d+-->/);
-    expect(js).toContain('<!---->');
-    // The text node between them must exist (space between marker and boundary)
-    // Pattern: <!--bN-->text<!----> with space or content between markers
-    // The nextSibling.data pattern should be present for updating the text node
-    expect(js).toContain('nextSibling.data');
+    // The marker and the boundary comment survive in the template, the marker without its id
+    // (A1-4), with the text node between them, which the binding writes
+    expect(js).not.toMatch(/<!--b\d+-->/);
+    expect(js).toContain('Hello <!---->World<!----> World');
+    expect(js).toMatch(/\.data ?=/);
   });
 
   test('when conditional markers survive whitespace stripping', async () => {
@@ -512,8 +511,9 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    expect(js).toMatch(/<!--b\d+-->/);
-    expect(js).toContain('nextSibling.data');
+    expect(js).toContain('<!----> <!----></span>');
+    expect(js).not.toMatch(/<!--b\d+-->/);
+    expect(js).toMatch(/\.data ?=/);
     expect(js).not.toContain('${count() + 1}');
   });
 });

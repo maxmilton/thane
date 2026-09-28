@@ -61,8 +61,12 @@ class FakeElement {
     log.push(`${this.name}.innerHTML = ${JSON.stringify(v)}`);
     this._innerHTML = v;
   }
-  appendChild(node: { name: string }): void {
-    log.push(`${this.name}.appendChild ${node.name}`);
+  append(node: { name: string }): void {
+    log.push(`${this.name}.append ${node.name}`);
+  }
+  querySelectorAll(selector: string): string[] {
+    log.push(`${this.name}.querySelectorAll ${selector}`);
+    return [`${this.name}-elements`];
   }
 }
 
@@ -71,7 +75,13 @@ const fakeTemplate = (name: string) =>
     content: {
       cloneNode: (deep: boolean) => {
         log.push(`${name}.content.cloneNode ${deep}`);
-        return { name: `${name}-clone` };
+        return {
+          name: `${name}-clone`,
+          querySelectorAll: (selector: string) => {
+            log.push(`${name}-clone.querySelectorAll ${selector}`);
+            return [`${name}-clone-elements`];
+          },
+        };
       },
     },
   }) as unknown as HTMLTemplateElement;
@@ -88,8 +98,8 @@ const loggingSetup =
   };
 
 const fullResult = (ctx: any, extra: Record<string, unknown> = {}) => ({
-  __b: (bctx: any) => {
-    log.push(`__b sameCtx=${bctx === ctx}`);
+  __b: (bctx: any, elements: any) => {
+    log.push(`__b sameCtx=${bctx === ctx} elements=${elements?.[0]}`);
     return () => log.push('bindingsCleanup');
   },
   onMount: () => log.push('onMount'),
@@ -120,8 +130,9 @@ describe('__registerComponent', () => {
       'classList.add x-a',
       'setup',
       'tpl.content.cloneNode true',
-      'target.appendChild tpl-clone',
-      '__b sameCtx=true',
+      'tpl-clone.querySelectorAll *',
+      'target.append tpl-clone',
+      '__b sameCtx=true elements=tpl-clone-elements',
       'onMount',
     ]);
     expect(instance.root).toBe(target);
@@ -186,8 +197,9 @@ describe('__registerComponent', () => {
       'classList.add x-a',
       'setup',
       'tpl.content.cloneNode true',
-      'target.appendChild tpl-clone',
-      '__b sameCtx=true',
+      'tpl-clone.querySelectorAll *',
+      'target.append tpl-clone',
+      '__b sameCtx=true elements=tpl-clone-elements',
       'onMount',
     ]);
   });
@@ -215,8 +227,9 @@ describe('__registerComponentLean', () => {
       'classList.add x-l',
       'setup',
       'tpl.content.cloneNode true',
-      'target.appendChild tpl-clone',
-      '__b sameCtx=true',
+      'tpl-clone.querySelectorAll *',
+      'target.append tpl-clone',
+      '__b sameCtx=true elements=tpl-clone-elements',
     ]);
     expect(instance.root).toBe(target);
     expect(Object.keys(instance)).toEqual(['root', '__bindingsCleanup']);
@@ -259,7 +272,8 @@ describe('defineComponent (uncompiled)', () => {
       'classList.add x-d',
       'setup',
       'target.innerHTML = "<p>hi</p>"',
-      '__b sameCtx=true',
+      'target.querySelectorAll *',
+      '__b sameCtx=true elements=target-elements',
       'onMount',
     ]);
     expect(instance.root).toBe(target);

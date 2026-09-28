@@ -28,7 +28,8 @@ import {
   buildConditionalEdits,
   buildWhenElseEdits,
   buildSignalReplacementEdits,
-  buildElementIdEdits,
+  buildBoundMarkEdits,
+  anchorMark,
   stripPropertyBoundAttributes,
   applyTemplateEdits,
   toRepeatBlock,
@@ -133,8 +134,8 @@ interface ProcessedTemplate {
 
 /**
  * Process a template: the component template (`parentId` null) or the content of a directive,
- * a when() element or a whenElse() branch, whose first root element carries `parentId` and
- * whose bindings are owned by that directive's initializer.
+ * a when() element or a whenElse() branch (`parentId` its id), whose bindings are owned by that
+ * directive's initializer.
  */
 const processTemplate = (
   templateContent: string,
@@ -163,7 +164,6 @@ const processTemplate = (
   const elementIdMap = new Map<HtmlElement, string>();
   // Share the caller's event id counter so ids stay unique across nesting levels
   const state: IdState = { idCounter: startingId, eventIdCounter, elementIdMap };
-  const firstRootElement = parentId === null ? null : (parsed.roots[0] ?? null);
   const scope =
     parentId === null ? { isInsideConditional: false } : { isInsideConditional: true, conditionalId: parentId };
 
@@ -289,15 +289,8 @@ const processTemplate = (
       continue;
     }
 
-    // An element's own id is its binding id, so nothing is injected and the id survives
-    if (!elementIdMap.has(binding.element)) {
-      elementIdMap.set(
-        binding.element,
-        binding.element === firstRootElement
-          ? parentId!
-          : binding.element.attributes.get('id')?.value || `b${state.idCounter++}`,
-      );
-    }
+    // A bound element is marked with a binding id of its own; a developer's id is left alone (A1-2)
+    if (!elementIdMap.has(binding.element)) elementIdMap.set(binding.element, `b${state.idCounter++}`);
     const elementId = elementIdMap.get(binding.element)!;
 
     if (binding.type === 'event') {
@@ -349,12 +342,6 @@ const processTemplate = (
   }
   for (const binding of componentEvents) {
     if (!binding.eventName || !binding.handlerExpression) continue;
-    // Use existing HTML id attribute if available, otherwise generate one
-    const existingIdAttr = binding.element.attributes.get('id');
-    if (existingIdAttr) {
-      pushEvent(binding, existingIdAttr.value);
-      continue;
-    }
     if (!elementIdMap.has(binding.element)) {
       elementIdMap.set(binding.element, `b${state.idCounter++}`);
     }
@@ -373,11 +360,8 @@ const processTemplate = (
   const edits: TemplateEdit[] = [
     ...buildConditionalEdits(rootConditionals),
     ...buildWhenElseEdits(rootWhenElseBlocks),
-    ...repeatBlocks.map((rep) => ({
-      start: rep.startIndex,
-      end: rep.endIndex,
-      replacement: `<template id="${rep.id}"></template>`,
-    })),
+    // A list's rows go before its anchor comment (A1-4)
+    ...repeatBlocks.map((rep) => ({ start: rep.startIndex, end: rep.endIndex, replacement: anchorMark(rep.id, '.') })),
     ...buildSignalReplacementEdits(
       signalInitializers,
       allRanges,
@@ -385,7 +369,7 @@ const processTemplate = (
       expressionBindingSpans,
       inlineExpressionReplacements,
     ),
-    ...buildElementIdEdits(elementIdMap, allRanges),
+    ...buildBoundMarkEdits(elementIdMap, allRanges),
   ];
 
   // Strip @event attributes from processed HTML (they'll be bound via addEventListener at runtime)

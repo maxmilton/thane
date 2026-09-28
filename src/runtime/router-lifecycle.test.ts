@@ -572,7 +572,7 @@ describe('route context', () => {
   /** A component created outside the router gets its route from the provider the router installs. */
   const providerRoute = (): any => {
     const seen: { ctx?: any } = {};
-    const tpl = { content: { cloneNode: () => ({}) } } as any;
+    const tpl = { content: { cloneNode: () => ({ querySelectorAll: () => [] }) } } as any;
     const ref = __registerComponentLean(
       'ctx-probe',
       (ctx: any) => {
@@ -581,7 +581,7 @@ describe('route context', () => {
       },
       tpl,
     );
-    ref.__f({ classList: { add() {} }, appendChild() {} } as any);
+    ref.__f({ classList: { add() {} }, append() {} } as any);
     return seen.ctx.route;
   };
 

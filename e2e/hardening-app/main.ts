@@ -3,9 +3,22 @@
  *
  * `/?probe=<id>` mounts that one probe into #app, so every test sees only its own component, styles
  * and errors. `&manual=1` skips the mount, for tests that measure state before mounting and call
- * `window.__mountProbe()` themselves. A mount that throws is recorded in `window.__mountErrors`.
+ * `window.__mountProbe()` themselves. `&target=body` mounts into document.body instead of #app. A mount
+ * that throws is recorded in `window.__mountErrors`.
  */
 import { mount, type ComponentHTMLSelector } from 'thane';
+import { A1Body } from './probes/a1-body.js';
+import { A1Dirs } from './probes/a1-dirs.js';
+import { A1Ids } from './probes/a1-ids.js';
+import { A1IdsNested } from './probes/a1-ids-nested.js';
+import { A1K12 } from './probes/a1-k12.js';
+import { A1Hosts } from './probes/a1-hosts.js';
+import { A1K14 } from './probes/a1-k14.js';
+import { A1Norm } from './probes/a1-norm.js';
+import { A1RootList } from './probes/a1-rootlist.js';
+import { A1Text } from './probes/a1-text.js';
+import { A1TextHidden } from './probes/a1-text-hidden.js';
+import { A1Top } from './probes/a1-top.js';
 import { I1 } from './probes/i1-index-child-props.js';
 import { K13 } from './probes/k13-component-row-template.js';
 import { L1 } from './probes/l1-destroy-rows.js';
@@ -58,6 +71,18 @@ const probes: Record<string, ComponentHTMLSelector<any>> = {
   n1: N1,
   n2: N2,
   k13: K13,
+  a1ids: A1Ids,
+  a1idsnested: A1IdsNested,
+  a1text: A1Text,
+  a1norm: A1Norm,
+  a1rootlist: A1RootList,
+  a1dirs: A1Dirs,
+  a1top: A1Top,
+  a1body: A1Body,
+  a1texthidden: A1TextHidden,
+  a1k12: A1K12,
+  a1hosts: A1Hosts,
+  a1k14: A1K14,
 };
 
 const win = window as any;
@@ -67,7 +92,8 @@ win.__mountErrors = [];
 
 win.__mountProbe = (): boolean => {
   const component = probes[probeId];
-  const target = document.getElementById('app');
+  // `&target=body` mounts into document.body, after the nodes the page already has (Mode A)
+  const target = params.get('target') === 'body' ? document.body : document.getElementById('app');
   if (!component || !target) {
     win.__mountErrors.push(`unknown probe "${probeId}"`);
     return false;

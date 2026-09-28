@@ -6,4 +6,9 @@ export interface GeneratedInitBindingsArtifact {
   staticTemplates: string[];
   /** The runtime helpers the generated code calls: the component imports exactly these. */
   helpers: Set<RuntimeHelperName>;
+  /**
+   * Whether the code reads the component template's elements, which the registration factory
+   * passes as `__b`'s second argument (`__b(ctx, _ns)`, `_ns[i]` the template's i-th element).
+   */
+  elementList: boolean;
 }

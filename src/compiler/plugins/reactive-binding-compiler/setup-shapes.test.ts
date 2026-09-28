@@ -65,7 +65,7 @@ describe('setup shapes: concise and block bodies', () => {
 });`);
     expect(
       block.registration.startsWith(
-        'var App = __registerComponent("app", () => {\n  const n = 1;\n  return {\n    __b: (ctx) => {\n',
+        'var App = __registerComponent("app", () => {\n  const n = 1;\n  return {\n    __b: (ctx, _ns) => {\n',
       ),
     ).toBe(true);
     expect(block.registration.endsWith('    },\n    onMount: () => {\n      log("m");\n    }\n  };\n}, __tpl);')).toBe(
@@ -76,9 +76,9 @@ describe('setup shapes: concise and block bodies', () => {
   template: html\`<p>\${flag}</p>\`,
   onMount: () => { log('m'); },
 }));`);
-    expect(concise.registration.startsWith('var App = __registerComponent("app", () => ({\n  __b: (ctx) => {\n')).toBe(
-      true,
-    );
+    expect(
+      concise.registration.startsWith('var App = __registerComponent("app", () => ({\n  __b: (ctx, _ns) => {\n'),
+    ).toBe(true);
     expect(concise.registration.endsWith('  },\n  onMount: () => {\n    log("m");\n  }\n}), __tpl);')).toBe(true);
   });
 

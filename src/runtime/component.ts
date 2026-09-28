@@ -43,8 +43,11 @@ export type ComponentReturnType = {
 
 /** @internal */
 interface InternalComponentResult extends ComponentReturnType {
-  /** Compiler-injected binding initializer (short name for bundle size) */
-  __b?: (ctx: ComponentContext) => (() => void) | void;
+  /**
+   * Compiler-injected binding initializer (short name for bundle size). It receives the elements
+   * of the template it binds, in document order, taken from the clone before it is inserted.
+   */
+  __b?: (ctx: ComponentContext, elements: NodeListOf<Element>) => (() => void) | void;
 }
 
 /** Setup function signature for defineComponent. */
@@ -323,7 +326,7 @@ export function defineComponent<P extends ComponentProps = {}>(
     // Initialize reactive bindings (injected by the compiler into the return object)
     let bindingsCleanup: (() => void) | void | undefined;
     if (result.__b) {
-      bindingsCleanup = result.__b(ctx);
+      bindingsCleanup = result.__b(ctx, root.querySelectorAll('*'));
     }
 
     // Lifecycle: onMount
@@ -391,8 +394,11 @@ export function __registerComponent(
       stylesRegistered = true;
     }
 
-    root.appendChild(compiledTemplate.content.cloneNode(true));
-    const bindingsCleanup = result.__b ? result.__b(ctx) : undefined;
+    // The template's elements are listed before the clone is inserted: the target may hold other nodes
+    const clone = compiledTemplate.content.cloneNode(true) as DocumentFragment;
+    const elements = clone.querySelectorAll('*');
+    root.append(clone);
+    const bindingsCleanup = result.__b?.(ctx, elements);
     if (result.onMount) result.onMount();
 
     const instance: ComponentInstance = { root };
@@ -437,8 +443,11 @@ export function __registerComponentLean(
       route: (extras?.route ?? _getRouteContext?.()) as RouteContextForSelector<any>,
     };
     const result = setup(ctx) as InternalComponentResult;
-    root.appendChild(compiledTemplate.content.cloneNode(true));
-    const bindingsCleanup = result.__b ? result.__b(ctx) : undefined;
+    // The template's elements are listed before the clone is inserted: the target may hold other nodes
+    const clone = compiledTemplate.content.cloneNode(true) as DocumentFragment;
+    const elements = clone.querySelectorAll('*');
+    root.append(clone);
+    const bindingsCleanup = result.__b?.(ctx, elements);
     const instance: ComponentInstance = { root };
     if (bindingsCleanup) instance.__bindingsCleanup = bindingsCleanup;
     return instance;

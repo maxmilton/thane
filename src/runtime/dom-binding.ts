@@ -2,7 +2,7 @@
  * DOM Binding utilities — conditional rendering and repeat directives.
  */
 
-import type { Signal, ComponentRoot } from './types.js';
+import type { Signal } from './types.js';
 
 /** Lazy template element for HTML parsing. */
 let tempEl: HTMLTemplateElement | null = null;
@@ -13,43 +13,35 @@ const getTempEl = (): HTMLTemplateElement => {
   return tempEl;
 };
 
-/** @internal — Core conditional binding (when/whenElse). */
+/**
+ * @internal — Core conditional binding (when/whenElse). The content sits between two comment
+ * anchors, with any number of root nodes; whatever is between them when the binding starts is
+ * the pre-rendered content. `initNested` receives the content's first node.
+ */
 const bindConditional = (
-  root: ComponentRoot,
-  id: string,
+  start: Node,
+  end: Node,
   template: string,
-  initNested: (contentEl?: Element) => (() => void)[],
+  initNested: (first: Node) => (() => void)[],
   signals: Signal<any>[],
   evalCondition: () => unknown,
-  anchorEl?: Element | null,
 ): (() => void) => {
-  // Use provided anchor element (for repeat-nested conditionals) or scoped lookup within component root
-  let currentNode: Element | null = anchorEl || (root as Element).querySelector('#' + id);
-  if (!currentNode) return () => {};
-  let showing = currentNode.tagName !== 'TEMPLATE';
-  let cleanups: (() => void)[] = showing ? initNested(currentNode) : [];
+  let showing = start.nextSibling !== end;
+  let cleanups: (() => void)[] = showing ? initNested(start.nextSibling!) : [];
 
   const update = () => {
     if (evalCondition()) {
       if (showing) return;
       showing = true;
-      // A branch template with no element (text only) leaves currentNode null; the binding then goes inert
-      if (currentNode) {
-        const tpl = getTempEl();
-        tpl.innerHTML = template;
-        const next = (tpl.content.cloneNode(true) as DocumentFragment).firstElementChild!;
-        currentNode.replaceWith(next);
-        currentNode = next;
-        cleanups = initNested(next);
-      }
+      const tpl = getTempEl();
+      tpl.innerHTML = template;
+      end.parentNode!.insertBefore(tpl.content, end);
+      cleanups = initNested(start.nextSibling!);
     } else if (showing) {
       showing = false;
-      if (currentNode) {
-        const p = document.createElement('template');
-        p.id = id;
-        currentNode.replaceWith(p);
-        currentNode = p;
-      }
+      // Everything between the anchors goes: the content, and rows, nested branches and child
+      // hosts that ended up at its top level
+      for (let n = start.nextSibling; n !== end; n = start.nextSibling) (n as ChildNode).remove();
       // Dispose nested subscriptions so hidden effects don't
       // fire against detached DOM. Re-initialized on next show().
       for (let i = 0; i < cleanups.length; i++) cleanups[i]!();
@@ -68,23 +60,21 @@ const bindConditional = (
 };
 
 export const __bindIf = (
-  root: ComponentRoot,
+  start: Node,
+  end: Node,
   signal: Signal<any>,
-  id: string,
   template: string,
-  initNested: (contentEl?: Element) => (() => void)[],
-  anchorEl?: Element | null,
-): (() => void) => bindConditional(root, id, template, initNested, [signal], signal, anchorEl);
+  initNested: (first: Node) => (() => void)[],
+): (() => void) => bindConditional(start, end, template, initNested, [signal], signal);
 
 export const __bindIfExpr = (
-  root: ComponentRoot,
+  start: Node,
+  end: Node,
   signals: Signal<any>[],
   evalExpr: () => boolean,
-  id: string,
   template: string,
-  initNested: (contentEl?: Element) => (() => void)[],
-  anchorEl?: Element | null,
-): (() => void) => bindConditional(root, id, template, initNested, signals, evalExpr, anchorEl);
+  initNested: (first: Node) => (() => void)[],
+): (() => void) => bindConditional(start, end, template, initNested, signals, evalExpr);
 
 // ─────────────────────────────────────────────────────────────
 //  Keyed Reconciler
@@ -130,7 +120,7 @@ export interface BatchRows<T> {
 
 export function createKeyedReconciler<T>(
   container: ParentNode & Element,
-  anchor: Element,
+  anchor: ChildNode,
   createItemFn: (item: T, index: number, refNode: Node) => ManagedItem<T>,
   keyFnOrProp: KeyFn<T> | string,
   batch?: BatchRows<T>,

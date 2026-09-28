@@ -91,27 +91,3 @@ export function escapeTemplateLiteral(s: string): string {
 export function escapeRawTemplateLiteral(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 }
-
-export function injectIdIntoFirstElement(html: string, id: string): string {
-  const trimmed = html.trim();
-  const firstTagMatch = trimmed.match(/^<([A-Za-z][\w:-]*)([^>]*)>/);
-  if (!firstTagMatch) {
-    return trimmed;
-  }
-
-  const tagName = firstTagMatch[1];
-  if (!tagName) return trimmed;
-  const existingAttrs = firstTagMatch[2] || '';
-  if (/\sid\s*=\s*['"][^'"]*['"]/.test(existingAttrs)) {
-    return trimmed;
-  }
-  const tagNameEnd = tagName.length + 1;
-
-  return trimmed.substring(0, tagNameEnd) + ` id="${id}"` + trimmed.substring(tagNameEnd);
-}
-
-/** The `id` attribute of a template's first element, if it has one. */
-export function firstElementId(html: string): string | undefined {
-  const firstTagMatch = html.trim().match(/^<([A-Za-z][\w:-]*)([^>]*)>/);
-  return firstTagMatch?.[2]?.match(/\sid\s*=\s*['"]([^'"]*)['"]/)?.[1];
-}

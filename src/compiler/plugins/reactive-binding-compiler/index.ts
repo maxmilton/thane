@@ -18,6 +18,8 @@ import { minifyHTML } from '../minification/template-minifier.js';
 import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
 import type { SelectorMap } from '../minification/selector-minifier.js';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
+import { anchorMark } from './template-utils.js';
+import { placeChildHosts } from './child-hosts.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
 
 // ============================================================================
@@ -169,36 +171,6 @@ const HELPER_IMPORT_ORDER: readonly string[] = [
 const importRank = (helper: string): number => {
   const rank = HELPER_IMPORT_ORDER.indexOf(helper);
   return rank === -1 ? HELPER_IMPORT_ORDER.length : rank;
-};
-
-/**
- * Compute a deterministic starting seed for generated binding ids (b0, b1, …).
- * Assigns each file a stable, non-overlapping id range to avoid DOM collisions.
- */
-const computeInitialIdSeed = (filePath: string, source: string): number => {
-  // FNV-1a 32-bit hash of normalized file path (fast, deterministic)
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < filePath.length; i++) {
-    hash ^= filePath.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  const unsigned = hash >>> 0;
-
-  // Allocate a file-specific block of ids. 1000 ids per file keeps generated
-  // ids short while providing room for typical component templates.
-  const blockBase = (unsigned % 100000) * 1000;
-
-  // Respect any already-inserted bN ids present in the source (e.g. CTFE child mounts)
-  // so the next generated id does not overlap.
-  let maxExisting = -1;
-  const idRegex = /id="b(\d+)"/g;
-  let match: RegExpExecArray | null;
-  while ((match = idRegex.exec(source)) !== null) {
-    const n = Number(match[1]);
-    if (Number.isFinite(n) && n > maxExisting) maxExisting = n;
-  }
-
-  return Math.max(blockBase, maxExisting + 1);
 };
 
 /** The import declaration that imports `defineComponent`: the compiler's helpers are imported next to it (H-10). */
@@ -432,7 +404,9 @@ export const transformDefineComponentSource = (
   let allWhenElseBlocks: WhenElseBlock[] = [];
   let allRepeatBlocks: RepeatBlock[] = [];
   let allEventBindings: EventBinding[] = [];
-  let idCounter = computeInitialIdSeed(filePath, source);
+  // Ids are names inside this file only (A1-5): they count from 0, after the child placeholders'
+  // (b0…, numbered by the precompiler), and no longer depend on where the file is
+  let idCounter = childMounts?.length ?? 0;
   let lastProcessedTemplateContent = '';
 
   for (const templateInfo of htmlTemplates) {
@@ -552,7 +526,7 @@ export const transformDefineComponentSource = (
 
     for (let i = 0; i < childMounts.length; i++) {
       const cm = childMounts[i]!;
-      const marker = `id="${cm.anchorId}"`;
+      const marker = anchorMark(cm.anchorId, '.');
       const directiveId =
         findInLists(marker, allRepeatBlocks) ??
         findInBranchLists(marker, allConditionals, allWhenElseBlocks) ??
@@ -569,10 +543,20 @@ export const transformDefineComponentSource = (
     html: options.minify ? minifyHTML : (template) => template,
     selector: (name) => options.selectorMap?.get(name) ?? name,
   };
+  // Each child's host goes into the template in place of its placeholder, where it fits (A1-4)
+  const component = { template: lastProcessedTemplateContent };
+  const childHosts = placeChildHosts(
+    childMounts ?? [],
+    component,
+    { conditionals: allConditionals, whenElse: allWhenElseBlocks, repeats: allRepeatBlocks },
+    emit,
+  );
+  lastProcessedTemplateContent = component.template;
   const {
     code: bindingsBody,
     staticTemplates: repeatStaticTemplates,
     helpers,
+    elementList,
   } = generateInitBindingsFunction(
     allBindings,
     allConditionals,
@@ -582,6 +566,8 @@ export const transformDefineComponentSource = (
     emit,
     directiveChildMounts.size > 0 ? directiveChildMounts : undefined,
     topLevelChildMounts,
+    lastProcessedTemplateContent,
+    childHosts,
   );
 
   let staticTemplateCode = '';
@@ -654,7 +640,9 @@ export const transformDefineComponentSource = (
     // of the text already there, so it lands before a removal that starts at the same `{`.
     if (injectBindings) {
       const at = returnObj.getStart(sourceFile) + 1;
-      edits.push({ start: at, end: at, replacement: `\n  __b: (ctx) => {\n  ${bindingsBody.trim()}\n  },` });
+      // The registration factory passes the template's elements when the code reaches them by position
+      const params = elementList ? 'ctx, _ns' : 'ctx';
+      edits.push({ start: at, end: at, replacement: `\n  __b: (${params}) => {\n  ${bindingsBody.trim()}\n  },` });
     }
   }
 

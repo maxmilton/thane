@@ -46,7 +46,7 @@ describe('Form attributes are written as DOM properties and left out of the stat
     expect(js).not.toMatch(/setAttribute\("(checked|disabled|value|readonly)"/);
     const tpl = componentTemplate(js);
     expect(tpl).not.toMatch(/checked=|disabled=|value=|readonly=/);
-    expect(tpl).toMatch(/<input id="b\d+" type="checkbox" \/>/);
+    expect(tpl).toMatch(/<input type="checkbox" \/>/);
   });
 
   test('inside rows the first write is not skipped and the row template carries no attribute', async () => {
@@ -65,14 +65,14 @@ describe('Form attributes are written as DOM properties and left out of the stat
     const js = await buildAndReadJs(componentApp('<p class=${name()}>x</p><svg><a disabled=${on()}></a></svg>'));
     expect(js).toMatch(/\.className = name\(\)/);
     expect(js).toMatch(/setAttribute\("disabled", on\(\)\)/);
-    expect(componentTemplate(js)).toMatch(/<p id="b\d+" class="alice">x<\/p>/);
+    expect(componentTemplate(js)).toMatch(/<p class="alice">x<\/p>/);
   });
 });
 
 describe('null and undefined render as empty text', () => {
   test('component text bindings coalesce the value', async () => {
     const js = await buildAndReadJs(componentApp('<p>${maybe()}</p><p>[${maybe()}]</p>'));
-    expect(js).toMatch(/\.nextSibling\.data = maybe\(\) \?\? ""/);
+    expect(js).toMatch(/\bb\d+\.data = maybe\(\) \?\? ""/);
   });
 
   test('row text bindings coalesce on fill and on update', async () => {

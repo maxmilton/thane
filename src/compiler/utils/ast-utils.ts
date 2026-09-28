@@ -331,16 +331,3 @@ export const parseArrowFunction = (
   visit(sf);
   return result;
 };
-
-// ============================================================================
-// Component HTML Generation (Compile-time)
-// ============================================================================
-
-/**
- * Emit a `<template>` anchor for a child component mount point.
- * CTFE allocates IDs `b0`, `b1`, … (`anchorId`) and the binding compiler starts its
- * `idCounter` at the offset = number of child mounts.
- */
-export const generateComponentHTML = (anchorId: string): string => {
-  return `<template id="${anchorId}"></template>`;
-};
