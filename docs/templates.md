@@ -1,6 +1,6 @@
 # Templates
 
-Thane uses tagged template literals for HTML. At build time, the compiler transforms `html``\`\``into static`<template>` elements with comment markers, then generates binding code that subscribes to the exact DOM nodes that need updating.
+Thane uses tagged template literals for HTML. At build time, the compiler transforms `html` templates into static `<template>` elements, then generates binding code that reaches the exact DOM nodes that need updating and subscribes them to their signals.
 
 ## Basic Template
 
@@ -22,7 +22,7 @@ const count = signal(0);
 template: html`<p>Count: ${count()}</p>`;
 ```
 
-The compiler places comment markers around the dynamic text. At runtime, a subscription updates only the text node between the markers.
+The compiler places an empty comment on each side of the dynamic text. At runtime, a subscription updates only the text node between them.
 
 ### Mixed Content
 
@@ -110,6 +110,23 @@ template: html`
 
 This injects the pre-built HTML fragment at that position.
 
+## Whitespace
+
+Compiled templates keep the text you write, with whitespace tidied the same way in development and production builds:
+
+- A run of spaces, tabs and newlines inside text becomes one space.
+- Whitespace-only text between two elements, and at the start or end of an element's content, is removed: `<b>x</b> <i>y</i>` renders as "xy". To keep such a space, put it inside one of the elements (`<b>x </b><i>y</i>`) or write it as `&#32;`.
+- A space next to a text binding is kept, whether the binding's neighbour is text, another binding, an element or a directive: `<b>Name:</b> ${name()}` and `${count()} <small>items</small>` render with their space. At the edges of an element it is not kept reliably: a space after the last binding (`<b>${a()} </b>`) is removed, and one before the first binding is kept in component templates but removed in `repeat()` rows. Put such a space outside the element.
+- Inside `<pre>`, `<textarea>`, `<script>` and `<style>`, content is kept exactly as written.
+
+## Escapes
+
+Templates are JavaScript template literals, and their escapes mean what they mean in any template literal: `\${` writes a literal `${`, which is text and not a binding, and `` \` `` writes a backtick.
+
+```typescript
+template: html`<code>\${price}</code>`; // renders "${price}"
+```
+
 ## Child Components in Templates
 
 Embed child components using their function-call syntax:
@@ -131,7 +148,7 @@ The compiler manages the child's lifecycle and binding initialization.
 
 ### No Nested `html` Tags
 
-You cannot nest `html``\`\``inside another`html``\`\`` (lint rule THANE404). Instead, assign inner templates to `const` variables:
+You cannot nest an `html` template inside another `html` template (lint rule THANE404). Instead, assign inner templates to `const` variables:
 
 ```typescript
 // ❌ BAD — nested html tag
@@ -157,7 +174,7 @@ const tpl = html`<div>...</div>`;
 
 ### Template Variables Must Be Local
 
-Template variables must be declared in the same file — you cannot import an `html``\`\`` value from another module and use it in a template. The compiler needs to see the full template at build time.
+Template variables must be declared in the same file — you cannot import an `html` template from another module and use it in a template. The compiler needs to see the full template at build time.
 
 ### Expression Order
 
@@ -167,11 +184,10 @@ Expression order in the template is preserved. The compiler generates bindings i
 
 ## How It Works Under the Hood
 
-1. **Build time:** The compiler parses the `html``\`\`` literal and extracts all dynamic expressions.
-2. **Static template:** The template string (with placeholder comment markers) becomes a `<template>` element in the compiled output.
-3. **Binding function:** The compiler generates a `__b(ctx)` function that:
-   - Clones the static template
-   - Uses `TreeWalker` to locate comment markers
+1. **Build time:** The compiler parses the `html` literal and extracts all dynamic expressions.
+2. **Static template:** The template string, with the signals' initial values and an empty comment on each side of every text binding, becomes a `<template>` element in the compiled output.
+3. **Binding function:** The compiler generates a `__b(ctx, elements)` function. When the component mounts, the runtime clones the static template and passes the clone's elements to it, and the function:
+   - Reaches every bound node by a path computed at build time (`elements[2].firstChild.nextSibling`), without searching the DOM and without ids
    - Creates signal subscriptions for each binding (text, attribute, style, or event)
 4. **Runtime:** When the component mounts, the binding function runs once. From then on, only signal subscriptions drive DOM updates — no diffing, no reconciliation.
 

@@ -1,5 +1,5 @@
 /**
- * Wave 3a compiler fixes (framework analysis/simplification.md §5.1), compiled end to end: each
+ * Compiler fixes, compiled end to end: each
  * shape is built with the real pipeline (development build, so templates are emitted as written)
  * and the emitted template or code is checked. The runtime behaviour of the same fixes is covered
  * by e2e/tests/hardening.spec.ts where a browser is needed.

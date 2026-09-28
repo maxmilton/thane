@@ -8,14 +8,19 @@
  * Notification model:
  *   - Depth counter (_nc) instead of array snapshot → zero-allocation hot path
  *   - Mid-notification unsubscribes null the slot; compaction after outermost notify
+ *   - A write inside a subscriber (a cascade) is applied at once and notified after the current
+ *     notification; each waiting signal then drains its own cascades before the next one
+ *   - No cycle detection: a cascade that never settles overflows the stack
  *
  * Batching:
  *   - Writes apply immediately; notifications deferred until outermost batch ends
- *   - Critical for glitch-free computed signals and atomic multi-signal updates
+ *   - Each changed signal is notified once, with its final value (atomic multi-signal updates)
  *
  * Computed:
- *   - Pull-on-read + dirty-marking prevents diamond glitches
- *   - Re-evaluation is lazy: only on the next read after a dependency changes
+ *   - Dirty-marked when a dependency notifies; re-evaluated lazily, on the next read
+ *   - A diamond notifies the join once, with the final value
+ *   - Reads are not glitch-free: until its dependencies have notified it, a computed returns its
+ *     previous value (inside a batch() function, or in a subscriber whose cascade has not run yet)
  */
 
 import type { Signal, ReadonlySignal } from './types.js';

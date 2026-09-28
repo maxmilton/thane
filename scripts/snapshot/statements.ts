@@ -1,5 +1,5 @@
 /**
- * Runtime-task equivalence helper (RT-app, wave 1).
+ * Equivalence check for runtime changes.
  *
  *   bun run snapshot:statements <base dir> <new dir> [--marker <regex>] [--show <n>]
  *

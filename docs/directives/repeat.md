@@ -15,7 +15,9 @@ ${repeat(items, renderFn, emptyTemplate?, trackBy?)}
 | `emptyTemplate` | `html \| null` | *(Optional)* Template shown when the array is empty |
 | `trackBy` | `(item: T, index: number) => string \| number` | *(Optional)* Key function for stable identity |
 
-The template returned by `renderFn` has exactly one root element; every row is cloned from a static copy of it and updated in place. A row with two root elements, or none, is reported at build time as THANE007. The `index` argument is the row's current position: bindings that read it are refreshed when rows move or are removed.
+The key function is always the **fourth** argument. To give a list a key without an empty template, pass `null` third: `repeat(items(), renderFn, null, (item) => item.id)`. A function in the third place is a build error (THANE010), because it would be taken for the empty template.
+
+The template returned by `renderFn` has exactly one root element; every row is cloned from a static copy of it and updated in place. A row with two root elements, or none, is reported at build time as THANE007, and so is a row that is only a directive. The row's root element cannot carry `when()` (THANE008): filter the array instead. The `index` argument is the row's current position: bindings that read it are refreshed when rows move or are removed.
 
 ## Basic Usage
 
@@ -58,7 +60,7 @@ When the array changes:
 - **New key:** New DOM node is created and inserted.
 - **Missing key:** DOM node is removed and its bindings are disposed.
 
-Without `trackBy`, the reconciler uses the item reference itself as the key.
+Without `trackBy`, rows are keyed by their index: the row at each position is reused and updated with the item now at that position, and rows are only added or removed at the end.
 
 ## Empty State
 
@@ -74,6 +76,8 @@ ${repeat(
 ```
 
 When the array transitions from empty to non-empty, the empty template is removed and list items are created. When the array becomes empty again, all items are removed and the empty template is shown.
+
+The empty template is static markup with one root element, like a row. It holds no bindings or event handlers: a `${…}` inside it is shown as written.
 
 ## Signal Items
 
@@ -133,7 +137,7 @@ template: html`
 
 ## Nested Directives
 
-Use `when()` or `whenElse()` inside repeat items:
+A row can hold anything a component template can: bindings, event handlers, child components, `when()`, `whenElse()` and further lists, nested to any depth. Use `when()` or `whenElse()` inside repeat items:
 
 ```typescript
 ${repeat(
@@ -149,14 +153,40 @@ ${repeat(
 )}
 ```
 
+A list inside a row reads the outer row's item like any other variable:
+
+```typescript
+${repeat(
+  categories(),
+  (category) => html`
+    <section>
+      <h2>${category.name}</h2>
+      <ul>
+        ${repeat(
+          category.products,
+          (product) => html`<li @click=${() => open(category.id, product.id)}>${product.title}</li>`,
+          html`<li>No products yet.</li>`,
+          (product) => product.id,
+        )}
+      </ul>
+    </section>
+  `,
+  null,
+  (category) => category.id,
+)}
+```
+
+When the items are signals, do not name the outer row's parameter `item` if an inner row calls it: see [Known Limitations](../known-limitations.md#signal-items-named-item-in-nested-lists).
+
 ## Fast-Path Optimizations
 
 The reconciler includes several fast paths for common operations:
 
 | Scenario | Optimization |
 |:---------|:-------------|
-| Array cleared (0 new items) | Batch teardown: all cleanups run, then DOM is cleared in one operation |
-| Array populated from empty | Bulk create: container is temporarily detached for batch insertion |
+| Array cleared (0 new items) | Batch teardown: all cleanups run, then the container is emptied in one operation when it holds nothing but the list; otherwise the rows are removed one by one and the container's other content stays |
+| Array populated from empty | Bulk create: container is temporarily detached for batch insertion; rows without per-row cleanups are cloned in batches |
+| Items appended | Only the new rows are created |
 | Single item removed | Detected by key scan — only the removed item's DOM node is torn down |
 | Same keys, different order | Two-element swap or general reorder — DOM nodes are moved, not recreated |
 | All keys replaced | Full clear + bulk create — avoids per-item diff overhead |

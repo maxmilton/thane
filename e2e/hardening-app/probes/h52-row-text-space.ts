@@ -3,7 +3,7 @@ import { expose } from '../shared/expose.js';
 
 // H-52 (K23): the text between row text bindings, one shape per list. The paragraphs are the same
 // shapes at component level, for comparison. The last four shapes (a binding next to an element) lose
-// their space too, outside H-52 (its hand-off note).
+// their space too (H-53).
 export const H52 = defineComponent('hardening-h52', () => {
   const items = signal([{ id: 1, first: 'John', mid: 'Q', last: 'Doe' }]);
   const label = signal('L');

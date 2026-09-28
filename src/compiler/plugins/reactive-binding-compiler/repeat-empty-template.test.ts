@@ -1,5 +1,5 @@
 /**
- * H-54 (framework analysis/simplification.md §5.1): repeat()'s third argument is the empty template.
+ * repeat()'s third argument is the empty template.
  * Every form the compiler takes there builds, pinned by what it emits: none, `null` or `undefined`
  * with a key function fourth, an html template and a plain template literal. A function there is a
  * key function written third by mistake; it was taken as the empty template's markup (the list keyed

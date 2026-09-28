@@ -2,7 +2,7 @@
  * Characterisation of the router's lifecycle, scroll restoration and route context with a fake
  * browser (before RT-10 and RT-11).
  *
- * router.ts has little unit coverage (simplification.md §1.4); the e2e router suite covers it in a
+ * router.ts has little other unit coverage; the e2e router suite covers it in a
  * browser, but only with `scrollRestoration: true`. These tests pin, as an operation log over a fake
  * `window` / `document`, what `startRouter`, `navigate`, popstate and `stopRouter` do for every
  * shape of the scroll-restoration option (RT-11's `normalizeScrollRestoration`), for every shape

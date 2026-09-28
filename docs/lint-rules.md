@@ -1,6 +1,8 @@
 # Lint Rules
 
-Thane includes 12 compile-time lint rules (THANE400–THANE411) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
+Thane includes 12 compile-time lint rules (THANE400–THANE412; THANE406 is retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
+
+The compiler reports a few more problems itself, while it compiles a template: see [Template Errors](#template-errors).
 
 ## Summary
 
@@ -17,6 +19,7 @@ Thane includes 12 compile-time lint rules (THANE400–THANE411) that catch patte
 | THANE409 | [no-aliased-component-export](#thane409--no-aliased-component-export)       | Error    |
 | THANE410 | [no-cross-file-html-template](#thane410--no-cross-file-html-template)       | Warning  |
 | THANE411 | [duplicate-mount-target](#thane411--duplicate-mount-target)                 | Warning  |
+| THANE412 | [single-return-object](#thane412--single-return-object)                     | Error    |
 
 ---
 
@@ -281,6 +284,75 @@ mount({ component: Other, target: el });
 // ✅ GOOD — different targets
 mount({ component: App, target: document.getElementById('app')! });
 mount({ component: Nav, target: document.getElementById('nav')! });
+```
+
+---
+
+## THANE412 — single-return-object
+
+**Severity:** Error
+
+A component's setup function returns **one object**. The compiler builds one static template per component, from the last object returned, so an earlier `return` would render the same template and lose its own hooks and styles. Returns inside nested functions (callbacks, helpers) are not counted.
+
+```typescript
+// ❌ BAD — an early return with its own template
+export const Card = defineComponent(() => {
+  const ready = signal(false);
+  if (!ready()) return { template: html`<p>Loading…</p>` };
+  return { template: html`<p>Ready</p>` };
+});
+
+// ✅ GOOD — one return object; the template chooses
+export const Card = defineComponent(() => {
+  const ready = signal(false);
+  return {
+    template: html`${whenElse(ready(), html`<p>Ready</p>`, html`<p>Loading…</p>`)}`,
+  };
+});
+```
+
+---
+
+## Template Errors
+
+These are reported by the compiler while it compiles a template, as build errors.
+
+| Code     | What it reports                                                                                                |
+| :------- | :------------------------------------------------------------------------------------------------------------- |
+| THANE006 | An attribute written with a `:` prefix (`:src=${url()}`). Write `src=${url()}` instead                         |
+| THANE007 | A `repeat()` row template without exactly one root element, including a row that is only a directive          |
+| THANE008 | A `when()` on the root element of a `repeat()` row. Filter the list, or put `when()` on an inner element        |
+| THANE009 | A template the compiler cannot bind reliably: markup the browser rebuilds (text directly in a table, an `<a>` inside an `<a>`, non-option content in a `<select>`), or a comment written like one of the compiler's own markers (`<!--b0-->`) |
+| THANE010 | A function as `repeat()`'s third argument, which is the empty template. Pass the key function fourth: `repeat(items, row, null, (it) => it.id)` |
+
+### THANE007 — one root element per row
+
+```typescript
+// ❌ BAD — two roots
+${repeat(terms(), (t) => html`<dt>${t.term}</dt><dd>${t.def}</dd>`)}
+
+// ✅ GOOD — one element that holds both
+${repeat(terms(), (t) => html`<div><dt>${t.term}</dt><dd>${t.def}</dd></div>`)}
+```
+
+### THANE008 — no `when()` on a row's root
+
+```typescript
+// ❌ BAD
+${repeat(items(), (item) => html`<li ${when(item.visible)}>${item.name}</li>`)}
+
+// ✅ GOOD — filter the list
+${repeat(items().filter((item) => item.visible), (item) => html`<li>${item.name}</li>`)}
+```
+
+### THANE010 — the key function goes fourth
+
+```typescript
+// ❌ BAD — the key function in the empty template's place
+${repeat(items(), (item) => html`<li>${item.name}</li>`, (item) => item.id)}
+
+// ✅ GOOD
+${repeat(items(), (item) => html`<li>${item.name}</li>`, null, (item) => item.id)}
 ```
 
 ← [Back to Docs](README.md)

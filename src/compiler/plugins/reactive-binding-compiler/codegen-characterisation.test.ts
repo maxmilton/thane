@@ -1,5 +1,5 @@
 /**
- * Characterisation of the code generator (wave 1, CG stream): the exact code that
+ * Characterisation of the code generator: the exact code that
  * `generateInitBindingsFunction` and `generateStaticTemplate` emit today for every emission path
  * the CG tasks refactor — list sources, key arguments, row templates, comment maps, `when` /
  * `whenElse` calls at the three levels, simple-binding writes, the directive walkers, and the

@@ -42,6 +42,23 @@ bun run bench:compare baseline my-change
 
 See [bench/README.md](../../bench/README.md) for the workflow and how to read the results.
 
+## Package, Size and Output Checks
+
+```bash
+# The package entries export exactly the documented names (packs and installs the package)
+bun run check:exports
+
+# Runtime and app sizes, raw and gzip; --json <file> saves a report, --compare <file> diffs one
+bun run size
+
+# Compiled-output snapshots of every build-through fixture and app, dev and prod
+bun run snapshot:output --out .tmp-snap-before
+bun run snapshot:output --out .tmp-snap-after
+bun run snapshot:compare .tmp-snap-before .tmp-snap-after
+```
+
+A refactor that should not change the compiled output is checked with two snapshots, one before and one after. Run `bun run test:benchmark` once in a fresh checkout first: the snapshot set includes the benchmark example, which builds from its installed package. `.tmp-*` folders are ignored by git.
+
 ## Formatting
 
 ```bash

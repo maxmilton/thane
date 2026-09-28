@@ -10,8 +10,7 @@
  *  - the tarball still ships the CLI binary and client.d.ts (the js-framework-benchmark projects
  *    include `node_modules/thane/client.d.ts` by path).
  *
- * The public surface is decided in framework analysis/simplification.md §2.7; update the lists
- * below with it. --no-build skips `bun run build`; --keep leaves the temporary project in place.
+ * The lists below are the public surface; change them together with the package exports. --no-build skips `bun run build`; --keep leaves the temporary project in place.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

@@ -27,9 +27,15 @@ Templates inside directive callbacks (`repeat`, `whenElse`) are the exception �
 
 `html` template variables used inside `defineComponent()` must be defined in the same file (THANE410). The compiler resolves templates via AST analysis and cannot process imported variables. CSS imports are unaffected.
 
-### CTFE Sandboxing
+### Unique Component Names
 
-The compiler's Compile-Time Function Evaluation (CTFE) runs component setup functions in a sandboxed context. Side-effectful code in the module scope (e.g., DOM access, network calls, global mutations) may behave differently or fail during compilation. Keep side effects inside `onMount`.
+The compiler recognises a child component call, `${Card({ … })}`, by the component's export name, over every component in the working directory and the project. Two components exported under the same name collide: the last one found wins, and its selector names the host element of both. A function called in a template with the name of a component defined elsewhere is taken for that component too. Give every component a unique export name.
+
+A component file added while `thane dev` is running is recognised as a child component only after `thane dev` is restarted.
+
+### One Return Object per Setup
+
+A setup function returns one object (THANE412). The compiler builds one static template per component, so an early `return { template: … }` in a branch cannot work. Use `when()` or `whenElse()` in the template instead.
 
 ### `const` Required for Components and Templates
 
@@ -41,13 +47,39 @@ The compiler's Compile-Time Function Evaluation (CTFE) runs component setup func
 
 Template variables cannot use ternary or logical operators (THANE405). Use `whenElse()` for conditional rendering instead.
 
-### User IDs and Directive Placeholders
+### User IDs
 
-Your `id` attributes are kept on every element, bound or not, including `when()` elements and `whenElse()` branch roots; the compiler adds its own `bN` ids only to bound elements that have none. Two things to know: inside `repeat()` rows an `id` is repeated on every row, so prefer `data-*` attributes there; and while a `when()` element or `whenElse()` branch is hidden, a `<template>` placeholder carries its `id`, so `getElementById` finds that placeholder until the content is shown again.
+Your `id` attributes are kept on every element, bound or not. The compiler adds no ids of its own and never uses one to find an element. Inside `repeat()` rows an `id` is repeated on every row, so prefer `data-*` attributes there.
+
+A comment written like one of the compiler's own markers (`<!--b0-->`) is reported as THANE009 when the compiler uses that name in the same template; change or remove it.
 
 ### One Root Element per Repeat Row
 
-Every `repeat()` row is cloned from one element and moved, updated and removed by that element, so a row template must have exactly one root element. A row such as `(item) => html\`<dt>${item.term}</dt><dd>${item.def}</dd>\``is reported at build time as THANE007; wrap the pair in a single element instead. A row that is a child component call,`(item) => Card({ item })`, has no markup of its own and is not affected.
+Every `repeat()` row is cloned from one element and moved, updated and removed by that element, so a row template must have exactly one root element. A row such as `(item) => html\`<dt>${item.term}</dt><dd>${item.def}</dd>\`` is reported at build time as THANE007; wrap the pair in a single element instead. A row that is only a directive (a `when()`, `whenElse()` or nested `repeat()`) is THANE007 as well. A row that is a child component call, `(item) => Card({ item })`, has no markup of its own and is not affected.
+
+For the same reason a row's root element cannot carry `when()` (THANE008): filter the list, or put the `when()` on an element inside the row.
+
+Inside the row, anything a component template can hold works, at any depth: bindings, event handlers, child components, `when()`, `whenElse()` and further lists.
+
+### Signal Items Named `item` in Nested Lists
+
+In a list whose items are signals (`Signal<Signal<T>[]>`) and whose rows hold a list of their own, the inner rows cannot call the outer item if its parameter is named `item`:
+
+```typescript
+// ❌ inside the inner rows, item() reads the inner row's item
+${repeat(groups(), (item) => html`<li>${repeat(item().tags, (tag) => html`<b>${item().name}: ${tag}</b>`)}</li>`)}
+
+// ✅ any other name works
+${repeat(groups(), (group) => html`<li>${repeat(group().tags, (tag) => html`<b>${group().name}: ${tag}</b>`)}</li>`)}
+```
+
+### Empty Templates Are Static
+
+The empty template of a `repeat()`, its third argument, is inserted as written: it holds no bindings or event handlers, and a `${…}` inside it is shown as text. It must be a single element, like a row.
+
+### Whitespace Between Elements
+
+Whitespace-only text between two elements is removed from compiled templates, so `<b>x</b> <i>y</i>` renders as "xy", where a browser would show "x y". Put the space inside one of the elements (`<b>x </b><i>y</i>`) or write it as `&#32;`. Whitespace next to a text binding is kept; see [Templates](templates.md#whitespace).
 
 ## Runtime Constraints
 
@@ -77,7 +109,6 @@ Thane targets modern browsers and uses APIs without polyfills:
 - `CSSStyleSheet.replaceSync()` for style injection
 - `queueMicrotask` for async error surfacing
 - `HTMLTemplateElement` for template cloning
-- `TreeWalker` for binding marker discovery
 - CSS Nesting for scoped styles
 
 ### No Async Component Setup
@@ -112,7 +143,11 @@ Only one router instance is supported. Calling `mount()` with a `router` option 
 
 ### Circular Signal Dependencies
 
-Cascading signal updates that form a cycle are detected after 100 iterations and throw `Error: Circular signal dependency`. This protects against infinite loops but means some recursive reactive patterns are not possible.
+Cycles are not detected. When subscribers keep setting each other's signals, every round of the cascade runs one level deeper, so a cycle that never settles ends in a stack overflow (`RangeError: Maximum call stack size exceeded`), and afterwards later writes may never be notified. A cascade that settles runs to the end, but a very long one can overflow the stack as well. See [Signals](signals.md#circular-dependencies).
+
+### Stale `computed` Reads in a Batch or a Cascade
+
+A `computed` is marked dirty when one of its sources notifies it, and re-evaluates on its next read; until then a read returns the previous value. Inside a `batch()` function, and while subscribers run, those notifications can still be waiting: a read in the batch function, in a subscriber that has just set one of the computed's sources, or of a `computed` built on other `computed`s in a subscriber of their source, returns the old value. Read the computed after the batch, or read the source signals directly there. See [Signals](signals.md#computed-signals).
 
 ## Missing Features
 
@@ -133,11 +168,11 @@ These features are **not currently supported**:
 
 ### `console.*` Stripping
 
-Production builds (`thane build --prod`) strip all `console.*` calls by default. Override with `--dropConsole false` if needed.
+Production builds (`thane build --prod`) strip all `console.*` calls by default. Override with `--no-drop-console` if needed.
 
 ### `debugger` Stripping
 
-Production builds strip `debugger` statements by default. Override with `--dropDebugger false`.
+Production builds strip `debugger` statements by default. Override with `--no-drop-debugger`.
 
 ### Source Maps
 

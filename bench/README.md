@@ -131,7 +131,7 @@ geometric mean                                        0.71x
 
 - **script** is the JavaScript time the operation caused, including event dispatch and
   microtasks. This is the part the compiler and runtime control, and it is where Thane trails the
-  fastest implementations (see `framework analysis/ANALYSIS.md`). It is the metric to optimise
+  fastest implementations. It is the metric to optimise
   against.
 - **total** is click to the end of the frame that shows the result. It is dominated by style,
   layout and paint, which every framework pays roughly equally, so it moves much less than script

@@ -6,7 +6,7 @@ The Thane CLI is the build tool for compiling, serving, and type-checking Thane 
 
 ### `thane dev`
 
-Start a development server with hot module replacement and browser error overlay.
+Build in watch mode and start a development server.
 
 ```bash
 thane dev
@@ -14,11 +14,13 @@ thane dev --port 3000 --open
 thane dev --host 0.0.0.0
 ```
 
-Default port: `4200`. Source maps are enabled. All 12 lint rules are active. `console.*` calls are preserved.
+Default port: `4200`. Always a development build (`--prod` is ignored). Source maps are enabled. All 12 lint rules are active. `console.*` calls are preserved.
+
+The build reruns when a source file changes; reload the page to load it. Errors in the browser (`console.error`, uncaught errors and unhandled promise rejections) are printed in the terminal, with their locations in the built files.
 
 ### `thane build`
 
-Compile the application for production.
+Compile the application into the output directory: a development build, or a production build with `--prod`.
 
 ```bash
 thane build
@@ -27,35 +29,35 @@ thane build --prod --gzip --analyze
 
 Production mode (`--prod`) enables:
 
-- Template and selector minification
+- JavaScript minification (esbuild), and template and selector minification
 - `console.*` call stripping
 - `debugger` statement stripping
-- Content-hashed filenames
 - Source maps disabled (unless `--sourcemap` is set)
+
+Output file names carry content hashes in every build, unless `--no-hash-file-names` is set.
 
 ### `thane serve`
 
-Serve the built output directory.
+Build the application and serve the output directory, rebuilding on changes. Unlike `dev`, it keeps `--prod`, so it serves a production build when asked to.
 
 ```bash
 thane serve
-thane serve --port 8080
+thane serve --prod --port 8080
 ```
 
 ### `thane typecheck`
 
-Run TypeScript type checking without building.
+Run TypeScript type checking without building. Type errors fail the command.
 
 ```bash
 thane typecheck
-thane typecheck --strictTypeCheck
 ```
 
-By default, type errors produce warnings. With `--strictTypeCheck`, they fail the build.
+`thane build`, `dev` and `serve` run the same check before they compile: there, type errors are printed as warnings, unless `--strict-type-check` makes them fail the build.
 
 ### `thane types`
 
-Generate router type definitions. This runs the `router-typegen` plugin, which scans `defineRoutes()` and writes `.d.ts` files to `.thane/types/router/`.
+Generate the hidden type files without building: `.thane/types/client.d.ts` (the `.css` import declarations) and, for each `defineRoutes()` table, the route types in `.thane/types/router/`.
 
 ```bash
 thane types
@@ -67,7 +69,6 @@ thane types
 | :------------------------------------------- | :-------------- | :---------------------------- | :------------------------------------------------------------ |
 | `--prod`, `-p`                               | boolean         | `false`                       | Production mode                                               |
 | `--gzip`                                     | boolean         | `false`                       | Enable gzip/brotli compression                                |
-| `--app <name>`                               | string          | `client`                      | Application name                                              |
 | `--entry <path>`                             | string          | `./src/main.ts`               | Entry point file                                              |
 | `--out <dir>`                                | string          | `./dist`                      | Output directory                                              |
 | `--assets <dir>`                             | string          | `./src/assets`                | Static assets directory copied into the output                |
@@ -89,8 +90,21 @@ thane types
 | `--empty-out-dir` / `--no-empty-out-dir`     | boolean         | `true`                        | Clear output directory before building                        |
 | `--legal-comments <mode>`                    | string          | `none`                        | Legal comment handling: `none`, `eof`, `linked`, `external`   |
 | `--verbose`, `-V` / `--quiet`, `-q`          | boolean         | normal                        | Logging verbosity                                             |
+| `--help`, `-h` / `--version`, `-v`           | boolean         |                               | Print the help text or the version, and exit                  |
 
 Compile-time constant replacements (`define`) can only be set in the config file.
+
+### Flags That Take a Value
+
+A value flag (`--entry`, `--out`, `--assets`, `--html`, `--config`, `--port`, `--host`, `--base`, `--target`, `--env-prefix`, `--legal-comments`) takes the next argument as its value. The rules are the same with or without a config file:
+
+- When the next argument is missing or starts with `-`, the flag is bare and takes no value: `thane dev --host --open` sets `open` and a bare `--host`.
+- A bare flag stands for its fallback, which overrides the config file: `--host` means `0.0.0.0`, `--port` `4200`, `--base` `/`, `--env-prefix` `THANE_`, `--legal-comments` `none`, and `--target` the default targets. A bare `--entry`, `--out`, `--assets`, `--html` or `--config` is ignored.
+- `--port` accepts digits only. Anything else (`--port abc`, `--port 3000x`) stops with an error.
+
+An unknown flag, or an argument that is neither a command nor a flag's value (`thane biuld`), prints a warning; the command then runs as if it were not there, so `thane biuld` runs `build`. `--help` and `--version` print and exit, whether or not a config file is present.
+
+Colours in the output are switched off when it is not a terminal or when `NO_COLOR` is set, and forced on with `FORCE_COLOR=1`.
 
 ## Configuration File
 
@@ -119,7 +133,6 @@ Use `--config <path>` to load a file from somewhere else. Relative paths in the 
 | `outDir`                                                                                                       | `--out`                                                            |
 | `assetsDir`                                                                                                    | `--assets`                                                         |
 | `html`                                                                                                         | `--html`                                                           |
-| `app`                                                                                                          | `--app`                                                            |
 | `hashFileNames`, `dropConsole`, `dropDebugger`, `strictTypeCheck`, `emptyOutDir`, `legalComments`, `envPrefix` | Same name in kebab-case (`--hash-file-names`, `--drop-console`, …) |
 | `prod`, `gzip`, `port`, `open`, `host`, `base`, `sourcemap`, `analyze`, `splitting`, `target`                  | Same name                                                          |
 | `define`                                                                                                       | _(config only)_                                                    |
@@ -152,7 +165,7 @@ The `commands` object lets you set different options for each CLI command (`buil
 
 ## Environment Variables
 
-Environment variables prefixed with `THANE_` (or your custom `--envPrefix`) are automatically injected as compile-time constants:
+Environment variables prefixed with `THANE_` (or your custom `--env-prefix`) are automatically injected as compile-time constants:
 
 ```bash
 THANE_API_URL=https://api.example.com thane build

@@ -11,8 +11,8 @@
  * `/// <reference path>` to the package's client.d.ts, so the declaration exists once.
  *
  * A `types` entry resolves only from an installed package, so the documented setup is stood in for
- * here by a tsconfig that includes the package's client.d.ts itself (the H-49 hand-off note has
- * the installed-package check).
+ * here by a tsconfig that includes the package's client.d.ts itself; the installed-package case is
+ * covered by scripts/check-exports.ts.
  */
 import { afterEach, describe, expect, test } from 'bun:test';
 import { runProjectTypeCheck } from './tsc-type-checker.js';

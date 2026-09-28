@@ -1,15 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // ═══════════════════════════════════════════════════════════════════════
-// F0-3 hardening probes: one test per defect confirmed on e4a17f1
-// (framework analysis/simplification.md §1.8), run against e2e/hardening-app.
+// Hardening probes: one test per defect found by probing e4a17f1, run against e2e/hardening-app.
 //
 // Each test asserts the CORRECT behaviour and stays `test.fixme` until the task named in its title
 // fixes the defect; that task changes `test.fixme` to `test`. Every page mounts one probe
 // (`/?probe=<id>`), so a test sees only its own component, styles and errors.
 //
 // X1 did not reproduce on e4a17f1 and runs as a normal test. N1 and N2 are defects found while
-// writing these probes (F0-3 hand-off note); N1 became H-40 and N2 H-41 (A1-2).
+// writing these probes; N1 is fixed by H-40 and N2 by H-41.
 // ═══════════════════════════════════════════════════════════════════════
 
 type Probe = {
@@ -436,10 +435,9 @@ test.describe('F0-3 hardening probes', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// A1-1: characterisation of element lookups and directive branches, before A1 replaces the id
-// lookups with paths and the <template> placeholders with comment anchors (simplification.md,
-// workstream A1). Every test passes on the wave base, except the `test.fixme` ones, which name the
-// A1 task that fixes their defect and switches them on.
+// Element lookups and directive branches: developer ids, text positions, browser-normalised markup,
+// branches at every position and depth, and two instances of one component. They pinned the
+// behaviour that path-based lookup and comment-anchored branches had to keep.
 // ═══════════════════════════════════════════════════════════════════════
 
 /** A probe's exposed signal setter: `window.__probe[id][key](value)`. */
@@ -900,8 +898,8 @@ test.describe('A1-1 lookups and branches', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// H-52 (K23, simplification.md §5.1): the text between row text bindings, rendered. A `test.fixme`
-// names the task that switches it on. Text is compared exactly (textContent), not whitespace-normalised.
+// H-52: the text between row text bindings, rendered. Text is compared exactly (textContent), not
+// whitespace-normalised.
 // ═══════════════════════════════════════════════════════════════════════
 
 type H52Row = { id: number; first: string; mid: string; last: string };
@@ -963,7 +961,7 @@ test.describe('H-52 row text bindings', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// H-53 (K24, K25, simplification.md §5.1): the whitespace between a text binding and an element or
+// H-53: the whitespace between a text binding and an element or
 // directive next to it, rendered. Text is compared exactly (textContent): a hidden when() leaves the
 // space on each side of its anchors, as static text around a removed element would.
 // ═══════════════════════════════════════════════════════════════════════
@@ -1017,9 +1015,8 @@ test.describe('H-53 text bindings next to elements and directives', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// Workstream RW (H-18 option (b), simplification.md §4 RW): nested directives inside repeat() rows.
-// Everything a component-level list or branch can contain also works inside a row, at any depth.
-// Each test is `test.fixme` until the task in its title makes it pass.
+// Nested directives inside repeat() rows: everything a component-level list or branch can contain
+// also works inside a row, at any depth.
 // ═══════════════════════════════════════════════════════════════════════
 
 type RW2Row = { id: number; first: string; last: string; on: boolean; tags: string[] };

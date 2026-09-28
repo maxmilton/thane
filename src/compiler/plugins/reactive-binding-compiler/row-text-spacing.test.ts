@@ -1,5 +1,5 @@
 /**
- * H-52 and H-53 (framework analysis/simplification.md §5.1): the static text next to text bindings,
+ * The static text next to text bindings,
  * pinned for rows, component templates, when() content, whenElse() branches and a row's when() content,
  * in development and production builds. One component holds every shape; each shape's emitted template
  * is found by the class on its element.
@@ -171,7 +171,7 @@ const COMPONENT_SHAPES: Record<string, Shape> = {
   afterElement: { source: '<b>B</b> ${a()}', template: '<b>B</b> <!---->A<!---->', text: 'B A' },
   afterVoid: { source: '<input> ${a()}', template: '<input> <!---->A<!---->', text: ' A' },
   betweenElements: { source: '<b>x</b> <i>y</i>', template: '<b>x</b><i>y</i>', text: 'xy' },
-  // The whitespace before the end of the binding's parent still goes (hand-off note)
+  // The whitespace before the end of the binding's parent still goes
   trailing: { source: '<b>${a()} </b>x', template: '<b><!---->A<!----></b>x', text: 'Ax' },
 };
 
@@ -240,7 +240,7 @@ const ROW_WHEN_SHAPES: Record<string, Shape> = {
 
 /**
  * A row whose when() is pre-rendered (a component condition, true at compile time). Until RW-2 its row
- * template was garbled (a boundary twice, no space; A1's hand-off note, finding 10). Since RW-2 the row
+ * template was garbled (a boundary twice, no space). Since RW-2 the row
  * holds the when()'s own template, with one space between the two bindings.
  */
 const PRERENDERED_ROW_WHEN = '<li class="rp-space"><!----><span><!----> <!----> <!----> <!----></span><!----></li>';

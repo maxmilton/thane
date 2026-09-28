@@ -61,17 +61,20 @@ export const Counter = defineComponent(() => {
 #### ⚙️ What the compiler generates
 
 ```javascript
-// Static template (cloned, never re-parsed)
-const _t = document.createElement('template');
-_t.innerHTML = `<button>Clicks: <!--b0-->0<!----></button>`;
+// Static template (parsed once, cloned per instance)
+const __tpl = __T(`<button> Clicks: <!---->0<!----></button>`);
 
-// TreeWalker finds all comment markers in one pass
-const _cm = _fcm(root); // { b0: CommentNode }
+// _ns: the clone's elements, in document order
+__b: (ctx, _ns) => {
+  // A compile-time path to the text node, no search
+  const text = _ns[0].lastChild.previousSibling;
 
-// Direct DOM binding — subscribe with skip-initial
-count.subscribe(v => {
-  _cm['b0'].nextSibling.data = v;
-}, true);
+  // Direct DOM binding — subscribe with skip-initial
+  count.subscribe(v => {
+    text.data = v;
+  }, true);
+  _ns[0].addEventListener('click', inc);
+}
 ```
 
 </td>
@@ -116,7 +119,7 @@ No Shadow DOM. Components render as regular DOM elements with auto-scoped CSS vi
 <td width="33%" valign="top">
 
 ### 📦 Built-in Directives
-`when()`, `whenElse()`, `repeat()` with keyed reconciliation, empty-state fallbacks, and full nesting support.
+`when()`, `whenElse()`, `repeat()` with keyed reconciliation, empty-state fallbacks, and nesting at any depth.
 
 </td>
 <td width="33%" valign="top">

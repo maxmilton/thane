@@ -8,7 +8,7 @@
 ${whenElse(condition(), thenTemplate, elseTemplate)}
 ```
 
-Both the `then` and `else` branches must be `html` tagged template results assigned to `const` variables (or inline template literals within the `whenElse` call).
+Both the `then` and `else` branches must be `html` tagged template results assigned to `const` variables (or inline template literals within the `whenElse` call). A branch may have any number of root nodes, text included: it is everything between two invisible comment anchors, and showing or hiding it moves the whole range.
 
 ## Basic Usage
 
@@ -41,7 +41,24 @@ When the condition changes:
 
 Only one branch is ever in the DOM — they are **mutually exclusive**.
 
-The compiler pre-renders the branch selected by the signals' initial values into the static template. If the condition cannot be evaluated at build time — for example it reads a plain local variable instead of a signal — both branches start as placeholders and the runtime picks one at mount.
+The compiler pre-renders the branch selected by the signals' initial values into the static template. If the condition cannot be evaluated at build time — for example it reads a plain local variable instead of a signal — both branches start empty and the runtime picks one at mount.
+
+## Branches with Several Roots
+
+A branch does not need a wrapper element. Several elements, text, or text mixed with elements all work:
+
+```typescript
+template: html`
+  ${whenElse(
+    isLoggedIn(),
+    html`<h2>Welcome back, ${name()}</h2>
+      <button @click=${logout}>Log out</button>`,
+    html`Please log in to continue.`,
+  )}
+`
+```
+
+When the condition changes, every node of the old branch is removed, including rows and child components at its top level, and every node of the new one is inserted.
 
 ## Bindings Inside Branches
 

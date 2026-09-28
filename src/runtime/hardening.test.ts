@@ -1,5 +1,5 @@
 /**
- * Signal defects confirmed on e4a17f1 (framework analysis/simplification.md §1.8, R1 and R2).
+ * Signal defects found by probing e4a17f1 (R1 and R2).
  *
  * Each test asserts the correct behaviour and stays `test.todo` until RT-3 fixes it and turns it into
  * `test`. `bun test --todo src/runtime/hardening.test.ts` runs them: a todo that passes is reported as a

@@ -63,7 +63,21 @@ styles: css`
 `;
 ```
 
-Becomes `.ui-card.active { border-color: blue; }`.
+Becomes `.ui-card.active { border-color: blue; }`. The condition can be any compound selector, including pseudo-classes with their own parentheses: `:host(:not(.disabled).active)` becomes `.ui-card:not(.disabled).active`.
+
+### `:host-context()`
+
+`:host-context(X)` styles the component when it sits inside an element that matches `X`, typically a theme class on a page wrapper:
+
+```typescript
+styles: css`
+  :host-context(.dark) .title {
+    color: white;
+  }
+`;
+```
+
+The compiler rewrites it to `.dark & .title`, which is scoped to `.dark .ui-card .title`. It matches when an **ancestor** matches `X`; to style the component element itself by its own class, use `:host(X)`. The argument is one compound selector, as in Shadow DOM CSS.
 
 ## CSS Nesting
 
@@ -90,6 +104,17 @@ styles: css`
   }
 `;
 ```
+
+## At-Rules and Comments
+
+- `@media`, `@supports`, `@container` and `@layer` blocks are scoped inside, like top-level rules.
+- `@layer a, b;` declares the layers' order as usual (the compiler writes it as one empty `@layer` block per name).
+- `@charset` is removed: it means nothing in a stylesheet string.
+- `@import` is removed, and the build prints a warning. Thane applies every stylesheet as a constructed stylesheet (`adoptedStyleSheets`), and browsers ignore `@import` there. Load such a stylesheet with a `<link>` in `index.html` instead.
+- `@keyframes` and `@font-face` are copied as written, so keyframe names are global: give them a prefix of your own.
+- `@namespace` is not supported in component stylesheets: the rule after it is not scoped.
+
+Comments are removed from stylesheets at build time, in development and production builds.
 
 ## CSS File Imports
 

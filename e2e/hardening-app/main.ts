@@ -1,5 +1,5 @@
 /**
- * Hardening app: one probe component per confirmed defect (framework analysis/simplification.md §1.8).
+ * Hardening app: one probe component per defect found by probing the compiler and runtime.
  *
  * `/?probe=<id>` mounts that one probe into #app, so every test sees only its own component, styles
  * and errors. `&manual=1` skips the mount, for tests that measure state before mounting and call

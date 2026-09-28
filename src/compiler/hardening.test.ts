@@ -1,5 +1,5 @@
 /**
- * Compile-time defects confirmed on e4a17f1 (framework analysis/simplification.md §1.8, C1–C8).
+ * Compile-time defects found by probing e4a17f1 (C1–C8).
  *
  * Each test asserts the correct behaviour and stays `test.todo` until the task named in its title
  * fixes the defect; that task turns it into `test`. The runtime defects are in

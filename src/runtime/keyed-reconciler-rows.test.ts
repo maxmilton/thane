@@ -1,5 +1,5 @@
 /**
- * Keyed reconciler behaviour found in wave 1 (RT-5, H-31) and pinned so that later changes keep it
+ * Keyed reconciler behaviour found while simplifying the reconciler, and pinned so that later changes keep it
  * until an approved fix changes it. The fake DOM is the one in keyed-reconciler-general.test.ts
  * (copied; that file is not shared).
  */
@@ -175,7 +175,7 @@ describe('creating rows in an empty list: the container is detached and put back
 describe('same-length reorder pass: rows after the third displaced row', () => {
   // Until H-48 the pass stopped updating after the third displaced row, and the move branch only
   // moves rows, so a row further on whose item changed (same key, new object) kept its old value
-  // (K17, found in wave 1). The pass now updates every row whose item changed, before the moves.
+  // (K17). The pass now updates every row whose item changed, before the moves.
   test('H-48: an item changed after the third displaced row is updated', () => {
     const { reconcile, order, reconciler } = setup();
     const [a, b, c, d, e] = rows('A', 'B', 'C', 'D', 'E');

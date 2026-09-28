@@ -1,7 +1,7 @@
 /**
  * Characterisation of the component factories, `__dc` and `mountComponent` (before RT-6…RT-8).
  *
- * component.ts has little unit coverage (simplification.md §1.4): its behaviour is covered by the
+ * component.ts has little other unit coverage: its behaviour is covered by the
  * e2e contract and destroy suites. These tests pin, with an operation log over a fake DOM, what
  * each factory does and in which order, so that RT-6 (defineComponent), RT-7
  * (__registerComponent) and RT-8 (mountComponent().destroy) can be checked without a browser.
