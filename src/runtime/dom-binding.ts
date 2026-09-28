@@ -97,22 +97,58 @@ interface ManagedItem<T> {
 /** Key function for tracking items in repeat. */
 type KeyFn<T> = (item: T, index: number) => string | number;
 
-/**
- * How to create rows in batches: `size` rows are cloned from one fragment (built once from
- * `row`) and bound one by one with `bind`, then inserted together. Only rows that need no
- * per-row cleanups use it; the reconciler falls back to the single-row factory for the
- * remainder of a batch and for lists shorter than one batch.
- */
+/** Creates the rows of `items[i..end]` in whole batches; returns the index of the first row left. */
 export interface BatchRows<T> {
-  size: number;
-  row: Node;
-  bind: (el: Element, item: T, index: number) => ManagedItem<T>;
-  /**
-   * One update function shared by every row, given the managed record (which carries the
-   * row's guard state) and the new item; rows bound this way have no per-row update closure.
-   */
-  update?: (managed: ManagedItem<T>, item: T, index: number) => void;
+  (
+    items: T[],
+    i: number,
+    end: number,
+    put: (managed: ManagedItem<T>, item: T, index: number) => void,
+    container: Node,
+    anchor: Node,
+  ): number;
+  /** The update function shared by every row, if any */
+  u?: ((managed: ManagedItem<T>, item: T, index: number) => void) | undefined;
 }
+
+/**
+ * @internal — How a list creates rows in batches: `size` rows are cloned from one fragment (built
+ * once from `row`) and bound one by one with `bind`, then inserted together. Compiled code passes
+ * it only for lists whose rows need no cleanups, so other apps do not bundle it; the reconciler
+ * creates the remainder of a batch, and lists shorter than one batch, with the single-row factory.
+ * `update` is one update function shared by every row, given the managed record (which carries
+ * the row's guard state) and the new item; rows bound this way have no per-row update closure.
+ */
+export const __batchRows = <T>(
+  size: number,
+  row: Node,
+  bind: (el: Element, item: T, index: number) => ManagedItem<T>,
+  update?: (managed: ManagedItem<T>, item: T, index: number) => void,
+): BatchRows<T> => {
+  let fragment: Node | undefined;
+  const rows: BatchRows<T> = (items, i, end, put, container, anchor) => {
+    // Whole batches: one clone and one insert per `size` rows instead of one of each per row.
+    while (end - i >= size) {
+      if (!fragment) {
+        fragment = row.ownerDocument!.createDocumentFragment();
+        for (let k = size; k--;) fragment.appendChild(row.cloneNode(true));
+      }
+      const clone = fragment.cloneNode(true) as ParentNode & Node;
+      // The clone holds exactly `size` rows
+      for (let el = clone.firstElementChild; el; el = el.nextElementSibling, i++) {
+        const item = items[i]!;
+        put(bind(el, item, i), item, i);
+      }
+      container.insertBefore(clone, anchor);
+    }
+    return i;
+  };
+  rows.u = update;
+  return rows;
+};
+
+/** @internal — The cleanups of every row that has none (the rows of lists passed __batchRows): one shared empty array. */
+export const __nc: (() => void)[] = [];
 
 // ─────────────────────────────────────────────────────────────
 //  createKeyedReconciler — keyed-only, direct-update mode
@@ -130,12 +166,12 @@ export function createKeyedReconciler<T>(
   const keyFn: KeyFn<T> =
     typeof keyFnOrProp === 'string' ? (item: T) => (item as any)[keyFnOrProp] as string | number : keyFnOrProp;
 
-  // Rows either carry their own update closure or share the one in `batch.update`.
-  const sharedUpdate = batch?.update;
+  // Rows either carry their own update closure or share the one in `batch.u`.
+  const sharedUpdate = batch?.u;
   const updateRow = (managed: ManagedItem<T>, item: T, index: number) => {
     managed.value = item;
     if (trackIndex) managed.i = index;
-    if (sharedUpdate !== undefined) sharedUpdate(managed, item, index);
+    if (sharedUpdate) sharedUpdate(managed, item, index);
     else managed.update!(item, index);
   };
 
@@ -215,8 +251,6 @@ export function createKeyedReconciler<T>(
    * per insertion; when rows already exist it stays attached, because removing and re-adding
    * a large subtree costs more than the incremental inserts it would save.
    */
-  let batchFragment: Node | null = null;
-
   const bulkCreate = (items: T[], from = 0) => {
     const end = items.length;
     const count = end - from;
@@ -230,27 +264,10 @@ export function createKeyedReconciler<T>(
 
     managedItems.length = base + count;
     let write = base;
-    let i = from;
-
-    // Whole batches: one clone and one insert per `size` rows instead of one of each per row.
-    if (batch !== undefined && count >= batch.size) {
-      const size = batch.size;
-      const bind = batch.bind;
-      if (batchFragment === null) {
-        batchFragment = batch.row.ownerDocument!.createDocumentFragment();
-        for (let k = 0; k < size; k++) batchFragment.appendChild(batch.row.cloneNode(true));
-      }
-      while (end - i >= size) {
-        const rows = batchFragment.cloneNode(true) as ParentNode & Node;
-        let el = rows.firstElementChild!;
-        for (let k = 0; k < size; k++, i++) {
-          const item = items[i]!;
-          managedItems[write++] = adopt(bind(el, item, i), keyFn(item, i), i);
-          el = el.nextElementSibling!;
-        }
-        container.insertBefore(rows, anchor);
-      }
-    }
+    const put = (managed: ManagedItem<T>, item: T, i: number) =>
+      (managedItems[write++] = adopt(managed, keyFn(item, i), i));
+    // Whole batches first (a list compiled with __batchRows), then single rows
+    let i = batch ? batch(items, from, end, put, container, anchor) : from;
 
     for (; i < end; i++) {
       const item = items[i]!;

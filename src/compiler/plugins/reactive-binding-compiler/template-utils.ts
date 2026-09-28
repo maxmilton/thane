@@ -5,7 +5,10 @@
  * eliminate ~300 lines of near-identical conditional/whenElse/edit logic.
  */
 
+import ts from 'typescript';
 import type { Range } from '../../types.js';
+import { ErrorCode } from '../../errors.js';
+import { createSourceFile } from '../../utils/ast-utils.js';
 import type { ConditionalBlock, WhenElseBlock, RepeatBlock, BindingInfo, EventBinding } from './types.js';
 import {
   findElementsWithWhenDirective,
@@ -294,6 +297,24 @@ const componentRowOf = (rowTemplate: string): RepeatBlock['componentRow'] => {
 };
 
 /**
+ * A repeat()'s empty template, its third argument, collapsed. A function there is a key function
+ * written third, which would become the empty template's markup and leave the list keyed by index:
+ * it is a build error (H-54).
+ */
+const emptyTemplateOf = (binding: ParsedBindingInfo): string | undefined => {
+  if (!binding.emptyTemplate) return undefined;
+  const [statement] = createSourceFile('__repeat.ts', binding.fullExpression.replace(/^\$\{|\}$/g, '')).statements;
+  const call = statement && ts.isExpressionStatement(statement) ? statement.expression : undefined;
+  const third = call && ts.isCallExpression(call) ? call.arguments[2] : undefined;
+  if (third && (ts.isArrowFunction(third) || ts.isFunctionExpression(third))) {
+    throw new Error(
+      `${ErrorCode.REPEAT_EMPTY_TEMPLATE_FUNCTION}: the third argument of repeat() is the empty template, shown while the list is empty, not a key function. Pass the key function fourth: repeat(items, row, null, ${third.getText()}).`,
+    );
+  }
+  return collapseEmptyTemplate(binding.emptyTemplate);
+};
+
+/**
  * The RepeatBlock for a parsed repeat() binding whose row template has been processed. The
  * caller allocates the id, processes the row template and passes the (possibly rewritten) items
  * expression and its signal names.
@@ -313,7 +334,7 @@ export const toRepeatBlock = (
   indexVar: binding.indexVar,
   itemTemplate: processed.processedContent,
   componentRow: componentRowOf(binding.itemTemplate!),
-  emptyTemplate: binding.emptyTemplate ? collapseEmptyTemplate(binding.emptyTemplate) : undefined,
+  emptyTemplate: emptyTemplateOf(binding),
   trackByFn: binding.trackByFn,
   startIndex: binding.expressionStart,
   endIndex: binding.expressionEnd,
@@ -362,12 +383,13 @@ export const applyTemplateEdits = (source: string, edits: TemplateEdit[]): strin
   // Between a tag and an anchor comment it goes as it does between two tags: anchors stand where
   // `<template>` placeholders stood before A1, and a list's container must hold only its rows and
   // its anchor for a clear to empty it at once (H-05). A text marker keeps the whitespace before it,
-  // which is text.
+  // which is text, and so does a binding's boundary (`<!---->`) before an element or an anchor (H-53);
+  // before its parent's end tag it goes.
   return outsideVerbatim(result, (html) =>
     html
       .replace(/\s+/g, ' ')
-      .replace(/>\s+<(?![!-])/g, '><')
-      .replace(/>\s+(?=<!--[ib]\d+[(|).]-->)/g, '>')
+      .replace(/(?<!<!----)>\s+<(?![!-])|>\s+<(?=\/)/g, '><')
+      .replace(/(?<!<!----)>\s+(?=<!--[ib]\d+[(|).]-->)/g, '>')
       .replace(/(<!--[ib]\d+-->)(<!---->)/g, '$1 $2')
       .replace(/\s+>/g, '>')
       .trim(),

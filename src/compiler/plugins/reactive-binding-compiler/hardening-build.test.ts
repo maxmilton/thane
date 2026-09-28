@@ -19,8 +19,8 @@ ${body}
 mount(App);
 `;
 
-/** The component's static template (the `_T(\`…\`)` of `__tpl`). */
-const componentTemplate = (js: string): string | undefined => /\b__tpl = _T\(`([^`]*)`\)/.exec(js)?.[1];
+/** The component's static template (the `__T(\`…\`)` of `__tpl`). */
+const componentTemplate = (js: string): string | undefined => /\b__tpl = __T\(`([^`]*)`\)/.exec(js)?.[1];
 
 /** A template literal's body in the bundle, escapes included. */
 const LITERAL = '`((?:\\\\[\\s\\S]|[^`\\\\])*)`';
@@ -43,16 +43,16 @@ describe('H-02 template text reads back as the source means it', () => {
 
   test('main, when(), row and empty templates, and an initial value', async () => {
     const js = await buildAndReadJs(app(body), DEV);
-    const main = cooked(new RegExp(`\\b__tpl = _T\\(${LITERAL}\\)`).exec(js)?.[1]);
+    const main = cooked(new RegExp(`\\b__tpl = __T\\(${LITERAL}\\)`).exec(js)?.[1]);
     expect(main).toMatch(
       /^<div><p>C:\\dir \$\{notExpr\} `q`<\/p><!----><b>w\\x<\/b><!----><i><!---->v\\1 `2` \$\{3\}<!----><\/i><ul>/,
     );
     const whenContent = cooked(new RegExp(`__bindIf\\(_ws_b\\d+, _we_b\\d+, on, ${LITERAL}`).exec(js)?.[1]);
     expect(whenContent).toMatch(/^<b>w\\x<\/b>$/);
-    expect(cooked(new RegExp(`__tpl_b\\d+ = _T\\(${LITERAL}\\)`).exec(js)?.[1])).toMatch(
+    expect(cooked(new RegExp(`__tpl_b\\d+ = __T\\(${LITERAL}\\)`).exec(js)?.[1])).toMatch(
       /^<li>r\\s <!----> <!----><\/li>$/,
     );
-    expect(cooked(new RegExp(`\\?\\?= _T\\(${LITERAL}\\)`).exec(js)?.[1])).toBe('<li>e\\q</li>');
+    expect(cooked(new RegExp(`\\?\\?= __T\\(${LITERAL}\\)`).exec(js)?.[1])).toBe('<li>e\\q</li>');
     // `notExpr` is text, not a binding: nothing reads it
     expect(js).not.toMatch(/[^{]notExpr/);
   });
@@ -95,7 +95,7 @@ describe('H-12 quote-aware expression scanning', () => {
         '${whenElse(on(), html`<i>\\`</i>`, html`<b>{</b>`)}</div>` };',
     ].join('\n');
     const js = await buildAndReadJs(app(body), DEV);
-    const rows = [...js.matchAll(new RegExp(`__tpl_b\\d+ = _T\\(${LITERAL}\\)`, 'g'))].map((m) => cooked(m[1]));
+    const rows = [...js.matchAll(new RegExp(`__tpl_b\\d+ = __T\\(${LITERAL}\\)`, 'g'))].map((m) => cooked(m[1]));
     expect(rows).toEqual(['<li></li>', '<li></li>']);
     expect(js).toMatch(/item\.on \? ["']\}["'] : ["']\{["']/);
     expect(js).toContain('fmt({ a: { b: item.a } })');
@@ -190,7 +190,7 @@ describe('H-46 duplicate attributes', () => {
     );
     expect(js).toMatch(/\.checked = c\(\)/);
     expect(js).not.toMatch(/\.disabled = /);
-    const main = cooked(new RegExp(`\\b__tpl = _T\\(${LITERAL}\\)`).exec(js)?.[1]);
+    const main = cooked(new RegExp(`\\b__tpl = __T\\(${LITERAL}\\)`).exec(js)?.[1]);
     expect(main).toMatch(/^<div><input class="k" checked><button disabled disabled=\$\{d\(\)\}>b<\/button><\/div>$/);
   });
 });

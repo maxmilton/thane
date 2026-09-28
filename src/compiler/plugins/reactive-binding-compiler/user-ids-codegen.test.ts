@@ -17,7 +17,7 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
 
-const componentTemplate = (js: string): string => js.match(/__tpl = _T\(`([^`]*)`\)/)?.[1] ?? '';
+const componentTemplate = (js: string): string => js.match(/__tpl = __T\(`([^`]*)`\)/)?.[1] ?? '';
 
 // A1-2: a bound element is reached by its position in the template (`_ns[i]`, the template's
 // elements in document order); its developer id stays on it and is not used to find it.

@@ -44,7 +44,7 @@ export const App = defineComponent('conformance-app', () => {
         \${when(show(), html\`<p>shown</p>\`)}
         \${whenElse(show(), html\`<p>A</p>\`, html\`<p>B</p>\`)}
         <ul>
-          \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, (item) => item.id)}
+          \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, null, (item) => item.id)}
         </ul>
       </section>
     \`,
@@ -305,7 +305,7 @@ mount(App);
 
     expect(js).not.toContain('class=${');
     expect(js).not.toContain('data-shared=${');
-    expect(js).not.toMatch(/_T\d+\(`[^`]*\$\{[^`]*`\)/);
+    expect(js).not.toMatch(/\b__T\(`[^`]*\$\{[^`]*`\)/);
   });
 
   test('non-signal prop expressions are compiled into update functions and not left raw in templates', async () => {
@@ -330,7 +330,7 @@ mount(App, { target: document.body, props: { title: 'Hello', subtitle: 'World' }
     expect(js).not.toContain('${props.title}');
     expect(js).not.toContain('${props.subtitle}');
     // Template must be a static string with no unresolved expressions
-    expect(js).not.toMatch(/__tpl\d+\s*=\s*_T\d+\(`[^`]*\$\{[^`]*`\)/);
+    expect(js).not.toMatch(/__tpl\s*=\s*__T\(`[^`]*\$\{[^`]*`\)/);
     // Should contain update logic referencing props.title and props.subtitle
     expect(js).toContain('props.title');
     expect(js).toContain('props.subtitle');

@@ -44,6 +44,16 @@ import {
 } from './template-utils.js';
 import type { Range } from '../../types.js';
 import { outsideVerbatim } from '../minification/template-minifier.js';
+import { VOID } from './dom-model.js';
+
+/**
+ * Whitespace before a row text marker whose other side is not a sibling (an element's end, a void
+ * element, an anchor or another marker): the parent's start tag, a boundary or a comment (H-53).
+ */
+const SPACE_BEFORE_MARKER_AFTER_NON_SIBLING = new RegExp(
+  `(?<!<\\/[^<>]*|<(?:${[...VOID].join('|')})\\b[^<>]*|<!--[ib]\\d+[(|).]?--)>\\s+(?=<!--[ib]\\d+-->)`,
+  'gi',
+);
 
 /**
  * Inside a row, nested directives (when/whenElse/repeat) cannot close over the row factory's
@@ -199,12 +209,21 @@ export const generateStaticRepeatTemplate = (
 
   // Aggressively strip whitespace BEFORE inserting comment marker placeholders.
   // - Collapse runs to single space
-  // - Remove all inter-element whitespace (><)
+  // - Remove all inter-element whitespace (><), except next to a text marker, where it is text: one
+  //   space stays between a binding and a sibling (an element or anchor after it, an element's end, a
+  //   void element or an anchor before it, another binding), as in component templates (H-52, H-53).
+  //   Between a binding and its parent's own tags it goes.
   // - Strip trailing whitespace before > in opening tags (<a > → <a>)
   // Sole-content elements become empty (<td></td>) — the row creates their text node on fill.
   // Verbatim elements (<pre>, <textarea>, …) keep their whitespace (H-03).
   staticHtml = outsideVerbatim(staticHtml, (html) =>
-    html.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim(),
+    html
+      .replace(/\s+/g, ' ')
+      .replace(/(?<!<!--[ib]\d+--)>\s+<(?!!--[ib]\d+-->)/g, '><')
+      .replace(/(<!--[ib]\d+-->)\s+(?=<(?![A-Za-z]|!--[ib]\d+[(|).]?-->))/g, '$1')
+      .replace(SPACE_BEFORE_MARKER_AFTER_NON_SIBLING, '>')
+      .replace(/\s+>/g, '>')
+      .trim(),
   );
 
   // Insert comment marker placeholders AFTER stripping (so they survive intact).

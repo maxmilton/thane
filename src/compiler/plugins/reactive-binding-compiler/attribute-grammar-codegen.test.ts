@@ -30,8 +30,8 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
 
-const componentTemplate = (js: string): string => js.match(/__tpl = _T\(`([^`]*)`\)/)?.[1] ?? '';
-const rowTemplate = (js: string): string => js.match(/__tpl_b\d+ = _T\(`([^`]*)`\)/)?.[1] ?? '';
+const componentTemplate = (js: string): string => js.match(/__tpl = __T\(`([^`]*)`\)/)?.[1] ?? '';
+const rowTemplate = (js: string): string => js.match(/__tpl_b\d+ = __T\(`([^`]*)`\)/)?.[1] ?? '';
 
 describe('One attribute grammar', () => {
   test('static text around an expression is kept, at component level', async () => {

@@ -66,7 +66,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -90,7 +90,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -117,7 +117,7 @@ export const App = defineComponent('test-app', () => {
               <td>\${item.id}</td>
               <td>\${item.label}</td>
             </tr>
-          \`, (item) => item.id)}
+          \`, null, (item) => item.id)}
         </tbody>
       </table>
     \`,
@@ -148,7 +148,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>Name: \${item.name}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>Name: \${item.name}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -173,7 +173,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>\${item.first} \${item.last}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>\${item.first} \${item.last}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -181,8 +181,9 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    // Two comment markers means two text nodes, each written in fill and update
-    expect(js).toContain('<li><!----> <!----><!----> <!----></li>');
+    // Two comment markers means two text nodes, each written in fill and update; the space between
+    // the bindings stays (H-52)
+    expect(js).toContain('<li><!----> <!----> <!----> <!----></li>');
     expect(js).not.toContain('createTreeWalker');
     const dataWrites = js.match(/\.data\s*=/g);
     expect(dataWrites).toBeTruthy();
@@ -199,7 +200,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>\${item.a}\${item.b}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>\${item.a}\${item.b}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -298,7 +299,7 @@ export const App = defineComponent('test-app', () => {
               <td>\${item.id}</td>
               <td>\${item.label}</td>
             </tr>
-          \`, (item) => item.id)}
+          \`, null, (item) => item.id)}
         </tbody>
       </table>
     \`,
@@ -321,7 +322,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li><a @click=\${() => click(item)}>\${item.label}</a></li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li><a @click=\${() => click(item)}>\${item.label}</a></li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -356,7 +357,7 @@ export const App = defineComponent('test-app', () => {
               <td>\${item.id}</td>
               <td>\${item.label}</td>
             </tr>
-          \`, (item) => item.id)}
+          \`, null, (item) => item.id)}
         </tbody>
       </table>
     \`,
@@ -368,17 +369,10 @@ mount(App);
     // The second binding should reference the first variable, not navigate from root again
     // After minification: let x = r.firstElementChild, y = x.nextElementSibling
     // Instead of: let x = r.firstElementChild, y = r.firstElementChild.nextElementSibling
-    const rowCreationMatch = js.match(/cloneNode.*?update:/s);
-    expect(rowCreationMatch).toBeTruthy();
-    const rowCode = rowCreationMatch![0];
-    // With prefix reuse, the second var should chain off the first via .nextElementSibling
-    // not re-navigate from the clone root. Check that the pattern varName.nextElementSibling
-    // appears where varName was previously assigned to .firstElementChild
-    const firstElemAssign = rowCode.match(/([\w$]+)=[\w$]+\.firstElementChild/);
-    expect(firstElemAssign).toBeTruthy();
-    const firstVar = firstElemAssign![1];
-    // The second binding should reuse firstVar (e.g., g.nextElementSibling)
-    expect(rowCode).toContain(`${firstVar}.nextElementSibling`);
+    // In the compiled component (not the runtime before it), the row binder declares both
+    // cells, the second chained off the first via .nextElementSibling
+    const compiled = js.slice(js.indexOf('__b:'));
+    expect(compiled).toMatch(/let ([\w$]+)=[\w$]+\.firstElementChild,[\w$]+=\1\.nextElementSibling/);
   });
 });
 
@@ -425,7 +419,7 @@ export const App = defineComponent('test-app', () => {
           <li>
             Item: <strong>\${item.label}</strong> (#\${item.id})
           </li>
-        \`, (item) => item.id)}
+        \`, null, (item) => item.id)}
       </ul>
     \`,
   };

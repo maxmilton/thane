@@ -18,8 +18,8 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
 
-/** The emitted static row template (the `_T(\`…\`)` of the list's `__tpl_bN`). */
-const rowTemplate = (js: string): string | undefined => /__tpl_b\d+ = _T\(`([^`]*)`\)/.exec(js)?.[1];
+/** The emitted static row template (the `__T(\`…\`)` of the list's `__tpl_bN`). */
+const rowTemplate = (js: string): string | undefined => /__tpl_b\d+ = __T\(`([^`]*)`\)/.exec(js)?.[1];
 
 describe('sole content through the build (TA-7)', () => {
   test('a void sibling before: comment marker, the void element gets no id', async () => {

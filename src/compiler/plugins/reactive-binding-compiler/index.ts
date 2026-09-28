@@ -601,6 +601,8 @@ export const transformDefineComponentSource = (
     // calls (when that code is emitted)
     const used = new Set<string>([registerFnName, ...(injectBindings ? helpers : [])]);
     if (hasStyles) used.add(BIND_FN.ENABLE_STYLES);
+    // The component's and the lists' templates are built by the runtime's __T
+    if (staticTemplateCode) used.add(BIND_FN.TEMPLATE);
     const requiredFunctions = [...used].sort((a, b) => importRank(a) - importRank(b));
 
     const newImport = generateUpdatedImport(filteredImport, requiredFunctions);

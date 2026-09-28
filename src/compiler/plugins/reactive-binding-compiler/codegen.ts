@@ -1043,7 +1043,7 @@ export const generateInitBindingsFunction = (
       const escapedEmptyTemplate = escapeTemplateLiteral(emit.html(rep.emptyTemplate));
       lines.push(`    let ${emptyVar};`);
       lines.push(
-        `    const ${syncVar} = (items) => { items.length ? ${emptyVar}?.remove() : ${containerVar}.insertBefore(${emptyVar} ??= _T(\`${escapedEmptyTemplate}\`).content.firstElementChild, ${anchorVar}); };`,
+        `    const ${syncVar} = (items) => { items.length ? ${emptyVar}?.remove() : ${containerVar}.insertBefore(${emptyVar} ??= ${use(BIND_FN.TEMPLATE)}(\`${escapedEmptyTemplate}\`).content.firstElementChild, ${anchorVar}); };`,
       );
     }
     lines.push(`    ${reconcilerVar}.reconcile(${itemsVar}());`);
@@ -1171,7 +1171,7 @@ export const generateInitBindingsFunction = (
 
         // Generate static template IIFE
         staticTemplates.push(
-          `  const ${templateId} = _T(\`${escapeTemplateLiteral(stripMarks(emit.html(staticInfo.staticHtml)))}\`);`,
+          `  const ${templateId} = ${use(BIND_FN.TEMPLATE)}(\`${escapeTemplateLiteral(stripMarks(emit.html(staticInfo.staticHtml)))}\`);`,
         );
 
         // Fully inlined repeat — inline navigation code, no runtime navigatePath
@@ -1534,7 +1534,7 @@ export const generateInitBindingsFunction = (
           );
           const innerTplId = `__tpl_${nr.id}`;
           staticTemplates.push(
-            `  const ${innerTplId} = _T(\`${escapeTemplateLiteral(stripMarks(emit.html(innerStaticInfo.staticHtml)))}\`);`,
+            `  const ${innerTplId} = ${use(BIND_FN.TEMPLATE)}(\`${escapeTemplateLiteral(stripMarks(emit.html(innerStaticInfo.staticHtml)))}\`);`,
           );
           const innerIndexVar = nr.indexVar || '_idx';
           // The inner row's text nodes, by path from `_nrEl` (A1-4)
@@ -1665,7 +1665,7 @@ export const generateInitBindingsFunction = (
             ...commentVars.map((v) => `${v.slice(1)}: ${v}`),
           ];
           lines.push(
-            `        return { el: _el, cleanups: _nc, value: item, key: undefined${fields.length > 0 ? ', ' + fields.join(', ') : ''} };`,
+            `        return { el: _el, cleanups: ${use(BIND_FN.NO_CLEANUPS)}, value: item, key: undefined${fields.length > 0 ? ', ' + fields.join(', ') : ''} };`,
           );
           lines.push(`    };`);
           if (useDelegation) leanParts.push('_el.__d = item');
@@ -1674,7 +1674,9 @@ export const generateInitBindingsFunction = (
           lines.push(`      ${leanParts.join('; ')};`);
           lines.push(`    };`);
         } else {
-          lines.push(`        return { el: _el, cleanups: ${needsCleanups ? '_cleanups' : '_nc'}, value: item,`);
+          lines.push(
+            `        return { el: _el, cleanups: ${needsCleanups ? '_cleanups' : use(BIND_FN.NO_CLEANUPS)}, value: item,`,
+          );
           lines.push(
             `          update: (item${usesIndex ? `, ${indexVar}` : ''}) => { ${updateParts.join('; ')}; } };`,
           );
@@ -1686,7 +1688,7 @@ export const generateInitBindingsFunction = (
             `      (item, ${indexVar}, _ref) => { const _el = _cloneNode.call(${tplContentVar}, true); const _m = _bind_${rep.id}(_el, item, ${indexVar}); _insertBefore.call(${containerVar}, _el, _ref); return _m; },`,
           );
           lines.push(
-            `    ${keyFnExpr}, { size: ${ROW_BATCH_SIZE}, row: ${tplContentVar}, bind: _bind_${rep.id}${leanRows ? `, update: _update_${rep.id}` : ''} }${usesIndex ? ', true' : ''});`,
+            `    ${keyFnExpr}, ${use(BIND_FN.BATCH_ROWS)}(${ROW_BATCH_SIZE}, ${tplContentVar}, _bind_${rep.id}${leanRows ? `, _update_${rep.id}` : ''})${usesIndex ? ', true' : ''});`,
           );
         } else {
           lines.push(`      },`);
@@ -1709,7 +1711,7 @@ export const generateInitBindingsFunction = (
 
         const templateId = `__tpl_${rep.id}`;
         staticTemplates.push(
-          `  const ${templateId} = _T(\`${escapeTemplateLiteral(stripMarks(emit.html(staticInfo.staticHtml)))}\`);`,
+          `  const ${templateId} = ${use(BIND_FN.TEMPLATE)}(\`${escapeTemplateLiteral(stripMarks(emit.html(staticInfo.staticHtml)))}\`);`,
         );
 
         const tplContentVar = `_tc_${rep.id}`;
@@ -1894,10 +1896,7 @@ export const generateInitBindingsFunction = (
     },
   );
   if (hasAnyRepeat) {
-    staticTemplates.push(`  const _cloneNode = Node.prototype.cloneNode;`);
-    staticTemplates.push(`  const _insertBefore = Node.prototype.insertBefore;`);
-    // Rows without cleanups share one empty array instead of allocating one each
-    staticTemplates.push(`  const _nc = [];`);
+    staticTemplates.push(`  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;`);
   }
 
   // when() element content is a full sub-template — same initializer as a whenElse branch
@@ -1961,13 +1960,12 @@ export const generateInitBindingsFunction = (
 };
 
 /**
- * Generate a static template property for pre-compiled HTML
+ * Generate a static template property for pre-compiled HTML (the file imports the runtime's `__T`)
  */
 export const generateStaticTemplate = (content: string, emit: EmitOptions): string => {
   const escapedContent = escapeTemplateLiteral(stripMarks(emit.html(content)));
   return `
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(\`${escapedContent}\`);`;
+  const __tpl = ${BIND_FN.TEMPLATE}(\`${escapedContent}\`);`;
 };
 
 /**

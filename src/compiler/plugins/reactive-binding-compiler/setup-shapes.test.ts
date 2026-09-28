@@ -34,7 +34,7 @@ mount({ component: App });
   if (start === -1 || end === -1) throw new Error(`registration not found in:\n${js}`);
   return {
     registration: js.slice(start, end + ', __tpl);'.length),
-    tpl: /var __tpl = _T\(`([^`]*)`\);/.exec(js)?.[1] ?? '<none>',
+    tpl: /var __tpl = __T\(`([^`]*)`\);/.exec(js)?.[1] ?? '<none>',
     stylesCall: js.includes('__enableComponentStyles();'),
     stylesImported: /function __enableComponentStyles\(/.test(js),
   };

@@ -29,8 +29,7 @@
     _subs.push(b.subscribe(_upd_b4_1, true));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<p class="" style="color: "><!----> <!----> and <!----> <!----></p><input><b title=""><!----> <!----></b>`);
+  const __tpl = __T(`<p class="" style="color: "><!----> <!----> and <!----> <!----></p><input><b title=""><!----> <!----></b>`);
 === top: events with modifiers ===
 --- template
 <button data-thane-ref="b0">+</button><button data-thane-ref="b1">go</button><input data-thane-ref="b2"><div data-thane-ref="b3">x</div>
@@ -42,8 +41,7 @@
     _ns[3].addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; (close)(e); });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<button>+</button><button>go</button><input><div>x</div>`);
+  const __tpl = __T(`<button>+</button><button>go</button><input><div>x</div>`);
 === top: when simple and expression, with bindings and events inside ===
 --- template
 <!--b0(--><div><button data-thane-ref="b1">A</button><!--b2--> <!----></div><!--b0)--><!--b3(--><!--b3)-->
@@ -75,8 +73,7 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><div><button>A</button><!----> <!----></div><!----><!----><!---->`);
+  const __tpl = __T(`<!----><div><button>A</button><!----> <!----></div><!----><!----><!---->`);
 === top: whenElse with bindings and events in both branches ===
 --- template
 <!--b0(--><!--b0|--><!--b0)--><p><!--b5--> <!----></p>
@@ -107,8 +104,7 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!----><!----><p><!----> <!----></p>`);
+  const __tpl = __T(`<!----><!----><!----><p><!----> <!----></p>`);
 === top: whenElse with a simple signal condition ===
 --- template
 <section><!--b0(--><!--b0|--><!--b0)--></section>
@@ -121,8 +117,7 @@
     _subs.push(__bindIfExpr(_wm_b0, _we_b0, [flag], () => !(flag()), `<i>no</i>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<section><!----><!----><!----></section>`);
+  const __tpl = __T(`<section><!----><!----><!----></section>`);
 === nested: when simple and expression, whenElse and a list inside a when ===
 --- template
 <!--b0(--><!--b0)-->
@@ -148,7 +143,7 @@
           const _e0 = _el;
           let _p0;
           _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
-          return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
       };
       const _update_b8 = (_m, item, _idx) => {
         const _el = _m.el;
@@ -156,7 +151,7 @@
       };
       const _rc_b8 = createKeyedReconciler(_ct_b8, _a_b8,
         (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b8, true); const _m = _bind_b8(_el, item, _idx); _insertBefore.call(_ct_b8, _el, _ref); return _m; },
-      (_, i) => i, { size: 16, row: _tc_b8, bind: _bind_b8, update: _update_b8 });
+      (_, i) => i, __batchRows(16, _tc_b8, _bind_b8, _update_b8));
       const _items_b8 = () => list();
       _rc_b8.reconcile(_items_b8());
       const _rsrc_b8_0 = list;
@@ -191,12 +186,9 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b8 = _T(`<li></li>`);
+  const __tpl = __T(`<!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b8 = __T(`<li></li>`);
 === nested: expression bindings inside a when and a whenElse branch ===
 --- template
 <!--b0(--><!--b0)--><!--b3(--><!--b3|--><!--b3)-->
@@ -237,8 +229,7 @@
     _subs.push(__bindIfExpr(_wm_b3, _we_b3, [c], () => !(c()), `<s>n</s>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!----><!----><!----><!---->`);
+  const __tpl = __T(`<!----><!----><!----><!----><!---->`);
 === nested: directives inside whenElse branches, events in a branch list ===
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
@@ -266,7 +257,7 @@
           const _e0 = _el;
           let _p0;
           _e0.textContent = (_p0 = item.id) ?? ''; let _t0;
-          return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
       };
       const _update_b8 = (_m, item, _idx) => {
         const _el = _m.el;
@@ -274,7 +265,7 @@
       };
       const _rc_b8 = createKeyedReconciler(_ct_b8, _a_b8,
         (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b8, true); const _m = _bind_b8(_el, item, _idx); _insertBefore.call(_ct_b8, _el, _ref); return _m; },
-      (_, i) => i, { size: 16, row: _tc_b8, bind: _bind_b8, update: _update_b8 });
+      (_, i) => i, __batchRows(16, _tc_b8, _bind_b8, _update_b8));
       const _items_b8 = () => rows();
       _rc_b8.reconcile(_items_b8());
       const _rsrc_b8_0 = rows;
@@ -312,7 +303,7 @@
           const _e0 = _el;
           let _p0;
           _e0.textContent = (_p0 = item) ?? ''; let _t0;
-          return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
       };
       const _update_b11 = (_m, item, _idx) => {
         const _el = _m.el;
@@ -320,10 +311,10 @@
       };
       const _rc_b11 = createKeyedReconciler(_ct_b11, _a_b11,
         (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b11, true); const _m = _bind_b11(_el, item, _idx); _insertBefore.call(_ct_b11, _el, _ref); return _m; },
-      (_, i) => i, { size: 16, row: _tc_b11, bind: _bind_b11, update: _update_b11 });
+      (_, i) => i, __batchRows(16, _tc_b11, _bind_b11, _update_b11));
       const _items_b11 = () => others();
       let _empty_b11;
-      const _syncEmpty_b11 = (items) => { items.length ? _empty_b11?.remove() : _ct_b11.insertBefore(_empty_b11 ??= _T(`<li>empty</li>`).content.firstElementChild, _a_b11); };
+      const _syncEmpty_b11 = (items) => { items.length ? _empty_b11?.remove() : _ct_b11.insertBefore(_empty_b11 ??= __T(`<li>empty</li>`).content.firstElementChild, _a_b11); };
       _rc_b11.reconcile(_items_b11());
       _syncEmpty_b11(_items_b11());
       const _rsrc_b11_0 = others;
@@ -336,13 +327,10 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b8 = _T(`<li></li>`);
-  const __tpl_b11 = _T(`<li></li>`);
+  const __tpl = __T(`<!----><!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b8 = __T(`<li></li>`);
+  const __tpl_b11 = __T(`<li></li>`);
 === nested: whenElse inside a whenElse branch inside a when ===
 --- template
 <!--b0(--><!--b0)-->
@@ -381,8 +369,7 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!---->`);
+  const __tpl = __T(`<!----><!---->`);
 === walkers: text only in a whenElse nested in a when (comment factory without _cm) ===
 --- template
 <!--b0(--><!--b0)-->
@@ -408,8 +395,7 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!---->`);
+  const __tpl = __T(`<!----><!---->`);
 === walkers: text only in a row-level when inside a when (no comment factory) ===
 --- template
 <!--b0(--><!--b0)-->
@@ -455,12 +441,9 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b1 = _T(`<li><!----><!----></li>`);
+  const __tpl = __T(`<!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b1 = __T(`<li><!----><!----></li>`);
 === walkers: text only inside a whenElse branch list (no comment factory) ===
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
@@ -505,12 +488,9 @@
     _subs.push(__bindIfExpr(_wm_b0, _we_b0, [a], () => !(a()), `<p>none</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b2 = _T(`<li><!----> <!----><!----> <!----></li>`);
+  const __tpl = __T(`<!----><!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b2 = __T(`<li><!----> <!----> <!----> <!----></li>`);
 === walkers: events in a when, in a whenElse inside a when, and in rows ===
 --- template
 <!--b0(--><!--b0)--><ul><!--b12.--></ul><!--b9(--><!--b9|--><!--b9)-->
@@ -608,13 +588,10 @@
     _subs.push(() => _rc_b12.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!----><ul><!----></ul><!----><!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b5 = _T(`<li><!----><!----></li>`);
-  const __tpl_b12 = _T(`<li><!----><!----></li>`);
+  const __tpl = __T(`<!----><!----><ul><!----></ul><!----><!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b5 = __T(`<li><!----><!----></li>`);
+  const __tpl_b12 = __T(`<li><!----><!----></li>`);
 === walkers: a list only inside a whenElse inside a when (prototype caches) ===
 --- template
 <!--b0(--><!--b0)-->
@@ -638,7 +615,7 @@
           const _e0 = _el;
           let _p0;
           _e0.textContent = (_p0 = item) ?? ''; let _t0;
-          return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
       };
       const _update_b3 = (_m, item, _idx) => {
         const _el = _m.el;
@@ -646,7 +623,7 @@
       };
       const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
         (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, item, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
-      (_, i) => i, { size: 16, row: _tc_b3, bind: _bind_b3, update: _update_b3 });
+      (_, i) => i, __batchRows(16, _tc_b3, _bind_b3, _update_b3));
       const _items_b3 = () => xs();
       _rc_b3.reconcile(_items_b3());
       const _rsrc_b3_0 = xs;
@@ -662,12 +639,9 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b3 = _T(`<li></li>`);
+  const __tpl = __T(`<!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b3 = __T(`<li></li>`);
 === walkers: a list only inside a when inside a whenElse (prototype caches) ===
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
@@ -691,7 +665,7 @@
           const _e0 = _el;
           let _p0;
           _e0.textContent = (_p0 = item) ?? ''; let _t0;
-          return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
       };
       const _update_b3 = (_m, item, _idx) => {
         const _el = _m.el;
@@ -699,7 +673,7 @@
       };
       const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
         (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, item, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
-      (_, i) => i, { size: 16, row: _tc_b3, bind: _bind_b3, update: _update_b3 });
+      (_, i) => i, __batchRows(16, _tc_b3, _bind_b3, _update_b3));
       const _items_b3 = () => xs();
       _rc_b3.reconcile(_items_b3());
       const _rsrc_b3_0 = xs;
@@ -715,12 +689,9 @@
     _subs.push(__bindIfExpr(_wm_b0, _we_b0, [b], () => !(b()), `<p>n</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b3 = _T(`<li></li>`);
+  const __tpl = __T(`<!----><!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b3 = __T(`<li></li>`);
 === walkers: no list anywhere (no prototype caches) ===
 --- template
 <!--b0(--><!--b0)-->
@@ -746,8 +717,7 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!---->`);
+  const __tpl = __T(`<!----><!---->`);
 === rows: direct child component, no empty template, key property ===
 --- template
 <ul><!--b0.--></ul>
@@ -769,11 +739,8 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
 === rows: direct child component with index, empty template and key function ===
 --- template
 <ul><!--b0.--></ul>
@@ -790,7 +757,7 @@
     (it) => it.a + it.b);
     const _items_b0 = () => items();
     let _empty_b0;
-    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= _T(`<li>none</li>`).content.firstElementChild, _a_b0); };
+    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= __T(`<li>none</li>`).content.firstElementChild, _a_b0); };
     _rc_b0.reconcile(_items_b0());
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
@@ -798,11 +765,8 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
 === rows: direct child component over a derived source ===
 --- template
 <ul><!--b0.--></ul>
@@ -826,11 +790,8 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
 === rows: template rows, no key, empty template ===
 --- template
 <ul><!--b0.--></ul>
@@ -843,7 +804,7 @@
         const _e0 = _el;
         let _p0;
         _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, t0: undefined };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
     };
     const _update_b0 = (_m, item, _idx) => {
       const _el = _m.el;
@@ -851,10 +812,10 @@
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
-    (_, i) => i, { size: 16, row: _tc_b0, bind: _bind_b0, update: _update_b0 });
+    (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     let _empty_b0;
-    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= _T(`<li class="e">none</li>`).content.firstElementChild, _a_b0); };
+    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= __T(`<li class="e">none</li>`).content.firstElementChild, _a_b0); };
     _rc_b0.reconcile(_items_b0());
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
@@ -862,12 +823,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li></li>`);
 === rows: template rows over a derived source with an empty template and key property ===
 --- template
 <ul><!--b0.--></ul>
@@ -880,7 +838,7 @@
         const _e0 = _el;
         let _p0;
         _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, t0: undefined };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
     };
     const _update_b0 = (_m, item, _idx) => {
       const _el = _m.el;
@@ -888,10 +846,10 @@
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
-    'id', { size: 16, row: _tc_b0, bind: _bind_b0, update: _update_b0 });
+    'id', __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items().filter((x) => x.on === flag());
     let _empty_b0;
-    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= _T(`<li>none</li>`).content.firstElementChild, _a_b0); };
+    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= __T(`<li>none</li>`).content.firstElementChild, _a_b0); };
     _rc_b0.reconcile(_items_b0());
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
@@ -901,12 +859,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li></li>`);
 === rows: template rows over a member source ===
 --- template
 <ul><!--b0.--></ul>
@@ -919,7 +874,7 @@
         const _e0 = _el;
         let _p0, _p1;
         _e0.textContent = (_p0 = item.label) ?? ''; let _t0; if ((_p1 = item.t) !== '') _e0.setAttribute('title', _p1);
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, p1: _p1, t0: undefined };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, t0: undefined };
     };
     const _update_b0 = (_m, item, _idx) => {
       const _el = _m.el;
@@ -927,7 +882,7 @@
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
-    (_, i) => i, { size: 16, row: _tc_b0, bind: _bind_b0, update: _update_b0 });
+    (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => store.items();
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = store.items;
@@ -935,12 +890,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li title=""></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li title=""></li>`);
 === rows: no bindings, no key, no empty template ===
 --- template
 <ul><!--b0.--></ul>
@@ -963,12 +915,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li>static</li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li>static</li>`);
 === rows: no bindings, empty template and key property ===
 --- template
 <ul><!--b0.--></ul>
@@ -986,7 +935,7 @@
     'id');
     const _items_b0 = () => items();
     let _empty_b0;
-    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= _T(`<li>none</li>`).content.firstElementChild, _a_b0); };
+    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= __T(`<li>none</li>`).content.firstElementChild, _a_b0); };
     _rc_b0.reconcile(_items_b0());
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
@@ -994,12 +943,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li>static</li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li>static</li>`);
 === rows: no bindings over a derived source, key function ===
 --- template
 <ul><!--b0.--></ul>
@@ -1024,12 +970,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li>static</li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li>static</li>`);
 === rows: no bindings with a child mount and a named index ===
 --- template
 <ul><!--b0.--></ul>
@@ -1053,12 +996,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><x-kid></x-kid></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><x-kid></x-kid></li>`);
 === rows: no bindings with a child mount, empty template ===
 --- template
 <ul><!--b0.--></ul>
@@ -1077,7 +1017,7 @@
     (_, i) => i);
     const _items_b0 = () => items();
     let _empty_b0;
-    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= _T(`<li>none</li>`).content.firstElementChild, _a_b0); };
+    const _syncEmpty_b0 = (items) => { items.length ? _empty_b0?.remove() : _ct_b0.insertBefore(_empty_b0 ??= __T(`<li>none</li>`).content.firstElementChild, _a_b0); };
     _rc_b0.reconcile(_items_b0());
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
@@ -1085,12 +1025,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><x-kid></x-kid></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><x-kid></x-kid></li>`);
 === rows: bindings with two child mounts ===
 --- template
 <ul><!--b0.--></ul>
@@ -1122,12 +1059,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><span></span><x-kid></x-kid><x-other></x-other></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><span></span><x-kid></x-kid><x-other></x-other></li>`);
 === mounts: child mount inside a when ===
 --- template
 <!--b0(--><!--b0)-->
@@ -1147,8 +1081,7 @@
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!---->`);
+  const __tpl = __T(`<!----><!---->`);
 === mounts: child hosts in the template, and comment anchors where the parser keeps no element ===
 --- template
 <div><p><x-kid data-thane-ref="b900"></x-kid></p><table><tr><td><!--b0--> <!----></td><!--b901.--></tr></table><svg><!--b902.--></svg></div>
@@ -1168,8 +1101,7 @@
     _subs.push(__dc(Icon.__f(_cm2, {})));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<div><p><x-kid></x-kid></p><table><tr><td><!----> <!----></td><!----></tr></table><svg><!----></svg></div>`);
+  const __tpl = __T(`<div><p><x-kid></x-kid></p><table><tr><td><!----> <!----></td><!----></tr></table><svg><!----></svg></div>`);
 === mounts: child mount inside a whenElse branch ===
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
@@ -1188,8 +1120,7 @@
     _subs.push(__bindIfExpr(_wm_b0, _we_b0, [a], () => !(a()), `<p>n</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<!----><!----><!---->`);
+  const __tpl = __T(`<!----><!----><!---->`);
 === rows: lean batch rows with sole-content text, attrs and a key property ===
 --- template
 <ul><!--b0.--></ul>
@@ -1204,7 +1135,7 @@
         const _e2 = _e1.nextElementSibling;
         let _p0, _p1, _p2, _p3;
         if ((_p0 = item.cls) !== '') _e0.className = _p0; if ((_p1 = item.id) !== '') _e0.setAttribute('data-id', _p1); _e1.textContent = (_p2 = item.label) ?? ''; let _t0; _e2.textContent = (_p3 = item.n) ?? ''; let _t1;
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, p3: _p3, t0: undefined, t1: undefined };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, p3: _p3, t0: undefined, t1: undefined };
     };
     const _update_b0 = (_m, item, _idx) => {
       const _el = _m.el;
@@ -1212,7 +1143,7 @@
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
-    'id', { size: 16, row: _tc_b0, bind: _bind_b0, update: _update_b0 });
+    'id', __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
@@ -1220,12 +1151,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li class="" data-id=""><a></a><span></span></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li class="" data-id=""><a></a><span></span></li>`);
 === rows: comment-marker item bindings ===
 --- template
 <ul><!--b0.--></ul>
@@ -1241,7 +1169,7 @@
         let _p0, _p1, _p2;
         _e0.textContent = (_p0 = item.c) ?? ''; let _t0;
         _c0.data = (_p1 = item.a) ?? ''; _c1.data = (_p2 = item.b) ?? '';
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, t0: undefined, c0: _c0, c1: _c1 };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, t0: undefined, c0: _c0, c1: _c1 };
     };
     const _update_b0 = (_m, item, _idx) => {
       const _el = _m.el;
@@ -1249,7 +1177,7 @@
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
-    (_, i) => i, { size: 16, row: _tc_b0, bind: _bind_b0, update: _update_b0 });
+    (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
@@ -1257,12 +1185,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><!----> <!----> and <!----> <!----><b></b> tail</li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><!----> <!----> and <!----> <!----><b></b> tail</li>`);
 === rows: delegated and non-delegatable events ===
 --- template
 <ul><!--b0.--></ul>
@@ -1277,7 +1202,7 @@
         let _p0;
         _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
         _e0.addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; open(item.id); });
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, t0: undefined };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
     };
     const _update_b0 = (_m, item, i) => {
       const _el = _m.el;
@@ -1285,7 +1210,7 @@
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, i, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, i); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
-    (_, i) => i, { size: 16, row: _tc_b0, bind: _bind_b0, update: _update_b0 });
+    (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
@@ -1295,12 +1220,9 @@
     _ct_b0.addEventListener('keydown', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling.nextElementSibling) { if (e.key !== 'Enter') return; save(item, i, e); return; } });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><a></a><button>x</button><input></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><a></a><button>x</button><input></li>`);
 === rows: non-delegatable events on elements without bindings ===
 --- template
 <ul><!--b0.--></ul>
@@ -1314,7 +1236,7 @@
         const _ev1 = _el.firstElementChild.nextElementSibling;
         ;
         _ev0.addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; open(item); }); _ev1.addEventListener('keydown', (e) => { if (e.target !== e.currentTarget) return; if (e.key !== 'Enter') return; { const ev = e; key(ev, item); }; });
-        return { el: _el, cleanups: _nc, value: item, key: undefined };
+        return { el: _el, cleanups: __nc, value: item, key: undefined };
     };
     const _update_b0 = (_m, item, _idx) => {
       const _el = _m.el;
@@ -1322,7 +1244,7 @@
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
-    (_, i) => i, { size: 16, row: _tc_b0, bind: _bind_b0, update: _update_b0 });
+    (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
@@ -1330,12 +1252,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><em>e</em><i>k</i></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><em>e</em><i>k</i></li>`);
 === rows: index bindings ===
 --- template
 <ul><!--b0.--></ul>
@@ -1351,7 +1270,7 @@
         let _p0, _p1, _p2;
         if ((_p0 = i) !== '') _e0.setAttribute('data-i', _p0);
         _c0.data = (_p1 = i) ?? ''; _c1.data = (_p2 = item) ?? '';
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, c0: _c0, c1: _c1 };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, c0: _c0, c1: _c1 };
     };
     const _update_b0 = (_m, item, i) => {
       const _el = _m.el;
@@ -1359,7 +1278,7 @@
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (item, i, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, i); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
-    (_, i) => i, { size: 16, row: _tc_b0, bind: _bind_b0, update: _update_b0 }, true);
+    (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0), true);
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
@@ -1367,12 +1286,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li data-i=""><!----> <!---->: <!----> <!----></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li data-i=""><!----> <!---->: <!----> <!----></li>`);
 === rows: selection binding and mixed signal-item bindings ===
 --- template
 <ul><!--b0.--></ul>
@@ -1409,12 +1325,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li class=""><span></span><b title=""></b></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li class=""><span></span><b title=""></b></li>`);
 === rows: signal attr, style and text bindings next to item comment bindings ===
 --- template
 <ul><!--b0.--></ul>
@@ -1451,12 +1364,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li title="" style="color: "><b></b> and <!----> <!----><!----> <!----></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li title="" style="color: "><b></b> and <!----> <!----> <!----> <!----></li>`);
 === rows: signal text binding without item comment bindings ===
 --- template
 <ul><!--b0.--></ul>
@@ -1489,12 +1399,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><b></b><i><!----> <!----></i><!----> <!----></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><b></b><i><!----> <!----></i> <!----> <!----></li>`);
 === rows: expression signal bindings over several signals ===
 --- template
 <ul><!--b0.--></ul>
@@ -1533,12 +1440,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li title="-" style="height: px"><b></b><i><!----> <!----><!----> <!----></i></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li title="-" style="height: px"><b></b><i><!----> <!----> <!----> <!----></i></li>`);
 === rows: signal bindings on the row element itself ===
 --- template
 <ul><!--b0.--></ul>
@@ -1571,12 +1475,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li class="" style="top: "></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li class="" style="top: "></li>`);
 === rows: when simple and expression, whenElse, with row signals ===
 --- template
 <ul><!--b0.--></ul>
@@ -1646,12 +1547,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><!----><!----><!----><!----><!----><!----><!----></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><!----><!----><!----><!----><!----><!----><!----></li>`);
 === rows: delegated events and a selection binding after row directives ===
 --- template
 <ul><!--b0.--></ul>
@@ -1694,12 +1592,9 @@
     _ct_b0.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; if (_row.__e0.contains(e.target)) { go(item.id); return; } if (_row.__e1.contains(e.target)) { go(e); return; } });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><!----><!----><!----><!----><!----><a>go</a><i class="">i</i></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><!----><!----><!----><!----><!----><a>go</a><i class="">i</i></li>`);
 === rows: row-level when with several bindings on one signal ===
 --- template
 <ul><!--b0.--></ul>
@@ -1737,12 +1632,9 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><!----><!----></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><!----><!----></li>`);
 === nested rows: element, comment and signal bindings ===
 --- template
 <ul><!--b0.--></ul>
@@ -1766,7 +1658,7 @@
         const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
           (_nrItem, _idx, _nrRef) => {
             const _nrEl = _cloneNode.call(_nrTc_b1, true);
-            const _nrc0 = _nrEl.lastChild.previousSibling.previousSibling;
+            const _nrc0 = _nrEl.firstChild.nextSibling.nextSibling.nextSibling;
             const _nrst0 = _nrEl.lastChild.firstChild.nextSibling;
             const _nre0 = _nrEl;
             const _nre1 = _nrEl.firstElementChild;
@@ -1800,13 +1692,10 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><span></span><ol><!----></ol></li>`);
-  const __tpl_b1 = _T(`<li class=""><b></b> x <!----> <!----><i title="" style="color: "><!----> <!----></i></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><span></span><ol><!----></ol></li>`);
+  const __tpl_b1 = __T(`<li class=""><b></b> x <!----> <!----> <i title="" style="color: "><!----> <!----></i></li>`);
 === nested rows: signal text without item comment bindings, key property ===
 --- template
 <ul><!--b0.--></ul>
@@ -1856,13 +1745,10 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><ol><!----></ol></li>`);
-  const __tpl_b1 = _T(`<li><b></b><i><!----> <!----></i><!----> <!----></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><ol><!----></ol></li>`);
+  const __tpl_b1 = __T(`<li><b></b><i><!----> <!----></i> <!----> <!----></li>`);
 === nested rows: expression signal bindings and bindings on the inner row element ===
 --- template
 <ul><!--b0.--></ul>
@@ -1912,13 +1798,10 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><ol><!----></ol></li>`);
-  const __tpl_b1 = _T(`<li title="-" style="left: "><i><!----> <!----></i></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><ol><!----></ol></li>`);
+  const __tpl_b1 = __T(`<li title="-" style="left: "><i><!----> <!----></i></li>`);
 === nested rows: no bindings, driven by a component signal ===
 --- template
 <ul><!--b0.--></ul>
@@ -1960,13 +1843,10 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><span></span><ol><!----></ol></li>`);
-  const __tpl_b1 = _T(`<li>static</li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><span></span><ol><!----></ol></li>`);
+  const __tpl_b1 = __T(`<li>static</li>`);
 === nested rows: only comment-marker item bindings ===
 --- template
 <ul><!--b0.--></ul>
@@ -2010,13 +1890,10 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li><ol><!----></ol></li>`);
-  const __tpl_b1 = _T(`<li><!----> <!----> and <!----> <!----></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li><ol><!----></ol></li>`);
+  const __tpl_b1 = __T(`<li><!----> <!----> and <!----> <!----></li>`);
 === escaping: backslash, backtick and newline in row, branch and main templates (dev) ===
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><!--b1.--></ul><ol><!--b3.--></ol><!--b0(--><!--b0)-->
@@ -2038,7 +1915,7 @@
         let _p0;
         ;
         _c0.data = (_p0 = item.x) ?? '';
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, c0: _c0 };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, c0: _c0 };
     };
     const _update_b1 = (_m, item, _idx) => {
       const _el = _m.el;
@@ -2046,10 +1923,10 @@
     };
     const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, item, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
-    (_, i) => i, { size: 16, row: _tc_b1, bind: _bind_b1, update: _update_b1 });
+    (_, i) => i, __batchRows(16, _tc_b1, _bind_b1, _update_b1));
     const _items_b1 = () => items();
     let _empty_b1;
-    const _syncEmpty_b1 = (items) => { items.length ? _empty_b1?.remove() : _ct_b1.insertBefore(_empty_b1 ??= _T(`<li>g\h</li>`).content.firstElementChild, _a_b1); };
+    const _syncEmpty_b1 = (items) => { items.length ? _empty_b1?.remove() : _ct_b1.insertBefore(_empty_b1 ??= __T(`<li>g\h</li>`).content.firstElementChild, _a_b1); };
     _rc_b1.reconcile(_items_b1());
     _syncEmpty_b1(_items_b1());
     const _rsrc_b1_0 = items;
@@ -2071,13 +1948,10 @@
     _subs.push(() => _rc_b3.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<p title="a\b">\`q\` <!----> <!----></p><ul><!----></ul><ol><!----></ol><!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b1 = _T(`<li title="c\d"><!----> <!----> e\f</li>`);
-  const __tpl_b3 = _T(`<li>s\t</li>`);
+  const __tpl = __T(`<p title="a\b">\`q\` <!----> <!----></p><ul><!----></ul><ol><!----></ol><!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b1 = __T(`<li title="c\d"><!----> <!----> e\f</li>`);
+  const __tpl_b3 = __T(`<li>s\t</li>`);
 === escaping: the same templates, production ===
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><!--b1.--></ul><ol><!--b3.--></ol><!--b0(--><!--b0)-->
@@ -2099,7 +1973,7 @@
         let _p0;
         ;
         _c0.data = (_p0 = item.x) ?? '';
-        return { el: _el, cleanups: _nc, value: item, key: undefined, p0: _p0, c0: _c0 };
+        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, c0: _c0 };
     };
     const _update_b1 = (_m, item, _idx) => {
       const _el = _m.el;
@@ -2107,10 +1981,10 @@
     };
     const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
       (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, item, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
-    (_, i) => i, { size: 16, row: _tc_b1, bind: _bind_b1, update: _update_b1 });
+    (_, i) => i, __batchRows(16, _tc_b1, _bind_b1, _update_b1));
     const _items_b1 = () => items();
     let _empty_b1;
-    const _syncEmpty_b1 = (items) => { items.length ? _empty_b1?.remove() : _ct_b1.insertBefore(_empty_b1 ??= _T(`<li>g\h</li>`).content.firstElementChild, _a_b1); };
+    const _syncEmpty_b1 = (items) => { items.length ? _empty_b1?.remove() : _ct_b1.insertBefore(_empty_b1 ??= __T(`<li>g\h</li>`).content.firstElementChild, _a_b1); };
     _rc_b1.reconcile(_items_b1());
     _syncEmpty_b1(_items_b1());
     const _rsrc_b1_0 = items;
@@ -2132,13 +2006,10 @@
     _subs.push(() => _rc_b3.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<p title="a\b">\`q\` <!----> <!----></p><ul><!----></ul><ol><!----></ol><!----><!---->`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b1 = _T(`<li title="c\d"><!----> <!----> e\f</li>`);
-  const __tpl_b3 = _T(`<li>s\t</li>`);
+  const __tpl = __T(`<p title="a\b">\`q\` <!----> <!----></p><ul><!----></ul><ol><!----></ol><!----><!---->`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b1 = __T(`<li title="c\d"><!----> <!----> e\f</li>`);
+  const __tpl_b3 = __T(`<li>s\t</li>`);
 === production: nested rows, row directives and a child mount ===
 --- template
 <ul><!--b0.--></ul>
@@ -2193,10 +2064,7 @@
     _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
-  const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  const __tpl = _T(`<ul><!----></ul>`);
-  const _cloneNode = Node.prototype.cloneNode;
-  const _insertBefore = Node.prototype.insertBefore;
-  const _nc = [];
-  const __tpl_b0 = _T(`<li class="row"><!----><!----><ol><!----></ol><m-5></m-5></li>`);
-  const __tpl_b3 = _T(`<li></li>`);
+  const __tpl = __T(`<ul><!----></ul>`);
+  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
+  const __tpl_b0 = __T(`<li class="row"><!----><!----><ol><!----></ol><m-5></m-5></li>`);
+  const __tpl_b3 = __T(`<li></li>`);

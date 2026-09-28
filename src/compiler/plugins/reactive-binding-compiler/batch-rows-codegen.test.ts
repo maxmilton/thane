@@ -34,8 +34,8 @@ describe('Rows without cleanups are bound by a standalone function and created i
     expect(js).toMatch(
       /\(item, _idx, _ref\) => \{\s*const _el = _cloneNode\.call\(_tc_b\d+, true\);\s*const _m = _bind_b\d+\(_el, item, _idx\);\s*_insertBefore\.call\(_ct_b\d+, _el, _ref\);\s*return _m;\s*\}/,
     );
-    // The reconciler gets the batch configuration built on the same template node
-    expect(js).toMatch(/"id",\s*\{ size: 16, row: _tc_b\d+, bind: _bind_b\d+, update: _update_b\d+ \}/);
+    // The reconciler gets the batch helper, built on the same template node (A2-1)
+    expect(js).toMatch(/"id",\s*__batchRows\(16, _tc_b\d+, _bind_b\d+, _update_b\d+\)/);
   });
 
   test('lean rows keep guard state on the record and share one update function', async () => {
@@ -49,7 +49,7 @@ describe('Rows without cleanups are bound by a standalone function and created i
     // and the comment-marker text nodes, and key is pre-declared so its shape is stable
     expect(js).not.toMatch(/update: \(item2?\) =>/);
     expect(js).toMatch(
-      /return \{ el: _el, cleanups: _nc, value: item, key: void 0, p0: _p0, p1: _p1, p2: _p2, p3: _p3, t0: void 0, c0: _c0, c1: _c1 \}/,
+      /return \{ el: _el, cleanups: __nc, value: item, key: void 0, p0: _p0, p1: _p1, p2: _p2, p3: _p3, t0: void 0, c0: _c0, c1: _c1 \}/,
     );
     // One update per list, given the current index; it navigates from the row element only
     // inside the guard of a binding that changed, and the text node cache makes that one-time
@@ -60,20 +60,21 @@ describe('Rows without cleanups are bound by a standalone function and created i
       /\(_m\.t0 \?\?= _el\.firstElementChild\.firstChild\) \? _m\.t0\.nodeValue = _m\.p1 \?\? "" : _el\.firstElementChild\.textContent = _m\.p1 \?\? ""/,
     );
     expect(js).toMatch(/if \(_m\.p3 !== \(_m\.p3 = idx\)\) _m\.c1\.data = _m\.p3/);
-    expect(js).toMatch(/bind: _bind_b\d+, update: _update_b\d+ \}/);
+    expect(js).toMatch(/__batchRows\(16, _tc_b\d+, _bind_b\d+, _update_b\d+\)/);
   });
 
   test('a lifted selection binding leaves no guard field on the record', async () => {
     const js = await buildAndReadJs(
       app("<li class=${selected() === item.id ? 'on' : ''}>${item.label}</li>", '', 'const selected = signal(0);'),
     );
-    expect(js).toMatch(/return \{ el: _el, cleanups: _nc, value: item, key: void 0, p0: _p0, t0: void 0 \}/);
+    expect(js).toMatch(/return \{ el: _el, cleanups: __nc, value: item, key: void 0, p0: _p0, t0: void 0 \}/);
   });
 
   test('a row with a nested when() keeps the inline factory and no batching', async () => {
     const js = await buildAndReadJs(app('<li>${item.label}${when(flag(), html`<em>on</em>`)}</li>'));
     expect(js).not.toMatch(/_bind_b\d+/);
-    expect(js).not.toMatch(/size: 16/);
+    // No list batches, so the batch helper is not bundled (A2-1)
+    expect(js).not.toContain('__batchRows');
     expect(js).toMatch(/\(item, _idx, _ref\) => \{\s*const _el = _cloneNode\.call/);
   });
 });

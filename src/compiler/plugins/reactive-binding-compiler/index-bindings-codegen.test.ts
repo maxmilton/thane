@@ -21,15 +21,17 @@ describe('Lists whose bindings read the index ask the reconciler to refresh move
     const js = await buildAndReadJs(
       app('${repeat(rows(), (item, index) => html`<li data-i=${index}>${item.label}</li>`, null, (item) => item.id)}'),
     );
-    expect(js).toMatch(/createKeyedReconciler\([\s\S]*?update: _update_b\d+ \},\s*true\s*\)/);
+    expect(js).toMatch(
+      /createKeyedReconciler\([\s\S]*?__batchRows\(16, _tc_b\d+, _bind_b\d+, _update_b\d+\),\s*true\s*\)/,
+    );
   });
 
   test('a list without an index binding does not', async () => {
     const js = await buildAndReadJs(
       app('${repeat(rows(), (item, index) => html`<li>${item.label}</li>`, null, (item) => item.id)}'),
     );
-    expect(js).toMatch(/update: _update_b\d+ \}\s*\)/);
-    expect(js).not.toMatch(/update: _update_b\d+ \},\s*true\s*\)/);
+    expect(js).toMatch(/_update_b\d+\)\s*\)/);
+    expect(js).not.toMatch(/_update_b\d+\),\s*true\s*\)/);
     expect(js).not.toMatch(/void 0,\s*true\s*\)/);
   });
 

@@ -34,7 +34,7 @@ const hint = 'call defineComponent(setup) once per file';
 export const Doc = defineComponent(() => ({ template: html\`<code>defineComponent(() => …)</code>\` }));
 `);
     expect(out).toContain("const hint = 'call defineComponent(setup) once per file';");
-    expect(out).toContain('_T(`<code>defineComponent(() => …)</code>`)');
+    expect(out).toContain('__T(`<code>defineComponent(() => …)</code>`)');
     expect(out).toContain("export const Doc = __registerComponentLean('doc', () => ({ }), __tpl);");
   });
 

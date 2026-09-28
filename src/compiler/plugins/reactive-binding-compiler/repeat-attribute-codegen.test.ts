@@ -21,7 +21,7 @@ mount(App);
 `;
 
 /** The static row template the optimised path clones, or null when the list uses the fallback renderer. */
-const rowTemplate = (js: string): string | null => js.match(/__tpl_b\d+ = _T\(`([^`]*)`\)/)?.[1] ?? null;
+const rowTemplate = (js: string): string | null => js.match(/__tpl_b\d+ = __T\(`([^`]*)`\)/)?.[1] ?? null;
 
 describe('Item attribute bindings in repeat() rows use the optimised row path', () => {
   test('an attribute on the row root (the documented `data-id` example)', async () => {

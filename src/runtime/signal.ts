@@ -88,7 +88,7 @@ export const signal = <T>(initialValue: T): Signal<T> => {
     if (!Object.is(fn._v, newValue)) {
       fn._v = newValue!;
 
-      if (_batchDepth > 0 || _notificationDepth > 0) {
+      if (_notificationDepth) {
         _pendingSignals.add(fn as unknown as SignalInternal<unknown>);
         return fn._v;
       }
@@ -108,7 +108,7 @@ export const signal = <T>(initialValue: T): Signal<T> => {
   return fn as Signal<T>;
 };
 
-/** @internal — cascading updates are auto-batched via notification depth. */
+/** @internal — above 0 while subscribers or a batch() function run; a write then waits in _pendingSignals. */
 let _notificationDepth = 0;
 
 /**
@@ -182,10 +182,13 @@ function _flushPending(): void {
  */
 export function batch(fn: () => void): void {
   _batchDepth++;
+  // fn()'s writes wait as a subscriber's do; the depth is back before the flush
+  _notificationDepth++;
   try {
     fn();
   } finally {
-    if (--_batchDepth === 0) _flushPending();
+    _notificationDepth--;
+    if (!--_batchDepth) _flushPending();
   }
 }
 

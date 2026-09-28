@@ -898,3 +898,120 @@ test.describe('A1-1 lookups and branches', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// H-52 (K23, simplification.md §5.1): the text between row text bindings, rendered. A `test.fixme`
+// names the task that switches it on. Text is compared exactly (textContent), not whitespace-normalised.
+// ═══════════════════════════════════════════════════════════════════════
+
+type H52Row = { id: number; first: string; mid: string; last: string };
+
+const H52_ROWS: H52Row[] = [{ id: 1, first: 'John', mid: 'Q', last: 'Doe' }];
+const H52_UPDATED: H52Row[] = [
+  { id: 2, first: 'Jane', mid: 'R', last: 'Roe' },
+  { id: 1, first: 'Max', mid: 'S', last: 'Mu' },
+];
+
+/** The exact text of every row of the probe's list `.h52-<shape>`. */
+const h52Texts = (page: Page, shape: string): Promise<string[]> => page.locator(`.h52-${shape} li`).allTextContents();
+
+test.describe('H-52 row text bindings', () => {
+  test('H-52 K23 row text bindings separated by whitespace show one space, and update', async ({ page }) => {
+    const probe = await mountProbe(page, 'h52');
+    const check = async (rows: H52Row[], label: string) => {
+      for (const shape of ['space', 'two', 'newline', 'padded']) {
+        await expect.poll(() => h52Texts(page, shape), shape).toEqual(rows.map((r) => `${r.first} ${r.last}`));
+      }
+      await expect.poll(() => h52Texts(page, 'three')).toEqual(rows.map((r) => `${r.first} ${r.mid} ${r.last}`));
+      await expect.poll(() => h52Texts(page, 'signal')).toEqual(rows.map((r) => `${r.first} ${label}`));
+    };
+    await check(H52_ROWS, 'L');
+    await setProbe(page, 'h52', 'items', H52_UPDATED);
+    await setProbe(page, 'h52', 'label', 'M');
+    await check(H52_UPDATED, 'M');
+    expect(probe.pageErrors).toEqual([]);
+  });
+
+  test('row shapes that already show their text as written: -, adjacent, around, in a when(), and component level', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 'h52');
+    const check = async (rows: H52Row[], a: string, b: string) => {
+      await expect.poll(() => h52Texts(page, 'dash')).toEqual(rows.map((r) => `${r.first}-${r.last}`));
+      await expect.poll(() => h52Texts(page, 'adjacent')).toEqual(rows.map((r) => `${r.first}${r.last}`));
+      await expect.poll(() => h52Texts(page, 'around')).toEqual(rows.map((r) => `x ${r.first} y`));
+      await expect.poll(() => h52Texts(page, 'when')).toEqual(rows.map((r) => `${r.first} ${r.last}`));
+      await expect.poll(() => page.locator('.h52-component').textContent()).toBe(`${a} ${b}`);
+    };
+    await check(H52_ROWS, 'A', 'B');
+    await setProbe(page, 'h52', 'items', H52_UPDATED);
+    await setProbe(page, 'h52', 'a', 'A2');
+    await check(H52_UPDATED, 'A2', 'B');
+    expect(probe.pageErrors).toEqual([]);
+  });
+
+  test('H-53 K24 K25 (found by H-52) the space between a text binding and an element shows, in rows and at component level', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 'h52');
+    await expect.poll(() => h52Texts(page, 'before')).toEqual(['John b']);
+    await expect.poll(() => h52Texts(page, 'after')).toEqual(['b John']);
+    await expect.poll(() => page.locator('.h52-cbefore').textContent()).toBe('A b');
+    await expect.poll(() => page.locator('.h52-cafter').textContent()).toBe('b A');
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// H-53 (K24, K25, simplification.md §5.1): the whitespace between a text binding and an element or
+// directive next to it, rendered. Text is compared exactly (textContent): a hidden when() leaves the
+// space on each side of its anchors, as static text around a removed element would.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** The exact text of every row of the probe's list `.h53-<shape>`. */
+const h53Rows = (page: Page, shape: string): Promise<string[]> => page.locator(`.h53-${shape} li`).allTextContents();
+const h53Text = (page: Page, shape: string): Promise<string | null> => page.locator(`.h53-${shape}`).textContent();
+
+test.describe('H-53 text bindings next to elements and directives', () => {
+  test('H-53 K24 K25 whitespace between a text binding and an element or directive shows as one space', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 'h53');
+    await expect.poll(() => h53Rows(page, 'label')).toEqual(['Name: John']);
+    await expect.poll(() => h53Rows(page, 'check')).toEqual([' John']);
+    await expect.poll(() => h53Rows(page, 'before')).toEqual(['John x']);
+    await expect.poll(() => h53Rows(page, 'when')).toEqual(['John w Doe']);
+    await expect.poll(() => h53Rows(page, 'whenelse')).toEqual(['John y Doe']);
+    await expect.poll(() => h53Text(page, 'cbefore')).toBe('A x');
+    await expect.poll(() => h53Text(page, 'cwhen')).toBe('A w B');
+    await expect.poll(() => h53Text(page, 'cwhenelse')).toBe('A y B');
+    await expect.poll(() => h53Text(page, 'branch')).toBe('A x');
+
+    await setProbe(page, 'h53', 'items', [
+      { id: 2, first: 'Jane', last: 'Roe', on: false },
+      { id: 1, first: 'Max', last: 'Mu', on: true },
+    ]);
+    await setProbe(page, 'h53', 'a', 'A2');
+    await expect.poll(() => h53Rows(page, 'label')).toEqual(['Name: Jane', 'Name: Max']);
+    await expect.poll(() => h53Rows(page, 'before')).toEqual(['Jane x', 'Max x']);
+    await expect.poll(() => h53Rows(page, 'when')).toEqual(['Jane  Roe', 'Max w Mu']);
+    await expect.poll(() => h53Rows(page, 'whenelse')).toEqual(['Jane n Roe', 'Max y Mu']);
+    await expect.poll(() => h53Text(page, 'cbefore')).toBe('A2 x');
+    await expect.poll(() => h53Text(page, 'branch')).toBe('A2 x');
+
+    await setProbe(page, 'h53', 'on', false);
+    await expect.poll(() => h53Text(page, 'cwhen')).toBe('A2  B');
+    await expect.poll(() => h53Text(page, 'cwhenelse')).toBe('A2 n B');
+    await expect.poll(() => h53Text(page, 'branch')).toBe('none');
+    await setProbe(page, 'h53', 'on', true);
+    await expect.poll(() => h53Text(page, 'cwhen')).toBe('A2 w B');
+    await expect.poll(() => h53Text(page, 'branch')).toBe('A2 x');
+    expect(probe.pageErrors).toEqual([]);
+  });
+
+  test('whitespace between two elements still goes', async ({ page }) => {
+    const probe = await mountProbe(page, 'h53');
+    await expect.poll(() => h53Text(page, 'elements')).toBe('xy');
+    expect(probe.pageErrors).toEqual([]);
+  });
+});

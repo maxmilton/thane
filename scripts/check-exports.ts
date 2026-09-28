@@ -49,10 +49,13 @@ const KEPT: Record<string, EntrySurface> = {
   },
   'thane/runtime': {
     values: [
+      '__T',
+      '__batchRows',
       '__bindIf',
       '__bindIfExpr',
       '__dc',
       '__enableComponentStyles',
+      '__nc',
       '__registerComponent',
       '__registerComponentLean',
       '__sig',

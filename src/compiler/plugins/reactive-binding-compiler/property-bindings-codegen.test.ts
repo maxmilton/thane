@@ -29,8 +29,8 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
 
-const componentTemplate = (js: string): string => js.match(/__tpl = _T\(`([^`]*)`\)/)?.[1] ?? '';
-const rowTemplate = (js: string): string => js.match(/__tpl_b\d+ = _T\(`([^`]*)`\)/)?.[1] ?? '';
+const componentTemplate = (js: string): string => js.match(/__tpl = __T\(`([^`]*)`\)/)?.[1] ?? '';
+const rowTemplate = (js: string): string => js.match(/__tpl_b\d+ = __T\(`([^`]*)`\)/)?.[1] ?? '';
 
 describe('Form attributes are written as DOM properties and left out of the static template', () => {
   test('checked, disabled, value and readonly at component level', async () => {

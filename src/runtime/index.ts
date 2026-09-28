@@ -24,11 +24,12 @@ declare global {
 
   /**
    * Repeat directive for rendering arrays
+   * @param emptyTemplate shown while the list is empty: an html template, or null; the key function goes fourth
    */
   function repeat<T>(
     items: T[] | (() => T[]),
     templateFn: (item: T, index: number) => any,
-    emptyTemplate?: any,
+    emptyTemplate?: string | null,
     trackBy?: (item: T, index: number) => string | number,
   ): any[];
 

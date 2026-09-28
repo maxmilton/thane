@@ -70,6 +70,13 @@ interface SetupWithSelector<P = {}, S extends string = string> extends SetupFunc
   __selector: string;
 }
 
+/** @internal — A `<template>` holding `html`: every compiled template (component, list row, empty list) is one. */
+export const __T = (html: string): HTMLTemplateElement => {
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  return t;
+};
+
 let _getRouteContext: (() => UntypedRouteContext) | undefined;
 
 /** @internal */

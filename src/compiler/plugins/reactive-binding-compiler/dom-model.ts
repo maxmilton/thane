@@ -79,7 +79,7 @@ export const cookTemplateText = (raw: string): string =>
 
 const names = (list: string): Set<string> => new Set(list.split(' '));
 
-const VOID = names(
+export const VOID = names(
   'area base basefont bgsound br col embed frame hr img input keygen link meta param source track wbr',
 );
 /** Template content is parsed without scripting, so `<noscript>` holds markup there */

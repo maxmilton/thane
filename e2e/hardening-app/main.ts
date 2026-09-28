@@ -19,6 +19,8 @@ import { A1RootList } from './probes/a1-rootlist.js';
 import { A1Text } from './probes/a1-text.js';
 import { A1TextHidden } from './probes/a1-text-hidden.js';
 import { A1Top } from './probes/a1-top.js';
+import { H52 } from './probes/h52-row-text-space.js';
+import { H53 } from './probes/h53-text-next-to-elements.js';
 import { I1 } from './probes/i1-index-child-props.js';
 import { K13 } from './probes/k13-component-row-template.js';
 import { L1 } from './probes/l1-destroy-rows.js';
@@ -83,6 +85,8 @@ const probes: Record<string, ComponentHTMLSelector<any>> = {
   a1k12: A1K12,
   a1hosts: A1Hosts,
   a1k14: A1K14,
+  h52: H52,
+  h53: H53,
 };
 
 const win = window as any;

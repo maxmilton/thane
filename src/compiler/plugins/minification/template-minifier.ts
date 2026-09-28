@@ -38,7 +38,8 @@ const collapseHTML = (html: string): string => {
   return (
     html
       .replace(/\s+/g, ' ')
-      .replace(/>\s+<(?![!-])/g, '><')
+      // A binding's boundary keeps the space before an element, which is text (H-53)
+      .replace(/(?<!<!----)>\s+<(?![!-])|>\s+<(?=\/)/g, '><')
       // Strip non-binding HTML comments (preserve <!--bN-->, <!--iN-->, <!--[if]-->, and <!----> boundary)
       .replace(/<!--(?!b\d)(?!i\d)(?!\[)(?!--)[\s\S]*?-->/g, '')
       // Repair: aggressive strip may have merged binding markers with boundary comments;

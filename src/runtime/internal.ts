@@ -6,6 +6,7 @@ export {
   __registerComponentLean,
   __enableComponentStyles,
   __dc,
+  __T,
   mountComponent,
 } from './component.js';
-export { __bindIf, __bindIfExpr, createKeyedReconciler } from './dom-binding.js';
+export { __bindIf, __bindIfExpr, createKeyedReconciler, __batchRows, __nc } from './dom-binding.js';
