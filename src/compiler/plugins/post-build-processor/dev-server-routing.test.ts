@@ -191,3 +191,23 @@ describe('dev server routing with useGzip', () => {
     });
   }
 });
+
+describe('a request handler that fails', () => {
+  // The options the server is started with (the method is private to the class, not to the test)
+  const serveOptions = (isProd: boolean) =>
+    (new DevServer({ distDir: dist, host: 'localhost', port: 0, isProd }) as any).createServeOptions(0);
+
+  test('production: a bare 500, without Bun development error page and its stack', async () => {
+    const options = serveOptions(true);
+    expect(options.development).toBe(false);
+    const response: Response = options.error(new Error('boom at /secret/place.ts:1:1'));
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe('Internal Server Error');
+  });
+
+  test('development: Bun development mode, whose error page helps while developing', () => {
+    const options = serveOptions(false);
+    expect(options.development).toEqual({ hmr: true });
+    expect(options.error).toBeUndefined();
+  });
+});

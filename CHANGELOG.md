@@ -115,6 +115,7 @@ The simplification and hardening round fixed these defects in valid code:
 - A setup variable named `r` or `ctx` is read as the setup declares it in the component's template: the compiled bindings called the component root `r` and their context `ctx`, so `${r()}` called the root element. The bindings' own names now start with `_`, and a template that still reads one of them (a name starting with `_`, an element name such as `b3`, or `e` in a row) is a build error, THANE012, instead of a wrong value.
 - `@namespace` in a component stylesheet no longer leaves the rule after it unscoped, applied to the whole page. The build writes an empty block after the statement, so the runtime scoper copies the statement and scopes the next rule; the namespace applies as usual.
 - The mount-call optimiser leaves an entry alone when it also uses `mount` as a value (`const m = mount`, `export { mount }`); it removed the import, and the file broke.
+- `thane serve --prod` answers a request that fails with a plain 500. It started Bun's server without `development: false`, so a failing request showed Bun's development error page with the stack trace.
 
 ### Removed
 

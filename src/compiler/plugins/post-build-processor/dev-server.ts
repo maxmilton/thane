@@ -381,8 +381,13 @@ export class DevServer {
     return {
       port,
       hostname: this.serverHost,
+      // Production answers a failing request with a bare 500: Bun's development error page shows the
+      // stack, which a served production build must not do
       ...(isProd
-        ? {}
+        ? {
+            development: false,
+            error: () => new Response('Internal Server Error', { status: 500 }),
+          }
         : {
             development: {
               hmr: true,
