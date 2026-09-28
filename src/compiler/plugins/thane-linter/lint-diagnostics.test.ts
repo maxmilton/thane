@@ -136,7 +136,7 @@ describe('THANE401 diagnostics', () => {
     expect(run(componentPropertyOrder, src)).toStrictEqual([error(src, 2, 'template', before('template', 'styles'))]);
   });
 
-  test('skips parenthesised, nested and non-object returns, and defineComponent calls inside another', () => {
+  test('inspects a parenthesised return; skips nested and non-object returns and calls inside another', () => {
     const src = [
       'export const A = defineComponent(() => {',
       '  if (x) {',
@@ -151,7 +151,7 @@ describe('THANE401 diagnostics', () => {
       'const B = defineComponent(() => build({ styles: s, template: t }));',
       'const C = lib.defineComponent(() => ({ styles: s, template: t }));',
     ];
-    expect(run(componentPropertyOrder, src)).toStrictEqual([]);
+    expect(run(componentPropertyOrder, src)).toStrictEqual([error(src, 9, 'template', before('template', 'styles'))]);
   });
 
   test('inspects every function-like argument and every top-level return', () => {
@@ -198,7 +198,7 @@ describe('THANE402 diagnostics', () => {
     ]);
   });
 
-  test('skips shorthand, accessor, string-named and other properties', () => {
+  test('reports shorthand, accessor and string-named hooks; skips other properties', () => {
     const src = [
       'const A = defineComponent(() => ({',
       '  onMount,',
@@ -207,7 +207,11 @@ describe('THANE402 diagnostics', () => {
       '  onClick() {},',
       '}));',
     ];
-    expect(run(lifecycleArrowFunction, src)).toStrictEqual([]);
+    expect(run(lifecycleArrowFunction, src)).toStrictEqual([
+      error(src, 2, 'onMount', inline('onMount')),
+      error(src, 3, 'get', `'onDestroy' must be an arrow function, not an accessor (use 'onDestroy: () => { ... }')`),
+      error(src, 4, "'onMount'", fnExpr('onMount')),
+    ]);
   });
 
   test('inspects the same return objects as THANE401', () => {
@@ -223,6 +227,7 @@ describe('THANE402 diagnostics', () => {
       'const D = defineComponent(() => ({ template: t, inner: defineComponent(() => ({ onMount() {} })) }));',
     ];
     expect(run(lifecycleArrowFunction, src)).toStrictEqual([
+      error(src, 5, 'onDestroy', method('onDestroy')),
       error(src, 6, 'onDestroy', method('onDestroy')),
       error(src, 8, 'onMount', method('onMount')),
       error(src, 8, 'onDestroy', method('onDestroy')),
@@ -254,8 +259,7 @@ describe('THANE403 diagnostics', () => {
       error(src, 1, 'header', message('html', 'let')),
       error(src, 1, 'footer', message('css', 'let')),
       error(src, 3, 'inner', message('html', 'var')),
-      // A `using` declaration is reported as 'var' today (its flags are neither Let nor Const).
-      error(src, 5, 'res', message('html', 'var')),
+      error(src, 5, 'res', message('html', 'using')),
     ]);
   });
 
@@ -345,7 +349,7 @@ describe('THANE407 diagnostics', () => {
     `Only one defineComponent() is allowed per file. Found ${n} calls — ` +
     'the compiler processes only one component per file. Split additional components into separate files.';
 
-  test('reports every declaration or default export after the first, with the total count', () => {
+  test('reports every call after the first, however it is written, with the total count', () => {
     const src = [
       'export const A = defineComponent(() => ({ template: html`<a/>` }));',
       'function make() {',
@@ -358,9 +362,11 @@ describe('THANE407 diagnostics', () => {
       'defineComponent(() => ({}));',
     ];
     expect(run(singleComponentPerFile, src)).toStrictEqual([
-      error(src, 3, 'B =', message(4)),
-      error(src, 3, 'C =', message(4)),
-      error(src, 6, 'export default', message(4)),
+      error(src, 3, 'B =', message(6)),
+      error(src, 3, 'C =', message(6)),
+      error(src, 6, 'export default', message(6)),
+      error(src, 8, 'alsoNot', message(6)),
+      error(src, 9, 'defineComponent', message(6)),
     ]);
   });
 
@@ -396,8 +402,7 @@ describe('THANE408 diagnostics', () => {
     expect(run(componentConstDeclaration, src)).toStrictEqual([
       error(src, 1, 'A =', message('let')),
       error(src, 3, 'B =', message('var')),
-      // A `using` declaration is reported as 'var' today (its flags are neither Let nor Const).
-      error(src, 5, 'C =', message('var')),
+      error(src, 5, 'C =', message('using')),
     ]);
   });
 });
@@ -487,9 +492,9 @@ describe('THANE411 diagnostics', () => {
     `A previous mount() to the same target was found at line ${previousLine}. ` +
     'Mounting multiple components to the same target appends duplicate content ' +
     'and causes binding collisions. Use a different target element for each mount().';
-  const BODY = 'document.body (default)';
+  const BODY = 'document.body';
 
-  test('keys both call shapes the same way and names the first mount of each target', () => {
+  test('keys every way of writing a target, and names the first mount of each target', () => {
     const src = [
       'mount(App);',
       '  mount(Other);',
@@ -497,44 +502,40 @@ describe('THANE411 diagnostics', () => {
       'mount({ component: App, target });',
       "mount({ 'target': el });",
       'mount(...args);',
-      'mount(App, el);',
+      'mount(options);',
       'mount({ component: B, target: el });',
-      'mount(App, document.body);',
-      'mount({ target: document.body });',
-      "mount(App, document.getElementById('app'));",
       "mount({ target: document.getElementById('app') });",
-      'mount(App, els[0]);',
+      'mount({ target: document.body });',
+      "mount({ target: document.getElementById('app') });",
       'mount({ target: els[0] });',
-      'mount(App, el!);',
-      'mount({ target: el! });',
-      'mount(App, (el));',
+      'mount({ target: els[0] });',
+      'mount({ target: (el as HTMLElement)! });',
+      'mount({ target: target });',
       'lib.mount(App);',
       'mount({ target: document.body, component: C }, extra);',
     ];
+    // The old mount(App) form, a spread and an options variable are not compared: their target is
+    // unknown. The shorthand `{ target }` and a string key are the variables they name.
     expect(run(duplicateMountTarget, src)).toStrictEqual([
-      warning(src, 2, 'mount', message(BODY, 1)),
-      warning(src, 3, 'mount', message(BODY, 1)),
-      warning(src, 4, 'mount', message(BODY, 1)),
-      warning(src, 5, 'mount', message(BODY, 1)),
-      warning(src, 6, 'mount', message(BODY, 1)),
-      warning(src, 8, 'mount', message('var:el', 7)),
-      warning(src, 10, 'mount', message('document.body', 9)),
-      warning(src, 12, 'mount', message("document.getElementById('app')", 11)),
-      warning(src, 14, 'mount', message('els[0]', 13)),
-      warning(src, 16, 'mount', message('el!', 15)),
-      warning(src, 19, 'mount', message('document.body', 9)),
+      warning(src, 8, 'mount', message('var:el', 5)),
+      warning(src, 10, 'mount', message(BODY, 3)),
+      warning(src, 11, 'mount', message("document.getElementById('app')", 9)),
+      warning(src, 13, 'mount', message('els[0]', 12)),
+      warning(src, 14, 'mount', message('var:el', 5)),
+      warning(src, 15, 'mount', message('var:target', 4)),
+      warning(src, 17, 'mount', message(BODY, 3)),
     ]);
   });
 
   test('tracks each function scope on its own', () => {
     const src = [
-      'mount(App, el);',
+      'mount({ component: App, target: el });',
       'const f = () => {',
-      '  mount(App, el);',
-      '  const g = function () { mount(App, el); };',
-      '  mount(Other, el);',
+      '  mount({ component: App, target: el });',
+      '  const g = function () { mount({ component: App, target: el }); };',
+      '  mount({ component: Other, target: el });',
       '};',
-      'mount(Other, el);',
+      'mount({ component: Other, target: el });',
     ];
     expect(run(duplicateMountTarget, src)).toStrictEqual([
       warning(src, 5, 'mount', message('var:el', 3)),

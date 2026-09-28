@@ -22,21 +22,20 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
   const { diagnostics, report } = createReporter(sourceFile, filePath, ErrorCode.SINGLE_COMPONENT_PER_FILE, 'error');
   const locations: ts.Node[] = [];
 
+  // Every defineComponent(…) call counts, however it is written. Each is reported where it is
+  // declared (`const X = …`), exported (`export default …`) or, anywhere else, called.
   const visit = (node: ts.Node) => {
-    // Match: [export] const X = defineComponent(...)
-    if (ts.isVariableStatement(node)) {
-      for (const decl of node.declarationList.declarations) {
-        if (decl.initializer && isDefineComponentExpr(decl.initializer)) {
-          locations.push(decl);
-        }
-      }
+    if (isDefineComponentExpr(node)) {
+      let at: ts.Node = node;
+      while (ts.isParenthesizedExpression(at.parent)) at = at.parent;
+      const owner = at.parent;
+      locations.push(
+        (ts.isVariableDeclaration(owner) && owner.initializer === at) ||
+          (ts.isExportAssignment(owner) && !owner.isExportEquals)
+          ? owner
+          : node,
+      );
     }
-
-    // Also catch: export default defineComponent(...)
-    if (ts.isExportAssignment(node) && !node.isExportEquals && isDefineComponentExpr(node.expression)) {
-      locations.push(node);
-    }
-
     ts.forEachChild(node, visit);
   };
 

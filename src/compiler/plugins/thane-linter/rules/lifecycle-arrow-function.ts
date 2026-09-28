@@ -9,6 +9,8 @@
  *
  *   onMount() { ... },                   // ❌ THANE402 — method shorthand
  *   onMount: function() { ... },         // ❌ THANE402 — function expression
+ *   onMount,                             // ❌ THANE402 — not an inline arrow function
+ *   get onMount() { ... },               // ❌ THANE402 — an accessor
  *
  * This keeps a consistent code style and avoids accidental `this` binding
  * issues — arrow functions inherit the enclosing lexical scope, which is
@@ -35,9 +37,19 @@ const LIFECYCLE_PROPS = new Set(['onMount', 'onDestroy']);
  */
 const checkArrowFunctions = (obj: ts.ObjectLiteralExpression, report: Report): void => {
   for (const prop of obj.properties) {
-    // Get the property name regardless of node type
-    const name = prop.name && ts.isIdentifier(prop.name) ? prop.name.text : null;
+    // The property name, written as an identifier or a string (`'onMount': …`)
+    const name = prop.name && (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name)) ? prop.name.text : null;
     if (!name || !LIFECYCLE_PROPS.has(name)) continue;
+
+    // ── Shorthand `{ onMount }` and accessors: not an inline arrow function ──
+    if (ts.isShorthandPropertyAssignment(prop)) {
+      report(prop, `'${name}' must be an inline arrow function (use '${name}: () => { ... }')`);
+      continue;
+    }
+    if (ts.isGetAccessorDeclaration(prop) || ts.isSetAccessorDeclaration(prop)) {
+      report(prop, `'${name}' must be an arrow function, not an accessor (use '${name}: () => { ... }')`);
+      continue;
+    }
 
     // ── Method declaration shorthand: onMount() { ... } ──────────────
     if (ts.isMethodDeclaration(prop)) {

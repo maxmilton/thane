@@ -49,17 +49,23 @@ export const isTaggedWith = (
 
 /**
  * The keyword a declaration list is reported as: 'const' when the Const flag is set (`await using`
- * included), otherwise 'let' when the Let flag is set, otherwise 'var' (`using` included).
+ * included), 'let', 'using', otherwise 'var'.
  */
-export const declarationKeyword = (list: ts.VariableDeclarationList): 'const' | 'let' | 'var' =>
-  list.flags & ts.NodeFlags.Const ? 'const' : list.flags & ts.NodeFlags.Let ? 'let' : 'var';
+export const declarationKeyword = (list: ts.VariableDeclarationList): 'const' | 'let' | 'var' | 'using' =>
+  list.flags & ts.NodeFlags.Const
+    ? 'const'
+    : list.flags & ts.NodeFlags.Let
+      ? 'let'
+      : list.flags & ts.NodeFlags.Using
+        ? 'using'
+        : 'var';
 
 /**
  * The return objects THANE401 and THANE402 inspect. For each `defineComponent(…)` call, and each arrow
  * or function expression among its arguments: a concise body that is an object literal (in any number
- * of parentheses), or each top-level `return {…}` statement of a block body. Returns inside other
- * statements or nested functions and `return ({…})` are not included, and the arguments are not searched
- * for further calls. The compiler finds return objects differently (H-07).
+ * of parentheses), or each top-level `return {…}` statement of a block body, `return ({…})` included.
+ * Returns inside other statements or nested functions are not included, and the arguments are not
+ * searched for further calls. The compiler finds return objects differently.
  */
 export const findReturnObjects = (root: ts.Node): ts.ObjectLiteralExpression[] => {
   const results: ts.ObjectLiteralExpression[] = [];
@@ -72,9 +78,8 @@ export const findReturnObjects = (root: ts.Node): ts.ObjectLiteralExpression[] =
       if (!ts.isArrowFunction(arg) && !ts.isFunctionExpression(arg)) continue;
       if (ts.isBlock(arg.body)) {
         for (const stmt of arg.body.statements) {
-          if (ts.isReturnStatement(stmt) && stmt.expression && ts.isObjectLiteralExpression(stmt.expression)) {
-            results.push(stmt.expression);
-          }
+          const returned = ts.isReturnStatement(stmt) && stmt.expression ? unwrapParens(stmt.expression) : null;
+          if (returned && ts.isObjectLiteralExpression(returned)) results.push(returned);
         }
       } else {
         const expr = unwrapParens(arg.body);

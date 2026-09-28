@@ -119,6 +119,12 @@ The simplification and hardening round fixed these defects in valid code:
 - Template parse warnings, such as a duplicate attribute, are reported for `whenElse()` branches and `repeat()` rows too, once each; only the component template's were.
 - A missing space after a tag name, `<button@click=${go}>` or `<div${when(on())}>`, is reported, and the rest of the tag is read as its attributes. The character was dropped and the name went on, so the example became a `<buttonclick>` element with no handler.
 - A config file key that nothing reads, such as a misspelled `outdir`, prints a warning with the key it most likely means; so do an unknown command in `commands` and a section that is not an object. They were ignored silently.
+- Lint rules:
+  - THANE411 no longer warns about a duplicate target for `mount({ target })` (shorthand) or `mount({ 'target': el })`. It read both as the default target, document.body. It also treats `target: document.body` as the default target, and `el!` or `(el)` as `el`. It no longer analyses the old `mount(App, target)` form.
+  - THANE403 and THANE408 report a `using` declaration as `using`; they called it `var`.
+  - THANE402 reports a shorthand `onMount`, an accessor and a string-named hook.
+  - THANE401 and THANE402 inspect `return ({…})`.
+  - THANE407 counts every `defineComponent()` call, a bare or parenthesised one too.
 
 ### Removed
 

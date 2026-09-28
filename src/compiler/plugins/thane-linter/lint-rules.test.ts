@@ -388,7 +388,7 @@ describe('THANE411 — duplicate-mount-target', () => {
     const src = `
       import { mount } from 'thane';
       import { App } from './app.js';
-      mount(App);
+      mount({ component: App });
     `;
     expect(duplicateMountTarget.check(parse(src), 'test.ts')).toEqual([]);
   });
@@ -398,8 +398,8 @@ describe('THANE411 — duplicate-mount-target', () => {
       import { mount } from 'thane';
       import { App } from './app.js';
       import { Other } from './other.js';
-      mount(App);
-      mount(Other);
+      mount({ component: App });
+      mount({ component: Other });
     `;
     const d = duplicateMountTarget.check(parse(src), 'test.ts');
     expect(d).toHaveLength(1);
@@ -411,8 +411,8 @@ describe('THANE411 — duplicate-mount-target', () => {
       import { mount } from 'thane';
       import { App } from './app.js';
       import { Nav } from './nav.js';
-      mount(App, document.getElementById('app'));
-      mount(Nav, document.getElementById('nav'));
+      mount({ component: App, target: document.getElementById('app') });
+      mount({ component: Nav, target: document.getElementById('nav') });
     `;
     expect(duplicateMountTarget.check(parse(src), 'test.ts')).toEqual([]);
   });
@@ -421,8 +421,8 @@ describe('THANE411 — duplicate-mount-target', () => {
     const src = `
       import { mount } from 'thane';
       const el = document.getElementById('root')!;
-      mount(App, el);
-      mount(Other, el);
+      mount({ component: App, target: el });
+      mount({ component: Other, target: el });
     `;
     const d = duplicateMountTarget.check(parse(src), 'test.ts');
     expect(d).toHaveLength(1);
@@ -440,15 +440,15 @@ describe('THANE411 — duplicate-mount-target', () => {
       const win = window;
       win.__mountA = () => {
         const t = document.createElement('div');
-        return mount(AppA, t);
+        return mount({ component: AppA, target: t });
       };
       win.__mountB = () => {
         const t = document.createElement('div');
-        return mount(AppB, t);
+        return mount({ component: AppB, target: t });
       };
       win.__mountC = () => {
         const t = document.createElement('div');
-        return mount(AppC, t);
+        return mount({ component: AppC, target: t });
       };
     `;
     expect(duplicateMountTarget.check(parse(src), 'test.ts')).toEqual([]);
@@ -459,8 +459,8 @@ describe('THANE411 — duplicate-mount-target', () => {
       import { mount } from 'thane';
       const setup = () => {
         const el = document.getElementById('root')!;
-        mount(AppA, el);
-        mount(AppB, el);
+        mount({ component: AppA, target: el });
+        mount({ component: AppB, target: el });
       };
     `;
     const d = duplicateMountTarget.check(parse(src), 'test.ts');
