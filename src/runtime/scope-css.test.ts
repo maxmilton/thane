@@ -1,9 +1,9 @@
 /**
- * Characterisation of runtime style scoping (F0-2 item 1, before RT-9).
+ * Characterisation of runtime style scoping.
  *
  * `scopeCssRules` rewrites a component stylesheet so every rule is prefixed with the host
  * selector. These tests pin what it does today, including the cases that look wrong: a
- * refactor of the scanners must keep every one of them. Fixes belong to H-19.
+ * refactor of the scanners must keep every one of them; a fix changes its row.
  */
 import { describe, expect, test } from 'bun:test';
 import { scopeCssRules } from './component.js';
@@ -27,7 +27,7 @@ describe('scopeCssRules: :host', () => {
     [':host:hover { color: red; }', '.sel:hover{ color: red; }'],
     [':host>.x{a:b}', '.sel>.x{a:b}'],
     [':host, :host(.x), .y { a: b }', '.sel, .sel.x, .sel .y{ a: b }'],
-    // The host suffix ends at the parenthesis that matches `:host(` (P26a, H-19 (i); until then
+    // The host suffix ends at the parenthesis that matches `:host(` (P26a; until it was fixed
     // it ended at the first `)`, giving `.sel:not(.x.y) .a`)
     [':host(:not(.x).y) .a { b: c }', '.sel:not(.x).y .a{ b: c }'],
     [':host(.a:is(.b,.c)) .d { e: f }', '.sel.a:is(.b,.c) .d{ e: f }'],
@@ -35,7 +35,7 @@ describe('scopeCssRules: :host', () => {
     [':host(:is(.a, .b)) .c, .d { e: f }', '.sel:is(.a, .b) .c, .sel .d{ e: f }'],
     // No parenthesis matches `:host(`: falls through to the plain `:host` prefix rule
     [':host(:not(.x) .a { b: c }', '.sel(:not(.x) .a{ b: c }'],
-    // `:host-context` is treated as `:host` followed by `-context` (P26b, H-19)
+    // `:host-context` is treated as `:host` followed by `-context`
     [':host-context(.dark) .a { b: c }', '.sel-context(.dark) .a{ b: c }'],
     // No closing parenthesis: falls through to the plain `:host` prefix rule
     [':host(.a { b: c }', '.sel(.a{ b: c }'],
@@ -81,9 +81,9 @@ describe('scopeCssRules: braces inside strings', () => {
     [".a::after { content: 'it\\'s {'; } .b { c: d }", ".sel .a::after{ content: 'it\\'s {'; }.sel .b{ c: d }"],
     // A quote preceded by a backslash never closes a string, even when the backslash is itself
     // escaped (`"\\"`): the string runs to the end, no brace matches, and the rest is copied
-    // unscoped. RT-9 keeps this rule (`s[i - 1] !== '\\'`).
+    // unscoped. The shared string scanner keeps this rule (`s[i - 1] !== '\\'`).
     ['.a::after { content: "\\\\"; } .b { c: d }', '.a::after { content: "\\\\"; } .b { c: d }'],
-    // An apostrophe in a comment opens a "string" too: every later rule is left unscoped (P26c, H-19)
+    // An apostrophe in a comment opens a "string" too: every later rule is left unscoped
     [".a { /* it's */ color: blue } .b { c: d }", ".a { /* it's */ color: blue } .b { c: d }"],
   ]);
 });

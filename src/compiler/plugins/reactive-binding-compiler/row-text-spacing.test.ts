@@ -10,10 +10,10 @@
  * directive anchors, whose comments it cannot tell from markers; e2e/tests/hardening.spec.ts renders
  * those).
  *
- * The shapes marked H-52 lost the space between two bindings until H-52 (K23: "JohnDoe"). Those marked
- * H-53 lost the space between a binding and an element or directive next to it until H-53 (K24, K25:
- * "Name:John", "Ax"). Every other shape is pinned as it is, including whitespace between two elements
- * and at the edges of the binding's parent, which H-53 leaves alone.
+ * The shapes with a `lostSpace` used to lose a space: between two bindings ("JohnDoe"), or between a
+ * binding and an element or directive next to it ("Name:John", "Ax"). Every other shape is pinned as it
+ * is, including whitespace between two elements and at the edges of the binding's parent, which the
+ * fix leaves alone.
  */
 import { describe, expect, test } from 'bun:test';
 import { buildAndReadJs, PROD_BUILD } from '../../testing/build-project.js';
@@ -27,49 +27,66 @@ interface Shape {
   values?: string[];
   /** The text the element shows (absent: the template holds directive anchors) */
   text?: string;
-  /** The task that fixed this shape, named in its test's title */
-  fixedBy?: 'H-52' | 'H-53';
+  /** The space this shape used to lose, named in its test's title */
+  lostSpace?: 'between two bindings' | 'next to an element';
 }
 
-const DEFECTS = { 'H-52': 'K23', 'H-53': 'K24 K25' } as const;
 const titleFor = (shape: Shape, what: string) =>
-  shape.fixedBy ? `${shape.fixedBy} ${DEFECTS[shape.fixedBy]} ${what}` : what;
+  shape.lostSpace ? `${what} (it lost the space ${shape.lostSpace})` : what;
 
 const TWO = '<!----> <!----> <!----> <!---->';
 
 /** Row content, in `<li class="r-<name>">` */
 const ROW_SHAPES: Record<string, Shape> = {
-  space: { source: '${it.a} ${it.b}', template: TWO, values: ['John', 'Doe'], text: 'John Doe', fixedBy: 'H-52' },
-  twoSpaces: { source: '${it.a}  ${it.b}', template: TWO, values: ['John', 'Doe'], text: 'John Doe', fixedBy: 'H-52' },
+  space: {
+    source: '${it.a} ${it.b}',
+    template: TWO,
+    values: ['John', 'Doe'],
+    text: 'John Doe',
+    lostSpace: 'between two bindings',
+  },
+  twoSpaces: {
+    source: '${it.a}  ${it.b}',
+    template: TWO,
+    values: ['John', 'Doe'],
+    text: 'John Doe',
+    lostSpace: 'between two bindings',
+  },
   newline: {
     source: '${it.a}\n    ${it.b}',
     template: TWO,
     values: ['John', 'Doe'],
     text: 'John Doe',
-    fixedBy: 'H-52',
+    lostSpace: 'between two bindings',
   },
   padded: {
     source: '\n    ${it.a} ${it.b}\n  ',
     template: TWO,
     values: ['John', 'Doe'],
     text: 'John Doe',
-    fixedBy: 'H-52',
+    lostSpace: 'between two bindings',
   },
   three: {
     source: '${it.a} ${it.b} ${it.c}',
     template: `${TWO} <!----> <!---->`,
     values: ['John', 'Doe', 'Jr'],
     text: 'John Doe Jr',
-    fixedBy: 'H-52',
+    lostSpace: 'between two bindings',
   },
   itemAndSignal: {
     source: '${it.a} ${label()}',
     template: TWO,
     values: ['John', 'L'],
     text: 'John L',
-    fixedBy: 'H-52',
+    lostSpace: 'between two bindings',
   },
-  signals: { source: '${a()} ${b()}', template: TWO, values: ['A', 'B'], text: 'A B', fixedBy: 'H-52' },
+  signals: {
+    source: '${a()} ${b()}',
+    template: TWO,
+    values: ['A', 'B'],
+    text: 'A B',
+    lostSpace: 'between two bindings',
+  },
   dash: {
     source: '${it.a}-${it.b}',
     template: '<!----> <!---->-<!----> <!---->',
@@ -94,59 +111,66 @@ const ROW_SHAPES: Record<string, Shape> = {
     template: '<!----> <!----> <b>B</b>',
     values: ['John'],
     text: 'John B',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   afterElement: {
     source: '<b>B</b> ${it.a}',
     template: '<b>B</b> <!----> <!---->',
     values: ['John'],
     text: 'B John',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   label: {
     source: '<b>Name:</b> ${it.a}',
     template: '<b>Name:</b> <!----> <!---->',
     values: ['John'],
     text: 'Name: John',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   afterVoid: {
     source: '<input type="checkbox"> ${it.a}',
     template: '<input type="checkbox"> <!----> <!---->',
     values: ['John'],
     text: ' John',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
-  // Between the two elements the whitespace still goes; next to the binding it stays
+  // Between the two elements a space on one line stays, as it does next to the binding
   betweenElements: {
     source: '<b>x</b> <i>y</i> ${it.a}',
+    template: '<b>x</b> <i>y</i> <!----> <!---->',
+    values: ['John'],
+    text: 'x y John',
+    lostSpace: 'next to an element',
+  },
+  // At the start of the binding's parent the whitespace goes; after its last element one space stays
+  edges: {
+    source: ' ${it.a} <b>x</b> ',
+    template: '<!----> <!----> <b>x</b> ',
+    values: ['John'],
+    text: 'John x ',
+    lostSpace: 'next to an element',
+  },
+  // Whitespace that holds a line break goes between tags: it is the template's own formatting
+  lineBreaks: {
+    source: '\n  <b>x</b>\n  <i>y</i>\n  ${it.a}',
     template: '<b>x</b><i>y</i> <!----> <!---->',
     values: ['John'],
     text: 'xy John',
-    fixedBy: 'H-53',
-  },
-  // At the edges of the binding's parent the whitespace still goes
-  edges: {
-    source: ' ${it.a} <b>x</b> ',
-    template: '<!----> <!----> <b>x</b>',
-    values: ['John'],
-    text: 'John x',
-    fixedBy: 'H-53',
   },
   when: {
     source: '${it.a} <span ${when(it.on)}>w</span> ${it.b}',
     template: '<!----> <!----> <!----><!----> <!----> <!---->',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   whenElse: {
     source: '${it.a} ${whenElse(it.on, html`<i>y</i>`, html`<i>n</i>`)} ${it.b}',
     template: '<!----> <!----> <!----><!----><!----> <!----> <!---->',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   nestedList: {
     source: '${it.a} <ol>${repeat(it.kids, (k) => html`<li>${k}</li>`)}</ol>',
     template: '<!----> <!----> <ol><!----></ol>',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
 };
 
@@ -160,17 +184,23 @@ const COMPONENT_SHAPES: Record<string, Shape> = {
   dash: { source: '${a()}-${b()}', template: '<!---->A<!---->-<!---->B<!---->', text: 'A-B' },
   adjacent: { source: '${a()}${b()}', template: '<!---->A<!----><!---->B<!---->', text: 'AB' },
   around: { source: 'x ${a()} y', template: 'x <!---->A<!----> y', text: 'x A y' },
-  beforeElement: { source: '${a()} <b>B</b>', template: '<!---->A<!----> <b>B</b>', text: 'A B', fixedBy: 'H-53' },
+  beforeElement: {
+    source: '${a()} <b>B</b>',
+    template: '<!---->A<!----> <b>B</b>',
+    text: 'A B',
+    lostSpace: 'next to an element',
+  },
   expressionBeforeElement: {
     source: '${a() + 1} <b>B</b>',
     template: '<!----> <!----> <b>B</b>',
     values: ['A1'],
     text: 'A1 B',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   afterElement: { source: '<b>B</b> ${a()}', template: '<b>B</b> <!---->A<!---->', text: 'B A' },
   afterVoid: { source: '<input> ${a()}', template: '<input> <!---->A<!---->', text: ' A' },
-  betweenElements: { source: '<b>x</b> <i>y</i>', template: '<b>x</b><i>y</i>', text: 'xy' },
+  betweenElements: { source: '<b>x</b> <i>y</i>', template: '<b>x</b> <i>y</i>', text: 'x y' },
+  lineBreaks: { source: '<b>x</b>\n  <i>y</i>', template: '<b>x</b><i>y</i>', text: 'xy' },
   // The whitespace before the end of the binding's parent still goes
   trailing: { source: '<b>${a()} </b>x', template: '<b><!---->A<!----></b>x', text: 'Ax' },
 };
@@ -180,22 +210,22 @@ const DIRECTIVE_SHAPES: Record<string, Shape> = {
   when: {
     source: '${a()} <span ${when(on())}>w</span> ${b()}',
     template: '<!---->A<!----> <!----><span>w</span><!----> <!---->B<!---->',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   whenHidden: {
     source: '${a()} <span ${when(off())}>w</span> ${b()}',
     template: '<!---->A<!----> <!----><!----> <!---->B<!---->',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   whenElse: {
     source: '${a()} ${whenElse(on(), html`<i>y</i>`, html`<i>n</i>`)} ${b()}',
     template: '<!---->A<!----> <!----><i>y</i><!----><!----> <!---->B<!---->',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   list: {
     source: '${a()} ${repeat(items(), (it) => html`<i>${it.a}</i>`)}',
     template: '<!---->A<!----> <!---->',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   afterWhen: {
     source: '<span ${when(on())}>w</span> ${a()}',
@@ -233,15 +263,15 @@ const ROW_WHEN_SHAPES: Record<string, Shape> = {
     template: '<!----> <!----> <b>B</b>',
     values: ['John'],
     text: 'John B',
-    fixedBy: 'H-53',
+    lostSpace: 'next to an element',
   },
   afterElement: { source: '<b>B</b> ${it.a}', template: '<b>B</b> <!----> <!---->', values: ['John'], text: 'B John' },
 };
 
 /**
- * A row whose when() is pre-rendered (a component condition, true at compile time). Until RW-2 its row
- * template was garbled (a boundary twice, no space). Since RW-2 the row
- * holds the when()'s own template, with one space between the two bindings.
+ * A row whose when() is pre-rendered (a component condition, true at compile time). Its row template
+ * used to be garbled (a boundary twice, no space); the row holds the when()'s own template, with one
+ * space between the two bindings.
  */
 const PRERENDERED_ROW_WHEN = '<li class="rp-space"><!----><span><!----> <!----> <!----> <!----></span><!----></li>';
 
@@ -271,7 +301,7 @@ const fixture = (): string => {
     "  const items = signal([{ id: 1, a: 'John', b: 'Doe', c: 'Jr', on: true, kids: ['k'] }]);",
     '  return { template: html`<div>' + parts.join('\n  ') + '</div>` };',
     '});',
-    'mount(H52App);',
+    'mount({ component: H52App });',
   ].join('\n');
 };
 
@@ -343,7 +373,7 @@ for (const mode of Object.keys(MODES) as (keyof typeof MODES)[]) {
     }
 
     test(
-      "a row whose when() is pre-rendered holds the when()'s own template (RW-2)",
+      "a row whose when() is pre-rendered holds the when()'s own template",
       async () => {
         expect(emitted(await bundle(mode), '<li class="rp-space">', '</li>', true)).toBe(PRERENDERED_ROW_WHEN);
       },

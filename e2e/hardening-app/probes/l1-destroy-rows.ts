@@ -1,8 +1,8 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 import { Kid } from '../shared/kid.js';
 import { l1Tick } from '../shared/store.js';
 
-// L1 (H-28): component-level rows subscribe to a store signal and mount a child component;
+// L1: component-level rows subscribe to a store signal and mount a child component;
 // destroying the component must release both.
 export const L1 = defineComponent('hardening-l1', () => {
   const items = signal([

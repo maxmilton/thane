@@ -10,7 +10,8 @@
  *   - Mid-notification unsubscribes null the slot; compaction after outermost notify
  *   - A write inside a subscriber (a cascade) is applied at once and notified after the current
  *     notification; each waiting signal then drains its own cascades before the next one
- *   - No cycle detection: a cascade that never settles overflows the stack
+ *   - Cycle detection in development builds only: a cascade that never settles throws a clear
+ *     error there; a production build has no check (it would cost every app bytes) and overflows
  *
  * Batching:
  *   - Writes apply immediately; notifications deferred until outermost batch ends
@@ -19,11 +20,39 @@
  * Computed:
  *   - Dirty-marked when a dependency notifies; re-evaluated lazily, on the next read
  *   - A diamond notifies the join once, with the final value
- *   - Reads are not glitch-free: until its dependencies have notified it, a computed returns its
- *     previous value (inside a batch() function, or in a subscriber whose cascade has not run yet)
+ *   - Reads are fresh: read inside a notification pass or a batch() function, where a source may have
+ *     changed without notifying yet, a computed computes again when any signal was written since
  */
 
 import type { Signal, ReadonlySignal } from './types.js';
+
+/**
+ * False in a production build (`thane build --prod` defines it), which leaves the development checks
+ * out. Undefined everywhere else, which keeps them.
+ */
+declare const __THANE_DEV__: boolean | undefined;
+
+/**
+ * Development builds: how deeply cascade drains are nested. Signals that keep setting each other nest
+ * one drain inside the last until the stack overflows, after which writes can stop being notified; the
+ * check stops them long before that. No real cascade is nested this deep.
+ */
+let _drainDepth = 0;
+const MAX_DRAIN_DEPTH = 500;
+
+/** Development builds: count one more nested drain, or stop a cycle with an error that says what it is */
+function _enterDrain(): void {
+  if (++_drainDepth > MAX_DRAIN_DEPTH) {
+    // What is still queued would start the cycle again: dropped, so that later writes notify as usual
+    _pendingSignals.clear();
+    _computedPendingQueue.length = 0;
+    throw new Error(
+      "[thane] Signals keep setting each other: a subscriber's write triggers itself again, " +
+        MAX_DRAIN_DEPTH +
+        ' cascades deep. Look for two signals (or a computed and its source) whose subscribers set each other.',
+    );
+  }
+}
 
 /** @internal */
 type SignalInternal<T> = Signal<T> & {
@@ -92,6 +121,7 @@ export const signal = <T>(initialValue: T): Signal<T> => {
 
     if (!Object.is(fn._v, newValue)) {
       fn._v = newValue!;
+      _writes++;
 
       if (_notificationDepth) {
         _pendingSignals.add(fn as unknown as SignalInternal<unknown>);
@@ -115,6 +145,9 @@ export const signal = <T>(initialValue: T): Signal<T> => {
 
 /** @internal — above 0 while subscribers or a batch() function run; a write then waits in _pendingSignals. */
 let _notificationDepth = 0;
+
+/** @internal — counts the writes that changed a value: a computed read in a notification pass compares it */
+let _writes = 0;
 
 /**
  * Hook for computed-signal deferred-notification flush.
@@ -167,6 +200,19 @@ const _pendingSignals = new Set<SignalInternal<unknown>>();
 
 /** @internal — one pass: at depth 0 each pending signal drains its own cascades before the next. */
 function _flushPending(): void {
+  if (typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) {
+    // The same drain, counted (development builds). A production build keeps only the loop below,
+    // byte for byte as it was
+    _enterDrain();
+    try {
+      const pending = Array.from(_pendingSignals);
+      _pendingSignals.clear();
+      for (let i = 0; i < pending.length; i++) _notifySubscribers(pending[i]!);
+    } finally {
+      _drainDepth--;
+    }
+    return;
+  }
   const pending = Array.from(_pendingSignals);
   _pendingSignals.clear();
   for (let i = 0; i < pending.length; i++) {
@@ -210,7 +256,8 @@ const _computedPendingQueue: (() => void)[] = [];
 /**
  * Create a derived signal that auto-tracks dependencies and re-evaluates lazily.
  *
- * Uses dirty-marking + pull-on-read to prevent diamond glitches.
+ * Dirty-marked by its sources and computed again on the next read, which is always fresh; a diamond
+ * notifies the join once, with the final value.
  * Returned value is a ReadonlySignal with `.dispose()` to unsubscribe.
  *
  * @example
@@ -222,6 +269,20 @@ const _computedPendingQueue: (() => void)[] = [];
 export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose: () => void } {
   // Install deferred-notification flush hook on first computed creation
   _computedFlushHook ??= () => {
+    if (typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) {
+      // Counted, as the pending-signal drain is: a computed whose subscriber sets the computed's own
+      // source runs this hook again from inside itself
+      _enterDrain();
+      try {
+        while (_computedPendingQueue.length > 0) {
+          const cbs = _computedPendingQueue.splice(0);
+          for (let i = 0; i < cbs.length; i++) cbs[i]!();
+        }
+      } finally {
+        _drainDepth--;
+      }
+      return;
+    }
     while (_computedPendingQueue.length > 0) {
       const cbs = _computedPendingQueue.splice(0);
       for (let i = 0; i < cbs.length; i++) cbs[i]!();
@@ -237,7 +298,15 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
   const depUnsubs = new Map<Signal<unknown>, () => void>();
   // Subscriber slots, kept like a signal's (sharedSubscribe, _compact); notification stays separate
   const slots: Slots<T> = { _s: [], _nc: 0, _nn: 0 };
+  // The write count when the value was computed: read inside a notification pass or a batch()
+  // function, where a dependency may have changed without notifying yet, a computed whose count is
+  // behind computes again, so the read is fresh
+  let computedAt = -1;
+  // The value the subscribers were last given: a change is measured against it, not against the
+  // value, which a fresh read may already have updated
+  let notified: T = undefined as T;
   const notifySubs = () => {
+    notified = value;
     const subscribers = slots._s;
     const len = subscribers.length;
     slots._nc++;
@@ -269,8 +338,6 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
    * During a notification cascade, defers to the computed pending queue.
    */
   let pendingNotify = false;
-  let pendingOldValue: T = undefined as T;
-  let hasPendingOldValue = false;
   const markDirty = () => {
     if (disposed) return;
     dirty = true;
@@ -279,8 +346,6 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
     if (_notificationDepth > 0) {
       if (!pendingNotify) {
         pendingNotify = true;
-        pendingOldValue = value;
-        hasPendingOldValue = true;
         _computedPendingQueue.push(notifyIfChanged);
       }
       return;
@@ -288,14 +353,12 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
     notifyIfChanged();
   };
 
-  /** Re-evaluate if value changed and notify subscribers. */
+  /** Re-evaluate, and notify the subscribers when the value is not the one they were last given. */
   const notifyIfChanged = () => {
-    const oldVal = hasPendingOldValue ? pendingOldValue : value;
     pendingNotify = false;
-    hasPendingOldValue = false;
     if (disposed || slots._s.length === slots._nn) return;
-    evaluate();
-    if (hasError || !Object.is(oldVal, value)) notifySubs();
+    if (dirty || computedAt !== _writes) evaluate();
+    if (hasError || !Object.is(notified, value)) notifySubs();
   };
 
   /** Unsubscribe from all tracked dependencies and clear the map */
@@ -311,6 +374,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
    * the delta. When the dep set is stable (common case), this is O(0) work.
    */
   const evaluate = () => {
+    computedAt = _writes;
     const newDeps = new Set<Signal<unknown>>();
     _evalDeps = newDeps;
     const prev = _activeTracker;
@@ -351,6 +415,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
 
   // Initial evaluation
   evaluate();
+  notified = value;
 
   // The computed signal function — read-only
   const fn = (() => {
@@ -363,7 +428,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
       parentTracker._track(fn as unknown as Signal<unknown>);
     }
 
-    if (dirty) {
+    if (dirty || (_notificationDepth > 0 && computedAt !== _writes)) {
       evaluate();
     }
     if (hasError) throw error;
@@ -376,6 +441,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
     if (!skipInitial) {
       // Re-evaluate if dirty before calling subscriber
       if (dirty && !disposed) evaluate();
+      notified = value;
       if (hasError) {
         // Clean up the subscriber before throwing so no orphan subscription leaks.
         // The caller catches the error and knows the subscribe failed cleanly.

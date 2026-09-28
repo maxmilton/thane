@@ -1,9 +1,8 @@
 /**
- * A1-1: the template shapes that workstream A1 (path-based lookup, anchored directives) must keep
- * compiling, built end to end in development and production. Each build must succeed and keep every
+ * The template shapes that path-based lookup and anchored directives must keep compiling, built end to end in development and production. Each build must succeed and keep every
  * developer id in the emitted markup, on its own element: A1 moves the compiler's own lookups off
- * ids, and developer ids are left alone. No generated id is left in the output (A1-4). The runtime behaviour of the same shapes (and of the markup
- * the browser's parser rebuilds) is covered in a browser by e2e/tests/hardening.spec.ts (A1-1 block).
+ * ids, and developer ids are left alone. No generated id is left in the output. The runtime behaviour of the same shapes (and of the markup
+ * the browser's parser rebuilds) is covered in a browser by e2e/tests/hardening.spec.ts ('lookups and branches').
  */
 import { describe, expect, test } from 'bun:test';
 import { buildAndReadJs, PROD_BUILD } from '../../testing/build-project.js';
@@ -25,7 +24,7 @@ export const App = defineComponent('test-app', () => {
 ${signals}
   return { template: html\`${template}\` };
 });
-mount(App);
+mount({ component: App });
 `;
 
 const SIGNALS = [
@@ -93,26 +92,26 @@ const shapes: { name: string; template: string; ids: Record<string, number> }[] 
     ids: { 'd-else2': 2 },
   },
   {
-    name: 'a row when() of unknown initial value before a child component (K12)',
+    name: 'a row when() of unknown initial value before a child component',
     template:
       '<ul>${repeat(rows(), (r) => html`<li><b ${when(unknown())}>${t()}</b>${A1ShapeKid({ label: r.g })}</li>`, null, (r) => r.id)}</ul>',
     ids: {},
   },
   {
-    name: 'child hosts in a paragraph, a table row, svg and a row of their own (A1-4)',
+    name: 'child hosts in a paragraph, a table row, svg and a row of their own',
     template:
       '<div><p>${A1ShapeKid({ label: "p" })}</p><table><tbody>${repeat(rows(), (r) => html`<tr><td>${r.g}</td>${A1ShapeKid({ label: r.g })}</tr>`, null, (r) => r.id)}</tbody></table>' +
       '<ul>${repeat(rows(), (r) => html`${A1ShapeKid({ label: r.g })}`, null, (r) => r.id)}</ul><svg>${A1ShapeKid({ label: "svg" })}</svg></div>',
     ids: {},
   },
   {
-    name: 'an event on an element with an empty id attribute (K14)',
+    name: 'an event on an element with an empty id attribute',
     template: '<div><button id="" @click=${inc}>${clicks()}</button></div>',
     ids: {},
   },
 ];
 
-describe('A1-1: template shapes compile in development and production, developer ids kept', () => {
+describe('template shapes compile in development and production, developer ids kept', () => {
   for (const shape of shapes) {
     for (const mode of ['development', 'production'] as const) {
       test(`${shape.name} (${mode})`, async () => {

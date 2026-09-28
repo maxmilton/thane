@@ -1,6 +1,6 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, css } from 'thane';
 
-// P26a (H-19 i): :host() with a compound argument that contains its own parentheses.
+// P26a: :host() with a compound argument that contains its own parentheses.
 // Correct scoping: the rule applies only while the host has .y and does not have .x.
 export const P26a = defineComponent('hardening-p26a', () => ({
   template: html`<p class="p26a-a">p26a</p>`,

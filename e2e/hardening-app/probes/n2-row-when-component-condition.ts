@@ -1,9 +1,9 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 
 type Row = { id: number; label: string };
 
-// N2 (new, not in §1.8): a when() inside a repeat() row whose condition reads only a component signal.
+// N2: a when() inside a repeat() row whose condition reads only a component signal.
 // On e4a17f1 the pre-rendered row template carries no ids, so the branch initializer finds nothing and
 // the attribute binding inside stays empty until the branch has been hidden and shown once.
 export const N2 = defineComponent('hardening-n2', () => {

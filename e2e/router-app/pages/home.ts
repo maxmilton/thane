@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 import { visitCount, sharedMessage } from '../store.js';
 
 export const HomePage = defineComponent('home-page', () => {

@@ -1129,3 +1129,41 @@ describe('batch + computed integration', () => {
     expect(observed).toEqual([4]);
   });
 });
+
+describe('computed() — fresh reads', () => {
+  test('a chain of computeds read inside a batch, with no subscribers, gives the new value', () => {
+    const a = signal(1);
+    const double = computed(() => a() * 2);
+    const quadruple = computed(() => double() * 2);
+    const seen: number[] = [];
+    batch(() => {
+      a(5);
+      seen.push(double(), quadruple());
+    });
+    expect(seen).toEqual([10, 20]);
+  });
+
+  test('a fresh read does not swallow the notification: the subscribers get the new value once', () => {
+    const a = signal(1);
+    const double = computed(() => a() * 2);
+    const notified: number[] = [];
+    double.subscribe((v) => notified.push(v), true);
+    batch(() => {
+      a(2);
+      expect(double()).toBe(4);
+    });
+    expect(notified).toEqual([4]);
+  });
+
+  test('a read at rest computes nothing again when nothing it reads was written', () => {
+    const a = signal(1);
+    const other = signal(0);
+    let evaluations = 0;
+    const double = computed(() => (evaluations++, a() * 2));
+    double();
+    other(1);
+    double();
+    double();
+    expect(evaluations).toBe(1);
+  });
+});

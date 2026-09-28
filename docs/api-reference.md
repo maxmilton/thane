@@ -1,14 +1,14 @@
 # API Reference
 
-Complete API surface for the Thane framework, covering all public exports, global template functions, and types.
+Complete API surface for the Thane framework, covering all public exports, the template markers, the router globals, and types.
 
 ## Package Exports
 
 | Entry           | What it holds                                                                                              |
 | :-------------- | :--------------------------------------------------------------------------------------------------------- |
-| `thane`         | Signals, components, mounting, global styles, and the types an app writes in its own code                  |
-| `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`                                                                 |
-| `thane/client`  | Type declarations for `.css` imports (a `tsconfig.json` entry, not an import; see below)                   |
+| `thane`         | Signals, components, mounting, global styles, the template markers, and the types an app writes in its own code |
+| `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`, `href`, `setMeta`, and the head-field helpers `metaName`, `metaProperty`, `linkTag` |
+| `thane/client`  | Type declarations for `.css` imports, which `thane` includes (see below)                                   |
 | `thane/runtime` | The helpers that compiled code calls. Only the compiler imports it: never import it in an app. It is not an API and changes with every version |
 
 ### `thane` (main entry)
@@ -35,13 +35,35 @@ Complete API surface for the Thane framework, covering all public exports, globa
 
 `ComponentReturnType` and `MountOptions` are described under [Shapes You Pass In](#shapes-you-pass-in).
 
+#### Template Markers
+
+`import { html, css, when, whenElse, repeat } from 'thane'`. The compiler turns each use into DOM code at build time, so none of them reaches the bundle. It finds them by name: import them under their own names (THANE413). Called at run time, outside a compiled template, each one throws.
+
+| Export     | Signature                                                                                                                                                                         | Description                                  |
+| :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------- |
+| `html`     | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for HTML content             |
+| `css`      | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for CSS content              |
+| `when`     | `(condition: boolean \| (() => boolean)) => string`                                                                                                                               | Conditional rendering — show/hide an element |
+| `whenElse` | `<T, F>(condition: boolean \| (() => boolean), thenTemplate: T, elseTemplate: F) => T \| F`                                                                                       | If/else conditional rendering                |
+| `repeat`   | `<T>(items: T[] \| (() => T[]), templateFn: (item: T, index: number) => any, emptyTemplate?: string \| null, trackBy?: (item: T, index: number) => string \| number) => any[]` | List rendering with keyed reconciliation     |
+
+`repeat()`'s third argument is the empty template (an `html` template, or `null`); the key function goes fourth: `repeat(items(), row, null, (item) => item.id)`. A function in third place is a build error (THANE010).
+
 ### `thane/router` (subpath export)
 
 | Export         | Signature                                               | Description                                                              |
 | :------------- | :------------------------------------------------------ | :----------------------------------------------------------------------- |
-| `defineRoutes` | `(routes: { [pattern: string]: Route; notFound: Route }) => typeof routes` | Define the route map with type-safe keys; required before `mount()` with a `router` option |
-| `navigate`     | `(path: RoutePaths) => void`                            | Navigate to a path (also available as a global)                          |
+| `defineRoutes` | `(routes: { [pattern: string]: Route; notFound: Route }, options?: RouterOptions) => typeof routes` | Define the route map with type-safe keys; required before `mount()` with a `router` option. `options` gives the site's head and the app's own head fields ([Route Heads](routing.md#route-heads)) |
+| `navigate`     | `(path: RoutePaths) => void`, `(pattern, params) => void` | Navigate to a path, or to a route pattern with its parameters filled in (also available as a global) |
+| `href`         | `(pattern, params) => RoutePaths`                       | A route pattern's path with its parameters filled in, URL-encoded: `href('/users/:id', { id: 7 })` is `/users/7` |
 | `navigateBack` | `() => void`                                            | Navigate back in browser history (also available as a global)            |
+| `setMeta`      | `(meta: AppRouteMeta) => void`                          | Set head fields of the page on screen, until the next route loads         |
+| `metaName`     | `(name: string) => CustomMetaField<string>`             | A custom head field for `<meta name="…">`                                |
+| `metaProperty` | `(property: string) => CustomMetaField<string>`         | A custom head field for `<meta property="…">`                            |
+| `linkTag`      | `(rel: string, attributes?: Record<string, string>) => CustomMetaField<string>` | A custom head field for `<link rel="…" href="…">`       |
+
+Its types: `RouteMeta` (the built-in head fields), `SiteMeta` (those and `siteUrl`, `titleTemplate`), `RouteImage`,
+`HeadTag`, `CustomMetaField`, and `AppRouteMeta` (the built-in fields and the app's own, as `setMeta()` takes them).
 
 ### `thane/runtime`
 
@@ -49,22 +71,15 @@ The entry that compiled code imports its helpers from (`__registerComponent`, `_
 
 ---
 
-## Global Template Functions
+## Router Globals
 
-These are available globally inside `html` tagged templates. The compiler transforms them at build time — they do not exist as runtime values you import.
+The router installs these as globals when it starts, so a template calls them without an import. `navigate` and `navigateBack` are also exported from `thane/router`.
 
-| Function       | Signature                                                                                                                                                                         | Description                                               |
-| :------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------- |
-| `html`         | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for HTML content                          |
-| `css`          | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for CSS content                           |
-| `when`         | `(condition: boolean \| (() => boolean)) => string`                                                                                                                               | Conditional rendering — show/hide an element              |
-| `whenElse`     | `<T, F>(condition: boolean \| (() => boolean), thenTemplate: T, elseTemplate: F) => T \| F`                                                                                       | If/else conditional rendering                             |
-| `repeat`       | `<T>(items: T[] \| (() => T[]), templateFn: (item: T, index: number) => any, emptyTemplate?: string \| null, trackBy?: (item: T, index: number) => string \| number) => any[]` | List rendering with keyed reconciliation                  |
-| `navigate`     | `(path: RoutePaths) => void`                                                                                                                                                      | Navigate to a path (type-safe when routes are registered) |
-| `navigateBack` | `() => void`                                                                                                                                                                      | Navigate back in browser history                          |
-| `currentPath`  | `ReadonlySignal<string>`                                                                                                                                                          | Read-only signal with the current pathname                |
-
-`repeat()`'s third argument is the empty template (an `html` template, or `null`); the key function goes fourth: `repeat(items(), row, null, (item) => item.id)`. A function in third place is a build error (THANE010).
+| Global         | Signature                | Description                                               |
+| :------------- | :----------------------- | :-------------------------------------------------------- |
+| `navigate`     | `(path: RoutePaths) => void`, `(pattern, params) => void` | Navigate to a path, or to a route pattern with its parameters (type-safe when routes are registered) |
+| `navigateBack` | `() => void`             | Navigate back in browser history                          |
+| `currentPath`  | `ReadonlySignal<string>` | Read-only signal with the current pathname                |
 
 ---
 
@@ -159,7 +174,12 @@ interface MountOptions {
 ```typescript
 interface Route {
   component: (() => Promise<any>) | ComponentHTMLSelector<any>; // Lazy or eager component
-  title?: string; // Document title
+  meta?: RouteMeta | ((route: UntypedRouteContext) => RouteMeta); // The document head (routing.md, Route Heads)
+}
+
+interface RouterOptions {
+  meta?: SiteMeta; // siteUrl, titleTemplate, and the default of every head field
+  customMeta?: Record<string, CustomMetaField>; // The app's own head fields
 }
 
 interface RouterConfig {
@@ -197,7 +217,7 @@ interface UntypedRouteContext {
 
 ## CSS Module Declaration
 
-The `thane/client` subpath provides type declarations for CSS file imports:
+`thane` includes the type declarations for CSS file imports, from its `client.d.ts`:
 
 ```typescript
 // client.d.ts
@@ -207,14 +227,7 @@ declare module '*.css' {
 }
 ```
 
-Add to your `tsconfig.json`:
-
-```json
-{
-  "compilerOptions": {
-    "types": ["thane/client"]
-  }
-}
-```
+A project needs no `tsconfig.json` entry for them. The `thane/client` subpath is the same file: a project that lists
+`"types": ["thane/client"]` keeps working, with the declaration once.
 
 ← [Back to Docs](README.md)

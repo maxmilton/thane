@@ -1,8 +1,8 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when } from 'thane';
 import { expose } from '../shared/expose.js';
 import { IdsChild } from '../shared/a1-ids-child.js';
 
-// A1-2: a lookup inside a when() that shows later must not find a same-id element of a child
+// A lookup inside a when() that shows later must not find a same-id element of a child
 // component that sits before it (the id lookup searched the whole component root, children included).
 export const A1IdsNested = defineComponent('hardening-a1-ids-nested', () => {
   const t = signal('own');

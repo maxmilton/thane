@@ -167,6 +167,16 @@ test.describe('3. Route Parameters', () => {
     await goto(page, '/users/alice');
     await expect(page.getByTestId('user-id')).toHaveText('alice');
   });
+
+  test('href() and navigate(pattern, params) fill in the parameter, encoded; the page reads it decoded', async ({
+    page,
+  }) => {
+    await goto(page, '/');
+    await expect(page.getByTestId('nav-user-params')).toHaveAttribute('href', '/users/ada%20lovelace');
+    await page.getByTestId('nav-user-params').click();
+    await expect(page.getByTestId('user-id')).toHaveText('ada lovelace');
+    expect(new URL(page.url()).pathname).toBe('/users/ada%20lovelace');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -481,15 +491,14 @@ test.describe('10. Route Swap', () => {
   });
 
   test('a page whose chunk fails to load leaves the outlet empty and the router usable', async ({ page }) => {
-    const errors: string[] = [];
-    page.on('console', (message: any) => {
-      if (message.type() === 'error') errors.push(message.text());
-    });
     await page.route(/\/about-[^/]*\.js$/, (route: any) => route.abort());
     await goto(page, '/');
 
+    // Production builds drop the router's console report, so the test waits for the failed request and
+    // then for the outlet: the home page stays on screen until the load has failed, then the outlet empties.
+    const failed = page.waitForEvent('requestfailed', (request: any) => /\/about-[^/]*\.js$/.test(request.url()));
     await page.getByTestId('nav-about').click();
-    await expect.poll(() => errors.some((text) => text.includes('[thane-router] Failed to load route'))).toBe(true);
+    await failed;
     await expect(page.locator('#router-outlet [data-testid$="-page"]')).toHaveCount(0);
 
     await page.getByTestId('nav-user').click();

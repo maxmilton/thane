@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import { visitCount, sharedMessage } from '../store.js';
 
 export const AboutPage = defineComponent('about-page', () => {

@@ -1,4 +1,4 @@
-import { defineComponent, mount } from 'thane';
+import { defineComponent, mount, html } from 'thane';
 
 const BrowserErrorApp = defineComponent('browser-error-app', () => {
   return {

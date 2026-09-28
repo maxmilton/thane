@@ -1,12 +1,12 @@
 /**
- * Characterisation of the keyed reconciler's general path (F0-2 item 3, before RT-5).
+ * Characterisation of the keyed reconciler's general path.
  *
  * The general path runs when a reconcile is neither an append, a single removal, an in-place
  * update, a pure reorder nor a complete same-length replacement. These tests pin the final DOM
  * order and the exact sequence of DOM operations, cleanups, creations and updates, with static
  * nodes around the rows. Unlike keyed-reconciler.test.ts, the fake DOM here distinguishes element
  * from non-element nodes, so `nextElementSibling` / `previousElementSibling` / `firstElementChild`
- * skip comments and text as a browser does.
+ * skip comments and text as a browser does. The list's anchor is a comment, as in compiled code.
  */
 import { describe, expect, test } from 'bun:test';
 import { createKeyedReconciler } from './dom-binding.js';
@@ -85,7 +85,7 @@ interface Row {
 const setup = (layout: { before?: FakeNode[]; after?: FakeNode[]; trackIndex?: boolean } = {}) => {
   const host = new FakeNode('host');
   const list = new FakeNode('list');
-  const anchor = new FakeNode('anchor');
+  const anchor = new FakeNode('anchor', false);
   host.appendChild(list);
   for (const n of layout.before ?? []) list.appendChild(n);
   list.appendChild(anchor);
@@ -144,6 +144,19 @@ describe('general path: a new first row', () => {
       'insert X before B',
     ]);
     expect(order()).toEqual(['X', 'B', 'C', 'anchor']);
+  });
+});
+
+describe('general path: the rows stay before the anchor', () => {
+  test('the last row moved to the front while a row goes: the rest follow it, before the anchor', () => {
+    const { reconcile, order } = setup({ after: [new FakeNode('tail')] });
+    const [a, b, c, d] = rows('A', 'B', 'C', 'D');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([c!, a!])).toEqual(['cleanup B', 'remove B', 'insert A before anchor']);
+    expect(order()).toEqual(['C', 'A', 'anchor', 'tail']);
+    // an append then goes after the last row, as it goes before the anchor
+    reconcile([c!, a!, d!]);
+    expect(order()).toEqual(['C', 'A', 'D', 'anchor', 'tail']);
   });
 });
 
@@ -300,7 +313,7 @@ describe('general path with static nodes around the rows', () => {
     expect(order()).toEqual(['head', '#comment', 'X', 'Y', 'Z', 'anchor', '#text', 'tail']);
   });
 
-  test('a complete same-length replacement keeps every static node in the container (P18, H-05)', () => {
+  test('a complete same-length replacement keeps every static node in the container', () => {
     const { reconcile, order } = setup(statics());
     reconcile(rows('A', 'B'));
     expect(reconcile(rows('X', 'Y'))).toEqual([
@@ -319,7 +332,7 @@ describe('general path with static nodes around the rows', () => {
     expect(order()).toEqual(['head', '#comment', 'X', 'Y', 'anchor', '#text', 'tail']);
   });
 
-  test('clearing the list keeps every static node in the container (P18, H-05)', () => {
+  test('clearing the list keeps every static node in the container', () => {
     const { reconcile, order } = setup(statics());
     reconcile(rows('A', 'B'));
     expect(reconcile([])).toEqual(['cleanup A', 'cleanup B', 'remove A', 'remove B']);
@@ -328,7 +341,7 @@ describe('general path with static nodes around the rows', () => {
     expect(order()).toEqual(['head', '#comment', 'C', 'anchor', '#text', 'tail']);
   });
 
-  test('a static node only after the anchor also keeps the rows from being cleared at once (P18, H-05)', () => {
+  test('a static node only after the anchor also keeps the rows from being cleared at once', () => {
     const { reconcile, order } = setup({ after: [new FakeNode('tail')] });
     reconcile(rows('A'));
     expect(reconcile([])).toEqual(['cleanup A', 'remove A']);
@@ -337,11 +350,11 @@ describe('general path with static nodes around the rows', () => {
 });
 
 describe('same-length reorder pass: more than two displaced rows before a new key', () => {
-  // Until H-31 the reorder pass stopped after the third displaced row (`mismatchCount > 2`)
+  // Until it was fixed, the reorder pass stopped after the third displaced row (`mismatchCount > 2`)
   // without checking the remaining keys, took the "all keys exist" branch and threw a TypeError
-  // part-way through the moves (K1). It now checks every key first, so a missing one sends the
+  // part-way through the moves. It now checks every key first, so a missing one sends the
   // update to the general path.
-  test('H-31: the general path runs: the missing row is cleaned up, the new one created', () => {
+  test('the general path runs: the missing row is cleaned up, the new one created', () => {
     const { reconcile, order } = setup();
     const [a, b, c, d] = rows('A', 'B', 'C', 'D');
     reconcile([a!, b!, c!, d!]);
@@ -359,7 +372,7 @@ describe('same-length reorder pass: more than two displaced rows before a new ke
     expect(order()).toEqual(['P', 'Q', 'anchor']);
   });
 
-  test('H-31: a row updated by the pass is not updated again by the general path', () => {
+  test('a row updated by the pass is not updated again by the general path', () => {
     const { reconcile, order } = setup();
     const [a, b, c, d] = rows('A', 'B', 'C', 'D');
     reconcile([a!, b!, c!, d!]);

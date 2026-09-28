@@ -1,5 +1,5 @@
 /**
- * A compiled component imports exactly the runtime helpers its code calls (IF-4, H-16): every
+ * A compiled component imports exactly the runtime helpers its code calls: every
  * helper used in transformDefineComponentSource's output is imported from 'thane/runtime',
  * and nothing else is. Checked before esbuild, which would drop an unused import and hide a
  * missing one until the code runs (P6: `__dc is not defined` when a when() shows child rows).
@@ -38,7 +38,7 @@ const card = (anchorId: string): ChildMountInfo => ({
 });
 
 describe('runtime helper imports follow the emitted code', () => {
-  test('P6: child-component rows inside a when() import __dc', () => {
+  test('child-component rows inside a when() import __dc', () => {
     const r = compile(
       'return { template: html`<div ${when(show())}><ul>${repeat(items(), (i) => Card({ label: i.n }))}</ul></div>` };',
     );
@@ -59,7 +59,7 @@ describe('runtime helper imports follow the emitted code', () => {
     ['a when() over a bare signal read', 'return { template: html`<p ${when(show())}>a</p>` };'],
     ['a when() over an expression', 'return { template: html`<p ${when(!show())}>a</p>` };'],
     [
-      'a list whose rows are created in batches (A2-1)',
+      'a list whose rows are created in batches',
       'return { template: html`<ul>${repeat(items(), (it) => html`<li>${it.n}</li>`)}</ul>` };',
     ],
     ['a whenElse()', 'return { template: html`<div>${whenElse(show(), html`<b>y</b>`, html`<i>n</i>`)}</div>` };'],

@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 
 type ChildCounterProps = {
   label?: string;

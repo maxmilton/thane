@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html, repeat } from 'thane';
 import type { Signal } from 'thane';
 import type { AppStateProduct } from '../../models/app-state.models.js';
 import { ProductCard } from '../ProductCard/ProductCard.js';

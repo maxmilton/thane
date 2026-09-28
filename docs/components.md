@@ -7,7 +7,7 @@ Components are the building blocks of a Thane application. Each component is a f
 Use `defineComponent()` to create a component:
 
 ```typescript
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 
 export const MyButton = defineComponent(() => {
   return {
@@ -35,7 +35,7 @@ export const MyButton = defineComponent('custom-button', () => {
 Components accept typed props via the generic parameter:
 
 ```typescript
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 
 type GreeterProps = {
   name: string;
@@ -59,7 +59,7 @@ ${Greeter({ name: 'World' })}
 Props can be signals for reactive references. The child reads the signal and automatically updates when the parent changes it. A zero-argument call on a prop in a template, `props.count()`, is compiled as a signal read, so pass a signal (not a plain function) for any prop the template calls:
 
 ```typescript
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import type { Signal } from 'thane';
 
 type CounterDisplayProps = {
@@ -76,7 +76,7 @@ export const CounterDisplay = defineComponent<CounterDisplayProps>('counter-disp
 Parent component:
 
 ```typescript
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 import { CounterDisplay } from './counter-display.js';
 
 export const Parent = defineComponent(() => {

@@ -16,7 +16,7 @@ import type {
 } from './types.js';
 import { isSimpleBinding } from './types.js';
 import { ErrorCode } from '../../errors.js';
-import { processSubTemplateWithNesting } from './template-processing.js';
+import { processSubTemplateWithNesting, reportParseDiagnostics } from './template-processing.js';
 import {
   parseHtmlTemplate,
   walkElements,
@@ -27,8 +27,7 @@ import {
   extractSignalsFromExpression,
   type HtmlElement,
 } from '../../utils/html-parser/index.js';
-import ts from 'typescript';
-import { expressionReferencesIdentifier } from '../../utils/index.js';
+import { expressionReferencesIdentifier, replaceReferences } from '../../utils/index.js';
 import {
   collectConditionalBlocks,
   collectWhenElseBlocks,
@@ -46,52 +45,17 @@ import {
   type TemplateEdit,
 } from './template-utils.js';
 import type { Range } from '../../types.js';
-import { outsideVerbatim } from '../minification/template-minifier.js';
+import { condenseBetweenTags, outsideVerbatim } from '../minification/template-minifier.js';
 import { VOID } from './dom-model.js';
 
 /**
  * Whitespace before a row text marker whose other side is not a sibling (an element's end, a void
- * element, an anchor or another marker): the parent's start tag, a boundary or a comment (H-53).
+ * element, an anchor or another marker): the parent's start tag, a boundary or a comment.
  */
 const SPACE_BEFORE_MARKER_AFTER_NON_SIBLING = new RegExp(
   `(?<!<\\/[^<>]*|<(?:${[...VOID].join('|')})\\b[^<>]*|<!--[ib]\\d+[(|).]?--)>\\s+(?=<!--[ib]\\d+-->)`,
   'gi',
 );
-
-/**
- * `expr` with each reference to the variable `name` replaced by `replacement`. Everything else keeps
- * its text: printed again, a nested directive's html`` template would read `html \`…\``, which the
- * template parser takes for markup. A function inside that declares its own `name` shadows it there,
- * as in JavaScript.
- */
-const replaceReferences = (expr: string, name: string, replacement: string): string => {
-  const sf = ts.createSourceFile('__row.ts', `(${expr})`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const edits: [start: number, end: number, text: string][] = [];
-  const binds = (n: ts.BindingName): boolean =>
-    ts.isIdentifier(n) ? n.text === name : n.elements.some((e) => !ts.isOmittedExpression(e) && binds(e.name));
-  const isPropertyName = (node: ts.Identifier): boolean => {
-    const p = node.parent;
-    return (
-      ((ts.isPropertyAccessExpression(p) || ts.isPropertyAssignment(p) || ts.isMethodDeclaration(p)) &&
-        p.name === node) ||
-      ((ts.isGetAccessorDeclaration(p) || ts.isSetAccessorDeclaration(p)) && p.name === node) ||
-      (ts.isBindingElement(p) && p.propertyName === node)
-    );
-  };
-  const visit = (node: ts.Node): void => {
-    if (ts.isFunctionLike(node) && node.parameters.some((p) => binds(p.name))) return;
-    if (ts.isShorthandPropertyAssignment(node) && node.name.text === name) {
-      edits.push([node.name.end, node.name.end, `: ${replacement}`]);
-    } else if (ts.isIdentifier(node) && node.text === name && !isPropertyName(node)) {
-      edits.push([node.getStart(sf), node.end, replacement]);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
-  let out = `(${expr})`;
-  for (const [start, end, text] of edits.reverse()) out = out.slice(0, start) + text + out.slice(end);
-  return out.slice(1, -1);
-};
 
 /**
  * Inside a row, nested directives (when/whenElse/repeat) cannot close over the row factory's
@@ -170,7 +134,7 @@ export const generateStaticRepeatTemplate = (
   // Rows are cloned from one element and reconciled by that element, so a row template is
   // exactly one root element; anything else is reported rather than rendered another way.
   if (parsed.roots.length !== 1) {
-    // A row that is only directives is only their anchor comments (A1-3, A1-4).
+    // A row that is only directives is only their anchor comments.
     const onlyDirectives = parsed.roots.length === 0 && /<!--[ib]\d+[(|).]-->/.test(itemTemplate);
     throw new Error(
       `${ErrorCode.REPEAT_ROW_ROOT}: a repeat() row template must have exactly one root element` +
@@ -229,7 +193,7 @@ export const generateStaticRepeatTemplate = (
   }
 
   // A when() / whenElse() branch pre-rendered in the row is emitted exactly as its own template, which
-  // its initializer's paths are computed on (RW-2): it is set aside, by its opening anchor, while the
+  // its initializer's paths are computed on: it is set aside, by its opening anchor, while the
   // row's own markup is processed, and put back after.
   const branches = new Map<string, string>();
   let staticHtml = itemTemplate.replace(
@@ -251,21 +215,23 @@ export const generateStaticRepeatTemplate = (
   staticHtml = stripPropertyBoundAttributes(staticHtml, itemBindings);
 
   // The marks stay: the row's code finds its text markers, anchors and child hosts by them in the
-  // template as emitted, which is written without them (A1-4)
+  // template as emitted, which is written without them
 
-  // Aggressively strip whitespace BEFORE inserting comment marker placeholders.
+  // Strip whitespace BEFORE inserting comment marker placeholders.
+  // - Between two tags, condense it: gone when it holds a line break, one space when it does not,
+  //   as in component templates
   // - Collapse runs to single space
-  // - Remove all inter-element whitespace (><), except next to a text marker, where it is text: one
-  //   space stays between a binding and a sibling (an element or anchor after it, an element's end, a
-  //   void element or an anchor before it, another binding), as in component templates (H-52, H-53).
-  //   Between a binding and its parent's own tags it goes.
+  // - Next to a comment it goes, except next to a text marker, where it is text: one space stays
+  //   between a binding and a sibling (an element or anchor after it, an element's end, a void element
+  //   or an anchor before it, another binding), as in component templates. Between a binding and its
+  //   parent's own tags it goes.
   // - Strip trailing whitespace before > in opening tags (<a > → <a>)
   // Sole-content elements become empty (<td></td>) — the row creates their text node on fill.
-  // Verbatim elements (<pre>, <textarea>, …) keep their whitespace (H-03).
+  // Verbatim elements (<pre>, <textarea>, …) keep their whitespace.
   staticHtml = outsideVerbatim(staticHtml, (html) =>
-    html
+    condenseBetweenTags(html)
       .replace(/\s+/g, ' ')
-      .replace(/(?<!<!--[ib]\d+--)>\s+<(?!!--[ib]\d+-->)/g, '><')
+      .replace(/(?<=--)(?<!<!--[ib]\d+--)>\s+<(?!!--[ib]\d+-->)|(?<!--)>\s+<(?=!--)(?!!--[ib]\d+-->)/g, '><')
       .replace(/(<!--[ib]\d+-->)\s+(?=<(?![A-Za-z]|!--[ib]\d+[(|).]?-->))/g, '$1')
       .replace(SPACE_BEFORE_MARKER_AFTER_NON_SIBLING, '>')
       .replace(/\s+>/g, '>')
@@ -416,7 +382,7 @@ const soleContentParent = (
 
 /**
  * The signals a row expression reads other than the row's own item, index and row signals, found
- * the way component bindings find theirs (H-01): `it.name.toUpperCase()` reads none.
+ * the way component bindings find theirs: `it.name.toUpperCase()` reads none.
  */
 const outerSignalsOf = (expr: string, itemVar: string, indexVar: string | undefined): string[] =>
   extractSignalsFromExpression(expr).filter((name) => name !== itemVar && name !== `${itemVar}$` && name !== indexVar);
@@ -694,7 +660,8 @@ export const processItemTemplate = (
   nextId: number;
 } => {
   const parsed = parseHtmlTemplate(templateContent);
-  // The reconciler holds each row by its root element, which a when() would replace (H-47)
+  reportParseDiagnostics(parsed);
+  // The reconciler holds each row by its root element, which a when() would replace
   if (parsed.roots.some((root) => root.whenDirective !== undefined)) {
     throw new Error(
       `${ErrorCode.ROW_ROOT_WHEN}: a repeat() row's root element cannot carry when(); filter the list, or put when() on an inner element.`,
@@ -720,7 +687,7 @@ export const processItemTemplate = (
 
   // ── Nested directives read the row's item and index through row-scoped signals ──
   const rowRefs = createRowRefRewriter(itemVar, indexVar);
-  const processRowSubTemplate = (template: string, id: string) =>
+  const processRowSubTemplate = (template: string, id: string, report?: boolean) =>
     processSubTemplateWithNesting(
       rowRefs.html(template),
       signalInitializers,
@@ -728,6 +695,7 @@ export const processItemTemplate = (
       id,
       undefined,
       state.eventIdCounter,
+      report,
     );
 
   // ── Conditionals: compiled as sub-templates, like at component level ──
@@ -740,7 +708,7 @@ export const processItemTemplate = (
 
   // ── Directive ownership: a whenElse/repeat nested inside another directive of the row (a nested
   //    list, a whenElse branch, a when() element) belongs to that directive's processing, as at
-  //    component level (RW-6) ──
+  //    component level ──
   const ranges = collectDirectiveRanges(parsed);
   const isOwnedByNestedProcessing = (start: number, end: number): boolean =>
     isNestedInsideAny(start, end, ranges.repeat) ||
@@ -848,11 +816,12 @@ export const processItemTemplate = (
     const { start, end, expr, id, soleParent } = textMatch;
 
     if (soleParent) {
-      // For sole content: just output the expression (no wrapper)
-      // The parent element will get the ID
+      // For sole content: just output the expression (no wrapper), in place of the element's whole
+      // content: the row writes the element's text, so whitespace around the binding would only be
+      // a node every row clones. The parent element will get the ID
       edits.push({
-        start,
-        end,
+        start: soleParent.openTagEnd,
+        end: soleParent.closeTagStart,
         replacement: `\${${expr}}`,
       });
       parentElementIds.set(soleParent, id);

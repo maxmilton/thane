@@ -2,6 +2,14 @@
 
 Thane uses tagged template literals for HTML. At build time, the compiler transforms `html` templates into static `<template>` elements, then generates binding code that reaches the exact DOM nodes that need updating and subscribes them to their signals.
 
+`html`, `css` and the [directives](directives/README.md) are imported from `thane`:
+
+```typescript
+import { html, css, when, whenElse, repeat } from 'thane';
+```
+
+They exist only at build time: the compiler turns each use into DOM code, so none of them adds to the bundle. The compiler finds them by name, so import them under their own names ([THANE413](lint-rules.md#thane413--no-aliased-thane-import)). The examples below leave the imports out.
+
 ## Basic Template
 
 ```typescript
@@ -115,7 +123,7 @@ This injects the pre-built HTML fragment at that position.
 Compiled templates keep the text you write, with whitespace tidied the same way in development and production builds:
 
 - A run of spaces, tabs and newlines inside text becomes one space.
-- Whitespace-only text between two elements, and at the start or end of an element's content, is removed: `<b>x</b> <i>y</i>` renders as "xy". To keep such a space, put it inside one of the elements (`<b>x </b><i>y</i>`) or write it as `&#32;`.
+- Whitespace-only text between two tags is condensed, as Vue's `condense` rule does: when it holds a line break it is removed (that is the template's own formatting), and when it does not it stays as one space, so `<b>x</b> <i>y</i>` renders as "x y". Next to a list's or a directive's anchor it is always removed.
 - A space next to a text binding is kept, whether the binding's neighbour is text, another binding, an element or a directive: `<b>Name:</b> ${name()}` and `${count()} <small>items</small>` render with their space. At the edges of an element it is not kept reliably: a space after the last binding (`<b>${a()} </b>`) is removed, and one before the first binding is kept in component templates but removed in `repeat()` rows. Put such a space outside the element.
 - Inside `<pre>`, `<textarea>`, `<script>` and `<style>`, content is kept exactly as written.
 

@@ -70,10 +70,10 @@ interface SetupWithSelector<P = {}, S extends string = string> extends SetupFunc
   __selector: string;
 }
 
-/** @internal — A `<template>` holding `html`: every compiled template (component, list row, empty list) is one. */
-export const __T = (html: string): HTMLTemplateElement => {
+/** @internal — A `<template>` holding `markup`: every compiled template (component, list row, empty list) is one. */
+export const __T = (markup: string): HTMLTemplateElement => {
   const t = document.createElement('template');
-  t.innerHTML = html;
+  t.innerHTML = markup;
   return t;
 };
 

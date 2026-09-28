@@ -1,12 +1,12 @@
 /**
- * `.css` imports under Thane's own type check (PL-4 step 9, H-49). The type sync writes
+ * `.css` imports under Thane's own type check. The type sync writes
  * `.thane/types/client.d.ts`, and the check always adds `.thane/types/**` to the program, so a
  * project type-checks a `.css` import without naming `thane/client` anywhere.
  *
- * Until H-49 that file was a copy of the package's client.d.ts (`declare module '*.css'`). Any
+ * That file used to be a copy of the package's client.d.ts (`declare module '*.css'`). Any
  * other way of including the package file then put the declaration in the program twice, and the
  * check failed with TS2300 (duplicate identifier) unless the project set skipLibCheck: the
- * documented setup, `"types": ["thane/client"]` (docs/getting-started.md), and PL-4 step 9's
+ * documented setup, `"types": ["thane/client"]` (docs/getting-started.md), and a
  * `/// <reference path>` in the `thane` declarations. Now the generated file is one
  * `/// <reference path>` to the package's client.d.ts, so the declaration exists once.
  *
@@ -75,7 +75,7 @@ describe('.css imports under thane typecheck', () => {
     expect(await typecheck({ types: [] })).toEqual({ outcome: 'resolved', codes: [] });
   }, 60000);
 
-  test("H-49: the package's client.d.ts included by the tsconfig as well, without skipLibCheck", async () => {
+  test("the package's client.d.ts included by the tsconfig as well, without skipLibCheck", async () => {
     // What `"types": ["thane/client"]` does from an installed package: the same file, named once more.
     // Temp projects live one level below the repository root, where client.d.ts is.
     expect(await typecheck({ types: [] }, ['../client.d.ts'])).toEqual({ outcome: 'resolved', codes: [] });

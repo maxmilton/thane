@@ -14,7 +14,7 @@ export const App = defineComponent('test-app', () => {
     template: html\`<div>${markup}</div>\`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 const rowApp = (row: string): string => `
@@ -26,7 +26,7 @@ export const App = defineComponent('test-app', () => {
     template: html\`<ul>\${repeat(rows(), (item) => html\`${row}\`, null, (item) => item.id)}</ul>\`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 const componentTemplate = (js: string): string => js.match(/__tpl = __T\(`([^`]*)`\)/)?.[1] ?? '';

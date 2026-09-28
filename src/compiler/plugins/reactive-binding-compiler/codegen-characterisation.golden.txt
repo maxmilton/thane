@@ -46,12 +46,12 @@
 --- template
 <!--b0(--><div><button data-thane-ref="b1">A</button><!--b2--> <!----></div><!--b0)--><!--b3(--><!--b3)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
     const _ws_b0 = _ns[0].previousSibling;
     const _we_b0 = _ns[0].nextSibling;
     const _ws_b3 = _we_b0.nextSibling;
-    const _we_b3 = r.lastChild;
+    const _we_b3 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, show, `<div><button>A</button><!----> <!----></div>`, (_c) => {
       const b1 = _c.lastElementChild;
       const b2 = b1.nextSibling.nextSibling;
@@ -122,10 +122,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, outer, `<section><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></section>`, (_c) => {
       const _a_b8 = _c.lastChild.lastChild;
       const _ws_b1 = _c.firstChild;
@@ -139,18 +139,18 @@
       { const _subs = _rsubs_b8;
       const _tc_b8 = __tpl_b8.content.firstElementChild;
       const _ct_b8 = _a_b8.parentNode;
-      const _bind_b8 = (_el, item, _idx) => {
+      const _bind_b8 = (_el, it, _idx) => {
           const _e0 = _el;
           let _p0;
-          _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
-          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          _e0.textContent = (_p0 = it.name) ?? ''; let _t0;
+          return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, t0: undefined };
       };
-      const _update_b8 = (_m, item, _idx) => {
+      const _update_b8 = (_m, it, _idx) => {
         const _el = _m.el;
-        if (_m.p0 !== (_m.p0 = item.name)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+        if (_m.p0 !== (_m.p0 = it.name)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
       };
       const _rc_b8 = createKeyedReconciler(_ct_b8, _a_b8,
-        (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b8, true); const _m = _bind_b8(_el, item, _idx); _insertBefore.call(_ct_b8, _el, _ref); return _m; },
+        (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b8, true); const _m = _bind_b8(_el, it, _idx); _insertBefore.call(_ct_b8, _el, _ref); return _m; },
       (_, i) => i, __batchRows(16, _tc_b8, _bind_b8, _update_b8));
       const _items_b8 = () => list();
       _rc_b8.reconcile(_items_b8());
@@ -193,13 +193,13 @@
 --- template
 <!--b0(--><!--b0)--><!--b3(--><!--b3|--><!--b3)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling.previousSibling.previousSibling;
     const _we_b0 = _ws_b0.nextSibling;
     const _ws_b3 = _we_b0.nextSibling;
     const _wm_b3 = _ws_b3.nextSibling;
-    const _we_b3 = r.lastChild;
+    const _we_b3 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><b title=""><!----> <!----></b></div>`, (_c) => {
       const b1 = _c.lastElementChild;
       const b2 = b1.firstChild.nextSibling;
@@ -234,11 +234,11 @@
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling;
     const _wm_b0 = _ws_b0.nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [mode], () => mode(), `<div><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
       const _a_b8 = _c.lastChild.lastChild;
       const _ws_b2 = _c.firstChild;
@@ -252,26 +252,26 @@
       { const _subs = _rsubs_b8;
       const _tc_b8 = __tpl_b8.content.firstElementChild;
       const _ct_b8 = _a_b8.parentNode;
-      const _bind_b8 = (_el, item, _idx) => {
-          _el.__d = item;
+      const _bind_b8 = (_el, r, _idx) => {
+          _el.__d = r;
           const _e0 = _el;
           let _p0;
-          _e0.textContent = (_p0 = item.id) ?? ''; let _t0;
-          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          _e0.textContent = (_p0 = r.id) ?? ''; let _t0;
+          return { el: _el, cleanups: __nc, value: r, key: undefined, p0: _p0, t0: undefined };
       };
-      const _update_b8 = (_m, item, _idx) => {
+      const _update_b8 = (_m, r, _idx) => {
         const _el = _m.el;
-        if (_m.p0 !== (_m.p0 = item.id)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? ''); _el.__d = item;
+        if (_m.p0 !== (_m.p0 = r.id)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? ''); _el.__d = r;
       };
       const _rc_b8 = createKeyedReconciler(_ct_b8, _a_b8,
-        (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b8, true); const _m = _bind_b8(_el, item, _idx); _insertBefore.call(_ct_b8, _el, _ref); return _m; },
+        (r, _idx, _ref) => { const _el = _cloneNode.call(_tc_b8, true); const _m = _bind_b8(_el, r, _idx); _insertBefore.call(_ct_b8, _el, _ref); return _m; },
       (_, i) => i, __batchRows(16, _tc_b8, _bind_b8, _update_b8));
       const _items_b8 = () => rows();
       _rc_b8.reconcile(_items_b8());
       const _rsrc_b8_0 = rows;
       _subs.push(typeof _rsrc_b8_0?.subscribe === 'function' ? _rsrc_b8_0.subscribe(() => { _rc_b8.reconcile(_items_b8()); }, true) : () => {});
       _subs.push(() => _rc_b8.clearAll());
-      _ct_b8.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b8) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; pick(item); });
+      _ct_b8.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b8) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const r = _row.__d; pick(r); });
       }
       return [
         __bindIf(_ws_b2, _we_b2, deep, `<p><!----> <!----></p>`, (_c) => {
@@ -299,18 +299,18 @@
       { const _subs = _rsubs_b11;
       const _tc_b11 = __tpl_b11.content.firstElementChild;
       const _ct_b11 = _a_b11.parentNode;
-      const _bind_b11 = (_el, item, _idx) => {
+      const _bind_b11 = (_el, o, _idx) => {
           const _e0 = _el;
           let _p0;
-          _e0.textContent = (_p0 = item) ?? ''; let _t0;
-          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          _e0.textContent = (_p0 = o) ?? ''; let _t0;
+          return { el: _el, cleanups: __nc, value: o, key: undefined, p0: _p0, t0: undefined };
       };
-      const _update_b11 = (_m, item, _idx) => {
+      const _update_b11 = (_m, o, _idx) => {
         const _el = _m.el;
-        if (_m.p0 !== (_m.p0 = item)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+        if (_m.p0 !== (_m.p0 = o)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
       };
       const _rc_b11 = createKeyedReconciler(_ct_b11, _a_b11,
-        (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b11, true); const _m = _bind_b11(_el, item, _idx); _insertBefore.call(_ct_b11, _el, _ref); return _m; },
+        (o, _idx, _ref) => { const _el = _cloneNode.call(_tc_b11, true); const _m = _bind_b11(_el, o, _idx); _insertBefore.call(_ct_b11, _el, _ref); return _m; },
       (_, i) => i, __batchRows(16, _tc_b11, _bind_b11, _update_b11));
       const _items_b11 = () => others();
       let _empty_b11;
@@ -335,10 +335,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
       const _ws_b1 = _c.firstChild;
       const _wm_b1 = _ws_b1.nextSibling;
@@ -374,10 +374,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
       const _ws_b1 = _c.firstChild;
       const _wm_b1 = _ws_b1.nextSibling;
@@ -400,10 +400,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><ul><!----></ul></div>`, (_c) => {
       const _a_b1 = _c.lastChild.lastChild;
       const _rsubs_b1 = [];
@@ -411,7 +411,7 @@
       const _tc_b1 = __tpl_b1.content.firstElementChild;
       const _ct_b1 = _a_b1.parentNode;
       const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
-        (item, _idx, _ref) => {
+        (x, _idx, _ref) => {
           const _el = _cloneNode.call(_tc_b1, true);
           const _ws_b2 = _el.firstChild;
           const _we_b2 = _el.lastChild;
@@ -425,8 +425,8 @@
         lbl.subscribe(v => { b3.data = v ?? ''; }, true),
       ];
     }));
-          return { el: _el, cleanups: _cleanups, value: item,
-            update: (item) => { ; } };
+          return { el: _el, cleanups: _cleanups, value: x,
+            update: (x) => { ; } };
         },
       (_, i) => i);
       const _items_b1 = () => xs();
@@ -448,11 +448,11 @@
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling;
     const _wm_b0 = _ws_b0.nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [a], () => a(), `<ul><!----></ul>`, (_c) => {
       const _a_b2 = _c.lastChild;
       const _rsubs_b2 = [];
@@ -460,19 +460,19 @@
       const _tc_b2 = __tpl_b2.content.firstElementChild;
       const _ct_b2 = _a_b2.parentNode;
       const _rc_b2 = createKeyedReconciler(_ct_b2, _a_b2,
-        (item, _idx, _ref) => {
+        (x, _idx, _ref) => {
           const _el = _cloneNode.call(_tc_b2, true);
           const _c0 = _el.firstChild.nextSibling;
           const _st0 = _el.lastChild.previousSibling;
           let _p0;
           ;
-          _c0.data = (_p0 = item) ?? '';
+          _c0.data = (_p0 = x) ?? '';
           _st0.data = sig() ?? '';
           _insertBefore.call(_ct_b2, _el, _ref);
           const _cleanups = [];
           _cleanups.push(sig.subscribe(() => { _st0.data = sig() ?? ''; }, true));
-          return { el: _el, cleanups: _cleanups, value: item,
-            update: (item) => { if (_p0 !== (_p0 = item)) _c0.data = (_p0) ?? ''; } };
+          return { el: _el, cleanups: _cleanups, value: x,
+            update: (x) => { if (_p0 !== (_p0 = x)) _c0.data = (_p0) ?? ''; } };
         },
       (_, i) => i);
       const _items_b2 = () => xs();
@@ -495,13 +495,13 @@
 --- template
 <!--b0(--><!--b0)--><ul><!--b12.--></ul><!--b9(--><!--b9|--><!--b9)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
     const _ws_b0 = _ns[0].previousSibling.previousSibling;
     const _we_b0 = _ws_b0.nextSibling;
     const _ws_b9 = _ns[0].nextSibling;
     const _wm_b9 = _ws_b9.nextSibling;
-    const _we_b9 = r.lastChild;
+    const _we_b9 = _r.lastChild;
     const _a_b12 = _ns[0].lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><button>1</button><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
       const b8 = _c.firstElementChild;
@@ -515,7 +515,7 @@
       const _tc_b5 = __tpl_b5.content.firstElementChild;
       const _ct_b5 = _a_b5.parentNode;
       const _rc_b5 = createKeyedReconciler(_ct_b5, _a_b5,
-        (item, _idx, _ref) => {
+        (x, _idx, _ref) => {
           const _el = _cloneNode.call(_tc_b5, true);
           const _ws_b6 = _el.firstChild;
           const _we_b6 = _el.lastChild;
@@ -528,8 +528,8 @@
       return [
       ];
     }));
-          return { el: _el, cleanups: _cleanups, value: item,
-            update: (item) => { ; } };
+          return { el: _el, cleanups: _cleanups, value: x,
+            update: (x) => { ; } };
         },
       (_, i) => i);
       const _items_b5 = () => xs();
@@ -564,7 +564,7 @@
     const _tc_b12 = __tpl_b12.content.firstElementChild;
     const _ct_b12 = _a_b12.parentNode;
     const _rc_b12 = createKeyedReconciler(_ct_b12, _a_b12,
-      (item, _idx, _ref) => {
+      (y, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b12, true);
         const _ws_b13 = _el.firstChild;
         const _we_b13 = _el.lastChild;
@@ -577,8 +577,8 @@
       return [
       ];
     }));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { ; } };
+        return { el: _el, cleanups: _cleanups, value: y,
+          update: (y) => { ; } };
       },
     (_, i) => i);
     const _items_b12 = () => ys();
@@ -596,10 +596,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
       const _ws_b1 = _c.firstChild;
       const _wm_b1 = _ws_b1.nextSibling;
@@ -611,18 +611,18 @@
       { const _subs = _rsubs_b3;
       const _tc_b3 = __tpl_b3.content.firstElementChild;
       const _ct_b3 = _a_b3.parentNode;
-      const _bind_b3 = (_el, item, _idx) => {
+      const _bind_b3 = (_el, x, _idx) => {
           const _e0 = _el;
           let _p0;
-          _e0.textContent = (_p0 = item) ?? ''; let _t0;
-          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          _e0.textContent = (_p0 = x) ?? ''; let _t0;
+          return { el: _el, cleanups: __nc, value: x, key: undefined, p0: _p0, t0: undefined };
       };
-      const _update_b3 = (_m, item, _idx) => {
+      const _update_b3 = (_m, x, _idx) => {
         const _el = _m.el;
-        if (_m.p0 !== (_m.p0 = item)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+        if (_m.p0 !== (_m.p0 = x)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
       };
       const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
-        (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, item, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
+        (x, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, x, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
       (_, i) => i, __batchRows(16, _tc_b3, _bind_b3, _update_b3));
       const _items_b3 = () => xs();
       _rc_b3.reconcile(_items_b3());
@@ -646,11 +646,11 @@
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling;
     const _wm_b0 = _ws_b0.nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [b], () => b(), `<div><!----><!----></div>`, (_c) => {
       const _ws_b2 = _c.firstChild;
       const _we_b2 = _c.lastChild;
@@ -661,18 +661,18 @@
       { const _subs = _rsubs_b3;
       const _tc_b3 = __tpl_b3.content.firstElementChild;
       const _ct_b3 = _a_b3.parentNode;
-      const _bind_b3 = (_el, item, _idx) => {
+      const _bind_b3 = (_el, x, _idx) => {
           const _e0 = _el;
           let _p0;
-          _e0.textContent = (_p0 = item) ?? ''; let _t0;
-          return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+          _e0.textContent = (_p0 = x) ?? ''; let _t0;
+          return { el: _el, cleanups: __nc, value: x, key: undefined, p0: _p0, t0: undefined };
       };
-      const _update_b3 = (_m, item, _idx) => {
+      const _update_b3 = (_m, x, _idx) => {
         const _el = _m.el;
-        if (_m.p0 !== (_m.p0 = item)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+        if (_m.p0 !== (_m.p0 = x)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
       };
       const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
-        (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, item, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
+        (x, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, x, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
       (_, i) => i, __batchRows(16, _tc_b3, _bind_b3, _update_b3));
       const _items_b3 = () => xs();
       _rc_b3.reconcile(_items_b3());
@@ -696,10 +696,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><!----><!----><!----></div>`, (_c) => {
       const _ws_b1 = _c.firstChild;
       const _wm_b1 = _ws_b1.nextSibling;
@@ -726,10 +726,10 @@
     const _a_b0 = _ns[0].lastChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = document.createElement('div');
         _insertBefore.call(_ct_b0, _el, _ref);
-        return { el: _el, cleanups: [__dc(Card.__f(_el, { item: item }))], value: item, update: () => {} };
+        return { el: _el, cleanups: [__dc(Card.__f(_el, { item: it }))], value: it, update: () => {} };
       },
     'id');
     const _items_b0 = () => items();
@@ -749,10 +749,10 @@
     const _a_b0 = _ns[0].lastChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, n, _ref) => {
+      (it, n, _ref) => {
         const _el = document.createElement('div');
         _insertBefore.call(_ct_b0, _el, _ref);
-        return { el: _el, cleanups: [__dc(Card.__f(_el, { item: item, n }))], value: item, update: () => {} };
+        return { el: _el, cleanups: [__dc(Card.__f(_el, { item: it, n }))], value: it, update: () => {} };
       },
     (it) => it.a + it.b);
     const _items_b0 = () => items();
@@ -775,10 +775,10 @@
     const _a_b0 = _ns[0].lastChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = document.createElement('div');
         _insertBefore.call(_ct_b0, _el, _ref);
-        return { el: _el, cleanups: [__dc(Card.__f(_el, { it: item }))], value: item, update: () => {} };
+        return { el: _el, cleanups: [__dc(Card.__f(_el, { it }))], value: it, update: () => {} };
       },
     (_, i) => i);
     const _items_b0 = () => items().filter((x) => x.on === flag());
@@ -800,18 +800,18 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
-    const _bind_b0 = (_el, item, _idx) => {
+    const _bind_b0 = (_el, it, _idx) => {
         const _e0 = _el;
         let _p0;
-        _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+        _e0.textContent = (_p0 = it.label) ?? ''; let _t0;
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, t0: undefined };
     };
-    const _update_b0 = (_m, item, _idx) => {
+    const _update_b0 = (_m, it, _idx) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+      if (_m.p0 !== (_m.p0 = it.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
+      (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, it, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
     (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     let _empty_b0;
@@ -834,18 +834,18 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
-    const _bind_b0 = (_el, item, _idx) => {
+    const _bind_b0 = (_el, it, _idx) => {
         const _e0 = _el;
         let _p0;
-        _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+        _e0.textContent = (_p0 = it.label) ?? ''; let _t0;
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, t0: undefined };
     };
-    const _update_b0 = (_m, item, _idx) => {
+    const _update_b0 = (_m, it, _idx) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+      if (_m.p0 !== (_m.p0 = it.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
+      (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, it, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
     'id', __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items().filter((x) => x.on === flag());
     let _empty_b0;
@@ -870,18 +870,18 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
-    const _bind_b0 = (_el, item, _idx) => {
+    const _bind_b0 = (_el, it, _idx) => {
         const _e0 = _el;
         let _p0, _p1;
-        _e0.textContent = (_p0 = item.label) ?? ''; let _t0; if ((_p1 = item.t) !== '') _e0.setAttribute('title', _p1);
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, t0: undefined };
+        _e0.textContent = (_p0 = it.label) ?? ''; let _t0; if ((_p1 = it.t) !== '') _e0.setAttribute('title', _p1);
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, p1: _p1, t0: undefined };
     };
-    const _update_b0 = (_m, item, _idx) => {
+    const _update_b0 = (_m, it, _idx) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? ''); if (_m.p1 !== (_m.p1 = item.t)) _el.setAttribute('title', _m.p1);
+      if (_m.p0 !== (_m.p0 = it.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? ''); if (_m.p1 !== (_m.p1 = it.t)) _el.setAttribute('title', _m.p1);
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
+      (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, it, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
     (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => store.items();
     _rc_b0.reconcile(_items_b0());
@@ -902,10 +902,10 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         _insertBefore.call(_ct_b0, _el, _ref);
-        return { el: _el, cleanups: [], value: item, update: () => {} };
+        return { el: _el, cleanups: [], value: it, update: () => {} };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -927,10 +927,10 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         _insertBefore.call(_ct_b0, _el, _ref);
-        return { el: _el, cleanups: [], value: item, update: () => {} };
+        return { el: _el, cleanups: [], value: it, update: () => {} };
       },
     'id');
     const _items_b0 = () => items();
@@ -955,10 +955,10 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         _insertBefore.call(_ct_b0, _el, _ref);
-        return { el: _el, cleanups: [], value: item, update: () => {} };
+        return { el: _el, cleanups: [], value: it, update: () => {} };
       },
     (it) => it.k + 1);
     const _items_b0 = () => items().slice(n());
@@ -982,11 +982,11 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, i, _ref) => {
+      (it, i, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _cm0 = _el.lastElementChild;
         _insertBefore.call(_ct_b0, _el, _ref);
-        return { el: _el, cleanups: [__dc(Kid.__f(_cm0, { label: item.name, i }))], value: item, update: () => {} };
+        return { el: _el, cleanups: [__dc(Kid.__f(_cm0, { label: it.name, i }))], value: it, update: () => {} };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1008,11 +1008,11 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _cm0 = _el.lastElementChild;
         _insertBefore.call(_ct_b0, _el, _ref);
-        return { el: _el, cleanups: [__dc(Kid.__f(_cm0, { it: item }))], value: item, update: () => {} };
+        return { el: _el, cleanups: [__dc(Kid.__f(_cm0, { it }))], value: it, update: () => {} };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1037,19 +1037,19 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
         const _cm0 = _el.firstElementChild.nextElementSibling;
         const _cm1 = _el.lastElementChild;
         let _p0;
-        _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
+        _e0.textContent = (_p0 = it.name) ?? ''; let _t0;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        _cleanups.push(__dc(Kid.__f(_cm0, { it: item })));
+        _cleanups.push(__dc(Kid.__f(_cm0, { it })));
         _cleanups.push(__dc(Other.__f(_cm1, {})));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.name)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it) => { if (_p0 !== (_p0 = it.name)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1066,10 +1066,10 @@
 --- template
 <!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling;
-    const _we_b0 = r.lastChild;
+    const _ws_b0 = _r.lastChild.previousSibling;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><x-kid></x-kid><b><!----> <!----></b></div>`, (_c) => {
       const _cm0 = _c.firstElementChild;
       const b1 = _c.lastChild.firstChild.nextSibling;
@@ -1106,11 +1106,11 @@
 --- template
 <!--b0(--><!--b0|--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
-    const _ws_b0 = r.lastChild.previousSibling.previousSibling;
+    const _ws_b0 = _r.lastChild.previousSibling.previousSibling;
     const _wm_b0 = _ws_b0.nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [a], () => a(), `<div><x-kid></x-kid></div>`, (_c) => {
       const _cm0 = _c.lastElementChild;
       return [
@@ -1129,20 +1129,20 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
-    const _bind_b0 = (_el, item, _idx) => {
+    const _bind_b0 = (_el, it, _idx) => {
         const _e0 = _el;
         const _e1 = _e0.firstElementChild;
         const _e2 = _e1.nextElementSibling;
         let _p0, _p1, _p2, _p3;
-        if ((_p0 = item.cls) !== '') _e0.className = _p0; if ((_p1 = item.id) !== '') _e0.setAttribute('data-id', _p1); _e1.textContent = (_p2 = item.label) ?? ''; let _t0; _e2.textContent = (_p3 = item.n) ?? ''; let _t1;
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, p3: _p3, t0: undefined, t1: undefined };
+        if ((_p0 = it.cls) !== '') _e0.className = _p0; if ((_p1 = it.id) !== '') _e0.setAttribute('data-id', _p1); _e1.textContent = (_p2 = it.label) ?? ''; let _t0; _e2.textContent = (_p3 = it.n) ?? ''; let _t1;
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, p1: _p1, p2: _p2, p3: _p3, t0: undefined, t1: undefined };
     };
-    const _update_b0 = (_m, item, _idx) => {
+    const _update_b0 = (_m, it, _idx) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.cls)) _el.className = _m.p0; if (_m.p1 !== (_m.p1 = item.id)) _el.setAttribute('data-id', _m.p1); if (_m.p2 !== (_m.p2 = item.label)) (_m.t0 ??= _el.firstElementChild.firstChild) ? (_m.t0.nodeValue = _m.p2 ?? '') : (_el.firstElementChild.textContent = _m.p2 ?? ''); if (_m.p3 !== (_m.p3 = item.n)) (_m.t1 ??= _el.firstElementChild.nextElementSibling.firstChild) ? (_m.t1.nodeValue = _m.p3 ?? '') : (_el.firstElementChild.nextElementSibling.textContent = _m.p3 ?? '');
+      if (_m.p0 !== (_m.p0 = it.cls)) _el.className = _m.p0; if (_m.p1 !== (_m.p1 = it.id)) _el.setAttribute('data-id', _m.p1); if (_m.p2 !== (_m.p2 = it.label)) (_m.t0 ??= _el.firstElementChild.firstChild) ? (_m.t0.nodeValue = _m.p2 ?? '') : (_el.firstElementChild.textContent = _m.p2 ?? ''); if (_m.p3 !== (_m.p3 = it.n)) (_m.t1 ??= _el.firstElementChild.nextElementSibling.firstChild) ? (_m.t1.nodeValue = _m.p3 ?? '') : (_el.firstElementChild.nextElementSibling.textContent = _m.p3 ?? '');
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
+      (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, it, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
     'id', __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
@@ -1162,21 +1162,21 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
-    const _bind_b0 = (_el, item, _idx) => {
+    const _bind_b0 = (_el, it, _idx) => {
         const _e0 = _el.firstElementChild;
         const _c0 = _el.firstChild.nextSibling;
         const _c1 = _c0.nextSibling.nextSibling.nextSibling.nextSibling;
         let _p0, _p1, _p2;
-        _e0.textContent = (_p0 = item.c) ?? ''; let _t0;
-        _c0.data = (_p1 = item.a) ?? ''; _c1.data = (_p2 = item.b) ?? '';
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, t0: undefined, c0: _c0, c1: _c1 };
+        _e0.textContent = (_p0 = it.c) ?? ''; let _t0;
+        _c0.data = (_p1 = it.a) ?? ''; _c1.data = (_p2 = it.b) ?? '';
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, p1: _p1, p2: _p2, t0: undefined, c0: _c0, c1: _c1 };
     };
-    const _update_b0 = (_m, item, _idx) => {
+    const _update_b0 = (_m, it, _idx) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.c)) (_m.t0 ??= _el.firstElementChild.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.firstElementChild.textContent = _m.p0 ?? ''); if (_m.p1 !== (_m.p1 = item.a)) _m.c0.data = (_m.p1) ?? ''; if (_m.p2 !== (_m.p2 = item.b)) _m.c1.data = (_m.p2) ?? '';
+      if (_m.p0 !== (_m.p0 = it.c)) (_m.t0 ??= _el.firstElementChild.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.firstElementChild.textContent = _m.p0 ?? ''); if (_m.p1 !== (_m.p1 = it.a)) _m.c0.data = (_m.p1) ?? ''; if (_m.p2 !== (_m.p2 = it.b)) _m.c1.data = (_m.p2) ?? '';
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
+      (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, it, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
     (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
@@ -1196,28 +1196,28 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
-    const _bind_b0 = (_el, item, i) => {
-        _el.__d = item;
+    const _bind_b0 = (_el, it, i) => {
+        _el.__d = it;
         const _e0 = _el.firstElementChild;
         let _p0;
-        _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
-        _e0.addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; open(item.id); });
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+        _e0.textContent = (_p0 = it.label) ?? ''; let _t0;
+        _e0.addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; open(it.id); });
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, t0: undefined };
     };
-    const _update_b0 = (_m, item, i) => {
+    const _update_b0 = (_m, it, i) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.label)) (_m.t0 ??= _el.firstElementChild.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.firstElementChild.textContent = _m.p0 ?? ''); _el.__d = item;
+      if (_m.p0 !== (_m.p0 = it.label)) (_m.t0 ??= _el.firstElementChild.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.firstElementChild.textContent = _m.p0 ?? ''); _el.__d = it;
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, i, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, i); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
+      (it, i, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, it, i); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
     (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     _subs.push(() => _rc_b0.clearAll());
-    _ct_b0.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; pick(item); if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling) { e.stopPropagation(); remove(e); return; } });
-    _ct_b0.addEventListener('keydown', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling.nextElementSibling) { if (e.key !== 'Enter') return; save(item, i, e); return; } });
+    _ct_b0.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const it = _row.__d; pick(it); if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling) { e.stopPropagation(); remove(e); return; } });
+    _ct_b0.addEventListener('keydown', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const it = _row.__d; if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling.nextElementSibling) { if (e.key !== 'Enter') return; save(it, i, e); return; } });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
@@ -1231,19 +1231,19 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
-    const _bind_b0 = (_el, item, _idx) => {
+    const _bind_b0 = (_el, it, _idx) => {
         const _ev0 = _el.firstElementChild;
         const _ev1 = _el.firstElementChild.nextElementSibling;
         ;
-        _ev0.addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; open(item); }); _ev1.addEventListener('keydown', (e) => { if (e.target !== e.currentTarget) return; if (e.key !== 'Enter') return; { const ev = e; key(ev, item); }; });
-        return { el: _el, cleanups: __nc, value: item, key: undefined };
+        _ev0.addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; open(it); }); _ev1.addEventListener('keydown', (e) => { if (e.target !== e.currentTarget) return; if (e.key !== 'Enter') return; { const ev = e; key(ev, it); }; });
+        return { el: _el, cleanups: __nc, value: it, key: undefined };
     };
-    const _update_b0 = (_m, item, _idx) => {
+    const _update_b0 = (_m, it, _idx) => {
       const _el = _m.el;
       ;
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
+      (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, it, _idx); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
     (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0));
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
@@ -1263,21 +1263,21 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
-    const _bind_b0 = (_el, item, i) => {
+    const _bind_b0 = (_el, it, i) => {
         const _e0 = _el;
         const _c0 = _el.firstChild.nextSibling;
         const _c1 = _el.lastChild.previousSibling;
         let _p0, _p1, _p2;
         if ((_p0 = i) !== '') _e0.setAttribute('data-i', _p0);
-        _c0.data = (_p1 = i) ?? ''; _c1.data = (_p2 = item) ?? '';
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, p2: _p2, c0: _c0, c1: _c1 };
+        _c0.data = (_p1 = i) ?? ''; _c1.data = (_p2 = it) ?? '';
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, p1: _p1, p2: _p2, c0: _c0, c1: _c1 };
     };
-    const _update_b0 = (_m, item, i) => {
+    const _update_b0 = (_m, it, i) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = i)) _el.setAttribute('data-i', _m.p0); if (_m.p1 !== (_m.p1 = i)) _m.c0.data = (_m.p1) ?? ''; if (_m.p2 !== (_m.p2 = item)) _m.c1.data = (_m.p2) ?? '';
+      if (_m.p0 !== (_m.p0 = i)) _el.setAttribute('data-i', _m.p0); if (_m.p1 !== (_m.p1 = i)) _m.c0.data = (_m.p1) ?? ''; if (_m.p2 !== (_m.p2 = it)) _m.c1.data = (_m.p2) ?? '';
     };
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, i, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, item, i); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
+      (it, i, _ref) => { const _el = _cloneNode.call(_tc_b0, true); const _m = _bind_b0(_el, it, i); _insertBefore.call(_ct_b0, _el, _ref); return _m; },
     (_, i) => i, __batchRows(16, _tc_b0, _bind_b0, _update_b0), true);
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
@@ -1298,7 +1298,7 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild.nextElementSibling;
         const _m0 = _el.firstElementChild;
@@ -1306,15 +1306,15 @@
         const _m2 = _e0;
         const _m3 = _e0;
         let _p0, _p1, _p2, _p3, _p4;
-        _e0.textContent = (_p0 = item.x) ?? ''; let _t0;
-        _m0.textContent = (_p1 = item.label + suffix()) ?? ''; if ((_p2 = sel() === item.id ? 'on' : '') !== '') _m1.className = _p2; if ((_p3 = item.t + sep()) !== '') _m2.setAttribute('title', _p3); _m3.style.cssText = _p4 = `width: ${item.w + unit()}`;
+        _e0.textContent = (_p0 = it.x) ?? ''; let _t0;
+        _m0.textContent = (_p1 = it.label + suffix()) ?? ''; if ((_p2 = sel() === it.id ? 'on' : '') !== '') _m1.className = _p2; if ((_p3 = it.t + sep()) !== '') _m2.setAttribute('title', _p3); _m3.style.cssText = _p4 = `width: ${it.w + unit()}`;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        _cleanups.push(suffix.subscribe(() => { if (_p1 !== (_p1 = item.label + suffix())) _m0.textContent = (_p1) ?? ''; }, true));
-        _cleanups.push(sep.subscribe(() => { if (_p3 !== (_p3 = item.t + sep())) _m2.setAttribute('title', _p3); }, true));
-        _cleanups.push(unit.subscribe(() => { if (_p4 !== (_p4 = `width: ${item.w + unit()}`)) _m3.style.cssText = _p4; }, true));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); if (_p1 !== (_p1 = item.label + suffix())) _m0.textContent = (_p1) ?? ''; if (_p3 !== (_p3 = item.t + sep())) _m2.setAttribute('title', _p3); if (_p4 !== (_p4 = `width: ${item.w + unit()}`)) _m3.style.cssText = _p4; } };
+        _cleanups.push(suffix.subscribe(() => { if (_p1 !== (_p1 = it.label + suffix())) _m0.textContent = (_p1) ?? ''; }, true));
+        _cleanups.push(sep.subscribe(() => { if (_p3 !== (_p3 = it.t + sep())) _m2.setAttribute('title', _p3); }, true));
+        _cleanups.push(unit.subscribe(() => { if (_p4 !== (_p4 = `width: ${it.w + unit()}`)) _m3.style.cssText = _p4; }, true));
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it) => { if (_p0 !== (_p0 = it.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); if (_p1 !== (_p1 = it.label + suffix())) _m0.textContent = (_p1) ?? ''; if (_p3 !== (_p3 = it.t + sep())) _m2.setAttribute('title', _p3); if (_p4 !== (_p4 = `width: ${it.w + unit()}`)) _m3.style.cssText = _p4; } };
       },
     'id');
     let _sel_b0_1 = sel(); _subs.push(sel.subscribe((_v) => { const _o = _rc_b0.get(_sel_b0_1); if (_o) _o.el.className = ''; const _n = _rc_b0.get(_v); if (_n) _n.el.className = 'on'; _sel_b0_1 = _v; }, true));
@@ -1337,7 +1337,7 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
         const _c0 = _el.firstChild.nextSibling.nextSibling.nextSibling;
@@ -1345,16 +1345,16 @@
         const _s0 = _el;
         const _s1 = _el;
         let _p0, _p1;
-        _e0.textContent = (_p0 = item.x) ?? ''; let _t0;
-        _c0.data = (_p1 = item.y) ?? '';
+        _e0.textContent = (_p0 = it.x) ?? ''; let _t0;
+        _c0.data = (_p1 = it.y) ?? '';
         _s0.setAttribute('title', tip()); _s1.style.setProperty('color', col()); _st0.data = sel() ?? '';
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         _cleanups.push(tip.subscribe(() => { _s0.setAttribute('title', tip()); }, true));
         _cleanups.push(col.subscribe(() => { _s1.style.setProperty('color', col()); }, true));
         _cleanups.push(sel.subscribe(() => { _st0.data = sel() ?? ''; }, true));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); if (_p1 !== (_p1 = item.y)) _c0.data = (_p1) ?? ''; } };
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it) => { if (_p0 !== (_p0 = it.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); if (_p1 !== (_p1 = it.y)) _c0.data = (_p1) ?? ''; } };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1376,20 +1376,20 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
         const _st0 = _el.lastElementChild.firstChild.nextSibling;
         const _st1 = _el.lastChild.previousSibling;
         let _p0;
-        _e0.textContent = (_p0 = item.x) ?? ''; let _t0;
+        _e0.textContent = (_p0 = it.x) ?? ''; let _t0;
         _st0.data = sel() ?? ''; _st1.data = other() ?? '';
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         _cleanups.push(sel.subscribe(() => { _st0.data = sel() ?? ''; }, true));
         _cleanups.push(other.subscribe(() => { _st1.data = other() ?? ''; }, true));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it) => { if (_p0 !== (_p0 = it.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1411,7 +1411,7 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
         const _st0 = _el.lastChild.firstChild.nextSibling;
@@ -1419,7 +1419,7 @@
         const _s0 = _el;
         const _s1 = _el;
         let _p0;
-        _e0.textContent = (_p0 = item.x) ?? ''; let _t0;
+        _e0.textContent = (_p0 = it.x) ?? ''; let _t0;
         _s0.setAttribute('title', `${a()}-${b()}`); _s1.style.setProperty('height', `${h() + 1}px`); _st0.data = user().name ?? ''; _st1.data = a() + b() ?? '';
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
@@ -1429,8 +1429,8 @@
         _cleanups.push(user.subscribe(() => { _st0.data = user().name ?? ''; }, true));
         _cleanups.push(a.subscribe(() => { _st1.data = a() + b() ?? ''; }, true));
         _cleanups.push(b.subscribe(() => { _st1.data = a() + b() ?? ''; }, true));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it) => { if (_p0 !== (_p0 = it.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1452,20 +1452,20 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el;
         const _s0 = _el;
         const _s1 = _el;
         let _p0;
-        _e0.textContent = (_p0 = item.x) ?? ''; let _t0;
+        _e0.textContent = (_p0 = it.x) ?? ''; let _t0;
         _s0.setAttribute('class', cls()); _s1.style.setProperty('top', top());
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         _cleanups.push(cls.subscribe(() => { _s0.setAttribute('class', cls()); }, true));
         _cleanups.push(top.subscribe(() => { _s1.style.setProperty('top', top()); }, true));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it) => { if (_p0 !== (_p0 = it.x)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1487,9 +1487,9 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, i, _ref) => {
+      (it, i, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
-        const it$ = __sig(item);
+        const it$ = __sig(it);
         const i$ = __sig(i);
         const _ws_b1 = _el.firstChild;
         const _we_b1 = _ws_b1.nextSibling;
@@ -1540,8 +1540,8 @@
         i$.subscribe(_upd_b10_0, true),
       ];
     }));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item, i) => { it$(item); i$(i); } };
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it, i) => { it$(it); i$(i); } };
       },
     (_, i) => i, undefined, true);
     const _items_b0 = () => items();
@@ -1563,12 +1563,12 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
-        _el.__d = item;
+        _el.__d = it;
         _el.__e0 = _el.firstElementChild;
         _el.__e1 = _el.firstElementChild.nextElementSibling;
-        const it$ = __sig(item);
+        const it$ = __sig(it);
         const _ws_b1 = _el.firstChild;
         const _we_b1 = _ws_b1.nextSibling;
         const _ws_b2 = _we_b1.nextSibling;
@@ -1577,15 +1577,15 @@
         const _m0 = _el.firstElementChild.nextElementSibling;
         let _p0;
         ;
-        if ((_p0 = sel() === item.id ? 'on' : '') !== '') _m0.className = _p0;
+        if ((_p0 = sel() === it.id ? 'on' : '') !== '') _m0.className = _p0;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        _cleanups.push(sel.subscribe(() => { if (_p0 !== (_p0 = sel() === item.id ? 'on' : '')) _m0.className = _p0; }, true));
+        _cleanups.push(sel.subscribe(() => { if (_p0 !== (_p0 = sel() === it.id ? 'on' : '')) _m0.className = _p0; }, true));
         _cleanups.push(__bindIfExpr(_ws_b1, _we_b1, [it$], () => it$().on, `<b>b</b>`, () => []));
         _cleanups.push(__bindIfExpr(_ws_b2, _wm_b2, [it$], () => it$().done, `<s>s</s>`, () => []));
         _cleanups.push(__bindIfExpr(_wm_b2, _we_b2, [it$], () => !(it$().done), `<u>u</u>`, () => []));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = sel() === item.id ? 'on' : '')) _m0.className = _p0; _el.__d = item; it$(item); } };
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it) => { if (_p0 !== (_p0 = sel() === it.id ? 'on' : '')) _m0.className = _p0; _el.__d = it; it$(it); } };
       },
     'id');
     const _items_b0 = () => items();
@@ -1593,7 +1593,7 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     _subs.push(() => _rc_b0.clearAll());
-    _ct_b0.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; if (_row.__e0.contains(e.target)) { go(item.id); return; } if (_row.__e1.contains(e.target)) { go(e); return; } });
+    _ct_b0.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const it = _row.__d; if (_row.__e0.contains(e.target)) { go(it.id); return; } if (_row.__e1.contains(e.target)) { go(e); return; } });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
@@ -1608,7 +1608,7 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _ws_b1 = _el.firstChild;
         const _we_b1 = _el.lastChild;
@@ -1629,8 +1629,8 @@
     }, true),
       ];
     }));
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { ; } };
+        return { el: _el, cleanups: _cleanups, value: it,
+          update: (it) => { ; } };
       },
     (_, i) => i);
     const _items_b0 = () => items();
@@ -1652,19 +1652,19 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (g, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
-        const g$ = __sig(item);
+        const g$ = __sig(g);
         const _e0 = _el.firstElementChild;
         const _a_b1 = _el.lastChild.lastChild;
         let _p0;
-        _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
+        _e0.textContent = (_p0 = g.name) ?? ''; let _t0;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         const _tc_b1 = __tpl_b1.content.firstElementChild;
         const _ct_b1 = _a_b1.parentNode;
         const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
-          (item, _idx, _ref) => {
+          (it, _idx, _ref) => {
             const _el = _cloneNode.call(_tc_b1, true);
             const _e0 = _el;
             const _e1 = _e0.firstElementChild;
@@ -1673,16 +1673,16 @@
             const _s0 = _el.firstElementChild.nextElementSibling;
             const _s1 = _el.firstElementChild.nextElementSibling;
             let _p0, _p1, _p2;
-            if ((_p0 = item.cls) !== '') _e0.className = _p0; _e1.textContent = (_p1 = item.label) ?? ''; let _t0;
-            _c0.data = (_p2 = item.n) ?? '';
+            if ((_p0 = it.cls) !== '') _e0.className = _p0; _e1.textContent = (_p1 = it.label) ?? ''; let _t0;
+            _c0.data = (_p2 = it.n) ?? '';
             _s0.setAttribute('title', tip()); _s1.style.setProperty('color', col()); _st0.data = sel() ?? '';
             _insertBefore.call(_ct_b1, _el, _ref);
             const _cleanups = [];
             _cleanups.push(tip.subscribe(() => { _s0.setAttribute('title', tip()); }, true));
             _cleanups.push(col.subscribe(() => { _s1.style.setProperty('color', col()); }, true));
             _cleanups.push(sel.subscribe(() => { _st0.data = sel() ?? ''; }, true));
-            return { el: _el, cleanups: _cleanups, value: item,
-              update: (item) => { if (_p0 !== (_p0 = item.cls)) _e0.className = _p0; if (_p1 !== (_p1 = item.label)) (_t0 ??= _e1.firstChild) ? (_t0.nodeValue = _p1 ?? '') : (_e1.textContent = _p1 ?? ''); if (_p2 !== (_p2 = item.n)) _c0.data = (_p2) ?? ''; } };
+            return { el: _el, cleanups: _cleanups, value: it,
+              update: (it) => { if (_p0 !== (_p0 = it.cls)) _e0.className = _p0; if (_p1 !== (_p1 = it.label)) (_t0 ??= _e1.firstChild) ? (_t0.nodeValue = _p1 ?? '') : (_e1.textContent = _p1 ?? ''); if (_p2 !== (_p2 = it.n)) _c0.data = (_p2) ?? ''; } };
           },
         (_, i) => i);
         const _items_b1 = () => g$().items;
@@ -1690,8 +1690,8 @@
         const _rsrc_b1_0 = g$;
         _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
         _cleanups.push(() => _rc_b1.clearAll());
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.name)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); g$(item); } };
+        return { el: _el, cleanups: _cleanups, value: g,
+          update: (g) => { if (_p0 !== (_p0 = g.name)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); g$(g); } };
       },
     (_, i) => i);
     const _items_b0 = () => groups();
@@ -1714,9 +1714,9 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (g, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
-        const g$ = __sig(item);
+        const g$ = __sig(g);
         const _a_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
@@ -1724,20 +1724,20 @@
         const _tc_b1 = __tpl_b1.content.firstElementChild;
         const _ct_b1 = _a_b1.parentNode;
         const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
-          (item, _idx, _ref) => {
+          (it, _idx, _ref) => {
             const _el = _cloneNode.call(_tc_b1, true);
             const _e0 = _el.firstElementChild;
             const _st0 = _el.lastElementChild.firstChild.nextSibling;
             const _st1 = _el.lastChild.previousSibling;
             let _p0;
-            _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
+            _e0.textContent = (_p0 = it.label) ?? ''; let _t0;
             _st0.data = sel() ?? ''; _st1.data = other() ?? '';
             _insertBefore.call(_ct_b1, _el, _ref);
             const _cleanups = [];
             _cleanups.push(sel.subscribe(() => { _st0.data = sel() ?? ''; }, true));
             _cleanups.push(other.subscribe(() => { _st1.data = other() ?? ''; }, true));
-            return { el: _el, cleanups: _cleanups, value: item,
-              update: (item) => { if (_p0 !== (_p0 = item.label)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
+            return { el: _el, cleanups: _cleanups, value: it,
+              update: (it) => { if (_p0 !== (_p0 = it.label)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
           },
         'id');
         const _items_b1 = () => g$().items;
@@ -1745,8 +1745,8 @@
         const _rsrc_b1_0 = g$;
         _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
         _cleanups.push(() => _rc_b1.clearAll());
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { g$(item); } };
+        return { el: _el, cleanups: _cleanups, value: g,
+          update: (g) => { g$(g); } };
       },
     (_, i) => i);
     const _items_b0 = () => groups();
@@ -1769,9 +1769,9 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (g, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
-        const g$ = __sig(item);
+        const g$ = __sig(g);
         const _a_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
@@ -1779,7 +1779,7 @@
         const _tc_b1 = __tpl_b1.content.firstElementChild;
         const _ct_b1 = _a_b1.parentNode;
         const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
-          (item, j, _ref) => {
+          (it, j, _ref) => {
             const _el = _cloneNode.call(_tc_b1, true);
             const _st0 = _el.lastChild.firstChild.nextSibling;
             const _s0 = _el;
@@ -1792,8 +1792,8 @@
             _cleanups.push(b.subscribe(() => { _s0.setAttribute('title', `${a()}-${b()}`); }, true));
             _cleanups.push(x.subscribe(() => { _s1.style.setProperty('left', x()); }, true));
             _cleanups.push(user.subscribe(() => { _st0.data = user().name ?? ''; }, true));
-            return { el: _el, cleanups: _cleanups, value: item,
-              update: (item) => { ; } };
+            return { el: _el, cleanups: _cleanups, value: it,
+              update: (it) => { ; } };
           },
         (it) => it.k + 1);
         const _items_b1 = () => g$().items;
@@ -1801,8 +1801,8 @@
         const _rsrc_b1_0 = g$;
         _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
         _cleanups.push(() => _rc_b1.clearAll());
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { g$(item); } };
+        return { el: _el, cleanups: _cleanups, value: g,
+          update: (g) => { g$(g); } };
       },
     (_, i) => i);
     const _items_b0 = () => groups();
@@ -1825,21 +1825,21 @@
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (g, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
         const _a_b1 = _el.lastChild.lastChild;
         let _p0;
-        _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
+        _e0.textContent = (_p0 = g.name) ?? ''; let _t0;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         const _tc_b1 = __tpl_b1.content.firstElementChild;
         const _ct_b1 = _a_b1.parentNode;
         const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
-          (item, _idx, _ref) => {
+          (t, _idx, _ref) => {
             const _el = _cloneNode.call(_tc_b1, true);
             _insertBefore.call(_ct_b1, _el, _ref);
-            return { el: _el, cleanups: [], value: item, update: () => {} };
+            return { el: _el, cleanups: [], value: t, update: () => {} };
           },
         (_, i) => i);
         const _items_b1 = () => things();
@@ -1847,8 +1847,8 @@
         const _rsrc_b1_0 = things;
         _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
         _cleanups.push(() => _rc_b1.clearAll());
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { if (_p0 !== (_p0 = item.name)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
+        return { el: _el, cleanups: _cleanups, value: g,
+          update: (g) => { if (_p0 !== (_p0 = g.name)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
       },
     (_, i) => i);
     const _items_b0 = () => groups();
@@ -1870,38 +1870,39 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
+    const _tc_b1 = __tpl_b1.content.firstElementChild;
+    const _bind_b1 = (_el, it, _idx) => {
+        const _c0 = _el.firstChild.nextSibling;
+        const _c1 = _el.lastChild.previousSibling;
+        let _p0, _p1;
+        ;
+        _c0.data = (_p0 = it.a) ?? ''; _c1.data = (_p1 = it.b) ?? '';
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, p1: _p1, c0: _c0, c1: _c1 };
+    };
+    const _update_b1 = (_m, it, _idx) => {
+      const _el = _m.el;
+      if (_m.p0 !== (_m.p0 = it.a)) _m.c0.data = (_m.p0) ?? ''; if (_m.p1 !== (_m.p1 = it.b)) _m.c1.data = (_m.p1) ?? '';
+    };
+    const _br_b1 = __batchRows(16, _tc_b1, _bind_b1, _update_b1);
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (g, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
-        const g$ = __sig(item);
+        const g$ = __sig(g);
         const _a_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _tc_b1 = __tpl_b1.content.firstElementChild;
         const _ct_b1 = _a_b1.parentNode;
-        const _bind_b1 = (_el, item, _idx) => {
-            const _c0 = _el.firstChild.nextSibling;
-            const _c1 = _el.lastChild.previousSibling;
-            let _p0, _p1;
-            ;
-            _c0.data = (_p0 = item.a) ?? ''; _c1.data = (_p1 = item.b) ?? '';
-            return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, c0: _c0, c1: _c1 };
-        };
-        const _update_b1 = (_m, item, _idx) => {
-          const _el = _m.el;
-          if (_m.p0 !== (_m.p0 = item.a)) _m.c0.data = (_m.p0) ?? ''; if (_m.p1 !== (_m.p1 = item.b)) _m.c1.data = (_m.p1) ?? '';
-        };
         const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
-          (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, item, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
-        (_, i) => i, __batchRows(16, _tc_b1, _bind_b1, _update_b1));
+          (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, it, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
+        (_, i) => i, _br_b1);
         const _items_b1 = () => g$().items;
         _rc_b1.reconcile(_items_b1());
         const _rsrc_b1_0 = g$;
         _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
         _cleanups.push(() => _rc_b1.clearAll());
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { g$(item); } };
+        return { el: _el, cleanups: _cleanups, value: g,
+          update: (g) => { g$(g); } };
       },
     (_, i) => i);
     const _items_b0 = () => groups();
@@ -1919,11 +1920,11 @@
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><!--b1.--></ul><ol><!--b3.--></ol><!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
     const b4 = _ns[0].lastChild.previousSibling;
     const _ws_b0 = _ns[2].nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     const _a_b1 = _ns[1].lastChild;
     const _a_b3 = _ns[2].lastChild;
     b4.data = t() ?? '';
@@ -1931,19 +1932,19 @@
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><i>\`w\`\</i></div>`, () => []));
     const _tc_b1 = __tpl_b1.content.firstElementChild;
     const _ct_b1 = _a_b1.parentNode;
-    const _bind_b1 = (_el, item, _idx) => {
+    const _bind_b1 = (_el, it, _idx) => {
         const _c0 = _el.firstChild.nextSibling;
         let _p0;
         ;
-        _c0.data = (_p0 = item.x) ?? '';
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, c0: _c0 };
+        _c0.data = (_p0 = it.x) ?? '';
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, c0: _c0 };
     };
-    const _update_b1 = (_m, item, _idx) => {
+    const _update_b1 = (_m, it, _idx) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.x)) _m.c0.data = (_m.p0) ?? '';
+      if (_m.p0 !== (_m.p0 = it.x)) _m.c0.data = (_m.p0) ?? '';
     };
     const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
-      (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, item, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
+      (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, it, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
     (_, i) => i, __batchRows(16, _tc_b1, _bind_b1, _update_b1));
     const _items_b1 = () => items();
     let _empty_b1;
@@ -1956,10 +1957,10 @@
     const _tc_b3 = __tpl_b3.content.firstElementChild;
     const _ct_b3 = _a_b3.parentNode;
     const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b3, true);
         _insertBefore.call(_ct_b3, _el, _ref);
-        return { el: _el, cleanups: [], value: item, update: () => {} };
+        return { el: _el, cleanups: [], value: it, update: () => {} };
       },
     (_, i) => i);
     const _items_b3 = () => items();
@@ -1977,11 +1978,11 @@
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><!--b1.--></ul><ol><!--b3.--></ol><!--b0(--><!--b0)-->
 --- binding function body
-    const r = ctx.root;
+    const _r = _ctx.root;
     const _subs = [];
     const b4 = _ns[0].lastChild.previousSibling;
     const _ws_b0 = _ns[2].nextSibling;
-    const _we_b0 = r.lastChild;
+    const _we_b0 = _r.lastChild;
     const _a_b1 = _ns[1].lastChild;
     const _a_b3 = _ns[2].lastChild;
     b4.data = t() ?? '';
@@ -1989,19 +1990,19 @@
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><i>\`w\`\</i></div>`, () => []));
     const _tc_b1 = __tpl_b1.content.firstElementChild;
     const _ct_b1 = _a_b1.parentNode;
-    const _bind_b1 = (_el, item, _idx) => {
+    const _bind_b1 = (_el, it, _idx) => {
         const _c0 = _el.firstChild.nextSibling;
         let _p0;
         ;
-        _c0.data = (_p0 = item.x) ?? '';
-        return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, c0: _c0 };
+        _c0.data = (_p0 = it.x) ?? '';
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, c0: _c0 };
     };
-    const _update_b1 = (_m, item, _idx) => {
+    const _update_b1 = (_m, it, _idx) => {
       const _el = _m.el;
-      if (_m.p0 !== (_m.p0 = item.x)) _m.c0.data = (_m.p0) ?? '';
+      if (_m.p0 !== (_m.p0 = it.x)) _m.c0.data = (_m.p0) ?? '';
     };
     const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
-      (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, item, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
+      (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, it, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
     (_, i) => i, __batchRows(16, _tc_b1, _bind_b1, _update_b1));
     const _items_b1 = () => items();
     let _empty_b1;
@@ -2014,10 +2015,10 @@
     const _tc_b3 = __tpl_b3.content.firstElementChild;
     const _ct_b3 = _a_b3.parentNode;
     const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
-      (item, _idx, _ref) => {
+      (it, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b3, true);
         _insertBefore.call(_ct_b3, _el, _ref);
-        return { el: _el, cleanups: [], value: item, update: () => {} };
+        return { el: _el, cleanups: [], value: it, update: () => {} };
       },
     (_, i) => i);
     const _items_b3 = () => items();
@@ -2039,10 +2040,22 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
+    const _tc_b3 = __tpl_b3.content.firstElementChild;
+    const _bind_b3 = (_el, it, _idx) => {
+        const _e0 = _el;
+        let _p0;
+        _e0.textContent = (_p0 = it.label) ?? ''; let _t0;
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, t0: undefined };
+    };
+    const _update_b3 = (_m, it, _idx) => {
+      const _el = _m.el;
+      if (_m.p0 !== (_m.p0 = it.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+    };
+    const _br_b3 = __batchRows(16, _tc_b3, _bind_b3, _update_b3);
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
-      (item, _idx, _ref) => {
+      (g, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
-        const g$ = __sig(item);
+        const g$ = __sig(g);
         const _cm0 = _el.lastElementChild;
         const _ws_b1 = _el.firstChild;
         const _we_b1 = _ws_b1.nextSibling;
@@ -2050,7 +2063,7 @@
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        _cleanups.push(__dc(Kid.__f(_cm0, { g: item })));
+        _cleanups.push(__dc(Kid.__f(_cm0, { g })));
         _cleanups.push(__bindIf(_ws_b1, _we_b1, on, `<b><!----> <!----></b>`, (_c) => {
       const b2 = _c.firstChild.nextSibling;
       b2.data = lbl() ?? '';
@@ -2058,28 +2071,17 @@
         lbl.subscribe(v => { b2.data = v ?? ''; }, true),
       ];
     }));
-        const _tc_b3 = __tpl_b3.content.firstElementChild;
         const _ct_b3 = _a_b3.parentNode;
-        const _bind_b3 = (_el, item, _idx) => {
-            const _e0 = _el;
-            let _p0;
-            _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
-            return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
-        };
-        const _update_b3 = (_m, item, _idx) => {
-          const _el = _m.el;
-          if (_m.p0 !== (_m.p0 = item.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
-        };
         const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
-          (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, item, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
-        (_, i) => i, __batchRows(16, _tc_b3, _bind_b3, _update_b3));
+          (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, it, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
+        (_, i) => i, _br_b3);
         const _items_b3 = () => g$().items;
         _rc_b3.reconcile(_items_b3());
         const _rsrc_b3_0 = g$;
         _cleanups.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
         _cleanups.push(() => _rc_b3.clearAll());
-        return { el: _el, cleanups: _cleanups, value: item,
-          update: (item) => { g$(item); } };
+        return { el: _el, cleanups: _cleanups, value: g,
+          update: (g) => { g$(g); } };
       },
     (_, i) => i);
     const _items_b0 = () => groups();

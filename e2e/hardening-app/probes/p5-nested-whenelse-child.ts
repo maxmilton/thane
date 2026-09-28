@@ -1,8 +1,8 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, whenElse } from 'thane';
 import { expose } from '../shared/expose.js';
 import { ProbeCard } from '../shared/probe-card.js';
 
-// P5 (H-17): a child component inside a whenElse() that is nested in a when().
+// P5: a child component inside a whenElse() that is nested in a when().
 export const P5 = defineComponent('hardening-p5', () => {
   const show = signal(true);
   const flag = signal(true);

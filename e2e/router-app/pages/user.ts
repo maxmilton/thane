@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 import { visitCount } from '../store.js';
 
 export const UserPage = defineComponent('user-page', ({ route }) => {

@@ -8,12 +8,13 @@
  *    unless --no-build is given). Raw is the length in characters here, as in the plan's
  *    baseline table (the files hold some non-ASCII comment characters); elsewhere it is bytes;
  *  - bundles: esbuild bundles of src/runtime feature sets (ESM, es2022, minified, tree-shaken),
- *    that is, what an app that imports that set pays;
+ *    that is, what an app that imports that set pays, built as production builds them (`__THANE_DEV__`
+ *    false: no development checks). The router rows define `__THANE_HEAD__` as a
+ *    production build would: false for an app whose routes set nothing but titles, true with route heads;
  *  - apps: `thane build --prod` of the apps in the snapshot set (total of the emitted .js files).
  *    example-apps/benchmark is left out: it is the same source as bench/app, built from a tarball.
- *    Until A1-5, generated binding ids are seeded from each file's absolute path and reach the
- *    bundle, so these rows differ by a few bytes between two checkouts of the same commit.
- *    Compare app rows only between reports taken in the same checkout.
+ *    Minified names can differ between two checkouts of the same commit, which moves gzip by a few
+ *    bytes: compare app rows only between reports taken in the same checkout.
  *
  * --json <file> writes the table as JSON; --compare <file> adds the change against such a file
  * and marks every row that grew.
@@ -51,17 +52,25 @@ const SECTION_TITLES: Record<SizeRow['section'], string> = {
   apps: 'built apps, prod (total .js)',
 };
 
-// Feature sets an app can import. Paths are relative to the repository root.
-const FEATURE_SETS: Record<string, string> = {
+// Feature sets an app can import, with the build constants a production build would define for them.
+// Paths are relative to the repository root.
+const FEATURE_SETS: Record<string, string | { contents: string; define: Record<string, string> }> = {
   'all of thane (every export kept)': `export * from './src/runtime/index.ts';`,
   'all of thane/runtime (compiler helpers)': `export * from './src/runtime/internal.ts';`,
-  'all of thane/router': `export * from './src/runtime/router.ts';`,
+  'all of thane/router': `export * from './src/runtime/router-exports.ts';`,
   'signal only': `import { signal } from './src/runtime/index.ts'; export const s = signal(1);`,
   'signal+computed+effect+batch': `import { signal, computed, effect, batch } from './src/runtime/index.ts'; export const x = [signal, computed, effect, batch];`,
   'lean component + mount (min app)': `import { mountComponent } from './src/runtime/internal.ts'; import { __registerComponentLean } from './src/runtime/internal.ts'; export const x = [mountComponent, __registerComponentLean];`,
   'full component + styles + dc': `import { mountComponent } from './src/runtime/internal.ts'; import { __registerComponent, __enableComponentStyles, __dc } from './src/runtime/internal.ts'; export const x = [mountComponent, __registerComponent, __enableComponentStyles, __dc];`,
   'when/whenElse + keyed reconciler': `import { __bindIf, __bindIfExpr, createKeyedReconciler } from './src/runtime/internal.ts'; export const x = [__bindIf, __bindIfExpr, createKeyedReconciler];`,
-  'router (defineRoutes+navigate+mount)': `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,
+  'router (defineRoutes+navigate+mount)': {
+    contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,
+    define: { __THANE_HEAD__: 'false' },
+  },
+  'router with route heads (+setMeta, metaName)': {
+    contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate, setMeta } from './src/runtime/router.ts'; import { metaName } from './src/runtime/router-head.ts'; export const x = [mount, defineRoutes, navigate, setMeta, metaName];`,
+    define: { __THANE_HEAD__: 'true' },
+  },
 };
 
 const gz = (b: Uint8Array) => gzipSync(b, { level: 9 }).length;
@@ -84,9 +93,12 @@ export async function measureSizes(runBuild = true): Promise<SizeReport> {
     rows.push({ section: 'dist', name: f, raw: b.toString('utf8').length, gzip: gz(b) });
   }
 
-  for (const [name, contents] of Object.entries(FEATURE_SETS)) {
+  for (const [name, set] of Object.entries(FEATURE_SETS)) {
+    const { contents, define } = typeof set === 'string' ? { contents: set, define: {} } : set;
     const r = await build({
       stdin: { contents, resolveDir: repoRoot, loader: 'ts', sourcefile: 'size-entry.ts' },
+      // as a production build: no development checks
+      define: { __THANE_DEV__: 'false', ...define },
       bundle: true,
       minify: true,
       format: 'esm',

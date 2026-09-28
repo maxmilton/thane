@@ -10,10 +10,10 @@ Use `defineRoutes()` from `thane/router` to declare your route map:
 import { defineRoutes } from 'thane/router';
 
 const Routes = defineRoutes({
-  '/': { component: () => import('./pages/home.js'), title: 'Home' },
-  '/about': { component: () => import('./pages/about.js'), title: 'About' },
-  '/users/:id': { component: () => import('./pages/user.js'), title: 'User Details' },
-  'notFound': { component: () => import('./pages/not-found.js'), title: '404' },
+  '/': { component: () => import('./pages/home.js'), meta: { title: 'Home' } },
+  '/about': { component: () => import('./pages/about.js'), meta: { title: 'About' } },
+  '/users/:id': { component: () => import('./pages/user.js'), meta: { title: 'User Details' } },
+  'notFound': { component: () => import('./pages/not-found.js'), meta: { title: '404' } },
 });
 
 export default Routes;
@@ -21,10 +21,10 @@ export default Routes;
 
 Each route consists of:
 
-| Property    | Type                                            | Description                                    |
-| :---------- | :---------------------------------------------- | :--------------------------------------------- |
-| `component` | `() => Promise<any>` \| `ComponentHTMLSelector` | Lazy loader or eager component                 |
-| `title`     | `string` _(optional)_                           | Sets `document.title` when the route is active |
+| Property    | Type                                            | Description                                                                  |
+| :---------- | :---------------------------------------------- | :--------------------------------------------------------------------------- |
+| `component` | `() => Promise<any>` \| `ComponentHTMLSelector` | Lazy loader or eager component                                               |
+| `meta`      | fields \| `(route) => fields` _(optional)_      | The document head while the route is active: see [Route Heads](#route-heads) |
 
 The `notFound` route is **required** — it renders when no other route matches. Route patterns starting with `/:param` (root-level parameters) are rejected at runtime.
 
@@ -104,6 +104,23 @@ template: html`
 
 `navigate()` is **type-safe** when you register your routes (see [Type-Safe Routes](#type-safe-routes) below).
 
+### `navigate(pattern, params)` and `href()`
+
+For a route with parameters, pass its pattern and a value for each parameter, rather than building the path
+by hand. Each value is URL-encoded, and a page reads it back decoded from `route.params`:
+
+```typescript
+import { href } from 'thane/router';
+
+navigate('/users/:id', { id: user.id });
+
+template: html`<a href=${href('/users/:id', { id: user.id })} @click.prevent=${navigate('/users/:id', { id: user.id })}>${user.name}</a>`;
+```
+
+`href(pattern, params)` gives the path (`/users/7`) as a value: for an `href` attribute, or to keep in a
+`RoutePaths` variable. Both are typed from the routes: the pattern must be one of them, with parameters,
+and `params` must give each of its parameters a string or a number and nothing else.
+
 ### `navigateBack()`
 
 Go back in browser history:
@@ -141,6 +158,8 @@ export const UserPage = defineComponent('user-page', ({ route }) => {
 });
 ```
 
+Parameters are decoded: `/users/ada%20lovelace` gives `id` the value `ada lovelace`. A segment that is not valid percent-encoding (`/users/100%`) is kept as written.
+
 ## Route Context
 
 Every component has access to route context via `ctx.route`:
@@ -152,10 +171,129 @@ Every component has access to route context via `ctx.route`:
 | `params`       | `Record<string, string>` | Extracted route parameters                 |
 | `searchParams` | `URLSearchParams`        | URL query parameters                       |
 | `hash`         | `string`                 | URL hash fragment                          |
-| `title`        | `string`                 | Document title from route config           |
+| `title`        | `string`                 | The document title the route's head set    |
 | `state`        | `unknown`                | History state object                       |
 
 The context is captured when the route mounts. A navigation that changes the pathname or the query mounts the route again, so a fresh instance reads the new `params` and `searchParams`; a navigation that changes only the hash keeps the current instance, and `hash` is not updated on it.
+
+## Route Heads
+
+A route's `meta` sets the document head while the route is active: the title, the description, the
+link-preview image, the canonical link and more. The Open Graph and Twitter tags that search engines and
+link previews read are derived from them, so a route states each fact once.
+
+```typescript
+import { defineRoutes, metaName } from 'thane/router';
+
+const Routes = defineRoutes(
+  {
+    '/': { component: () => import('./pages/home.js').then((m) => m.HomePage) },
+    '/about': {
+      component: () => import('./pages/about.js').then((m) => m.AboutPage),
+      meta: { title: 'About', description: 'Who we are', image: '/og/about.png', author: 'Ada Lovelace' },
+    },
+    '/users/:id': {
+      component: () => import('./pages/user.js').then((m) => m.UserPage),
+      meta: (route) => ({ title: `User ${route.params.id}` }),
+    },
+    notFound: { component: () => import('./pages/404.js').then((m) => m.NotFound), meta: { title: 'Not found', robots: 'noindex' } },
+  },
+  {
+    // The site: its address, a title template, and the default of every field
+    meta: {
+      siteUrl: 'https://example.com',
+      title: 'Example',
+      titleTemplate: '%s | Example',
+      description: 'Everything about Example',
+      image: '/og/default.png',
+      siteName: 'Example',
+      twitter: { site: '@example' },
+    },
+    // The app's own fields (see Custom Fields)
+    customMeta: { author: metaName('author') },
+  },
+);
+```
+
+A route's fields override the site's one by one (the Twitter handles too). A route without a title shows the
+site's `title` as it is; a route with one shows it through `titleTemplate` (`'%s | Example'`, or a function of
+the title). A route with parameters can compute its fields from the route, as `/users/:id` does above.
+
+| Field         | Type                                      | Tags                                                                       |
+| :------------ | :---------------------------------------- | :------------------------------------------------------------------------- |
+| `title`       | `string`                                  | `document.title`, `og:title`, `twitter:title`                              |
+| `description` | `string`                                  | `<meta name="description">`, `og:description`, `twitter:description`       |
+| `image`       | `string` \| `{ url, alt, width, height, type }` | `og:image` (with `:alt`, `:width`, `:height`, `:type`), `twitter:image`, `twitter:image:alt` |
+| `canonical`   | `string` \| `false`                       | `<link rel="canonical">` and `og:url`; defaults to `siteUrl` and the path   |
+| `robots`      | `string`                                  | `<meta name="robots">`, such as `'noindex, nofollow'`                      |
+| `type`        | `string`                                  | `og:type`, `'website'` unless set                                          |
+| `siteName`    | `string`                                  | `og:site_name`                                                             |
+| `locale`      | `string`                                  | `og:locale`, such as `'en_ZA'`                                             |
+| `twitter`     | `{ card, site, creator }`                 | `twitter:card` (`summary_large_image` when there is an image, else `summary`), `twitter:site`, `twitter:creator` |
+| `jsonLd`      | `object` \| `object[]`                    | one `<script type="application/ld+json">`                                  |
+
+The site's `meta` also takes `siteUrl` (canonical links, `og:url`, and image paths that start with `/` are
+made absolute with it), `titleTemplate`, and `trailingSlash`: canonical URLs are written without a slash at the
+end (`https://example.com/about`) however the page was reached, or with one when `trailingSlash` is `true`.
+
+An app whose routes set nothing but titles gets the title alone, as before: no other tag is added.
+
+### Data that arrives later
+
+A page whose head depends on data it fetches sets it with `setMeta()` once the data is there. The fields go
+over the route's own and hold until the next route loads:
+
+```typescript
+import { setMeta } from 'thane/router';
+
+const product = await loadProduct(route.params.id);
+setMeta({ title: product.name, description: product.summary, image: product.photo });
+```
+
+### Custom Fields
+
+`customMeta` declares the app's own head fields, each once. Routes, the site's `meta` and `setMeta()` then
+accept them, typed:
+
+```typescript
+import { defineRoutes, linkTag, metaName, metaProperty } from 'thane/router';
+
+defineRoutes(routes, {
+  customMeta: {
+    author: metaName('author'), // <meta name="author" content="…">
+    fbAppId: metaProperty('fb:app_id'), // <meta property="fb:app_id" content="…">
+    feed: linkTag('alternate', { type: 'application/rss+xml' }), // <link rel="alternate" type="…" href="…">
+    // anything else: a function from the value to the tags it stands for
+    hreflang: (langs: Record<string, string>) =>
+      Object.entries(langs).map(([hreflang, href]) => ({ link: { rel: 'alternate', hreflang, href } })),
+  },
+});
+
+// a route
+meta: { title: 'About', author: 'Ada Lovelace', hreflang: { af: '/af/about', en: '/about' } }
+```
+
+A helper field takes a string. A function field takes what its parameter's type says, and returns one tag or
+several (`{ meta: { … } }`, `{ link: { … } }` or `{ script: { type, text } }`), or nothing. `setMeta()` knows the
+custom fields through the generated route types; a function's parameter type must be one the generated file can
+name (a built-in type, an imported one, or one the routes file exports), or `setMeta()` takes that field as
+`unknown`.
+
+### How the head is written
+
+- **In the browser**, on every navigation, the router updates each tag in place: a tag is the same tag on the
+  next page when its kind and every attribute but its value match (`meta[name="description"]`,
+  `link[rel="alternate"][hreflang="af"]`). A tag with that key in `index.html` is taken over, never duplicated.
+  A tag the previous page had and this one does not is removed.
+- **In a production build**, every route without parameters also gets its own page, `about/index.html` for
+  `/about`, with its head already written, for crawlers and link-preview bots that do not run JavaScript. The
+  root `index.html` gets the head of `/`. The build reads the values from the source: literals, template
+  strings, objects and arrays, and `const` names in the routes file or imported from the project. A meta
+  function, and a custom field defined by a function, are applied in the browser only (`--verbose` lists them).
+  Hosts serve `about/index.html` for `/about`, and many redirect `/about` to `/about/`; the router matches a
+  path with a trailing slash to its route, and `thane serve --prod` serves the page for both.
+- **Size.** The head renderer is about 1 KB gzipped. A production build leaves it out when the routes use no
+  field but `title` and nothing calls `setMeta()`.
 
 ## Code Splitting
 
@@ -248,6 +386,7 @@ Thane generates type definitions for your routes automatically. After running `t
 1. Make `navigate()` autocomplete valid paths
 2. Type `route.params` correctly for each page component
 3. Reject invalid paths at compile time
+4. Type the patterns and parameters of `href()` and `navigate(pattern, params)`
 
 The types are generated at the start of every build, and by `thane types`, from your `defineRoutes()` call. Include `.thane/types` in your `tsconfig.json` so your editor sees them (see [Getting Started](getting-started.md#installation)).
 
@@ -267,13 +406,13 @@ navigate(backTo);
 import { defineRoutes } from 'thane/router';
 
 const Routes = defineRoutes({
-  '/': { component: () => import('./pages/Products/Products.js'), title: 'Products' },
-  '/my-cart': { component: () => import('./pages/Cart/Cart.js'), title: 'My Cart' },
+  '/': { component: () => import('./pages/Products/Products.js'), meta: { title: 'Products' } },
+  '/my-cart': { component: () => import('./pages/Cart/Cart.js'), meta: { title: 'My Cart' } },
   '/product-details/:productID': {
     component: () => import('./pages/ProductDetails/ProductDetails.js'),
-    title: 'Product Details',
+    meta: { title: 'Product Details' },
   },
-  'notFound': { component: () => import('./pages/NotFound/NotFound.js'), title: 'Not Found' },
+  'notFound': { component: () => import('./pages/NotFound/NotFound.js'), meta: { title: 'Not Found' } },
 });
 
 export default Routes;

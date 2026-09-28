@@ -11,6 +11,7 @@ export {
   getContentType,
   createBuildContext,
   resolveProjectRoot,
+  projectRootWarning,
 } from './file-utils.js';
 
 export { applyEdits } from './source-editor.js';
@@ -28,9 +29,10 @@ export {
   hasHtmlTemplates,
   toCamelCase,
   pascalToKebab,
-  renameIdentifierInExpression,
+  replaceReferences,
   expressionReferencesIdentifier,
   parseArrowFunction,
+  isFunctionExpressionText,
 } from './ast-utils.js';
 
 export { sourceCache } from './cache.js';

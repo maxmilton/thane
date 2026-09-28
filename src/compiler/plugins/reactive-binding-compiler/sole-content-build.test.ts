@@ -1,5 +1,5 @@
 /**
- * Row text bindings whose sole-content answer changed with TA-7 (H-32), compiled end to end
+ * Row text bindings whose sole-content answer changed with the parse-tree rule, compiled end to end
  * (development build, so the row template is emitted as written). The analysis itself is
  * pinned in sole-content.test.ts; this checks that codegen builds each shape and emits the
  * marker or the element id where the analysis put it.
@@ -15,13 +15,13 @@ export const App = defineComponent('test-app', () => {
   const a = signal(0);
   return { template: html\`<ul>\${repeat(items(), (item) => html\`${row}\`)}</ul>\` };
 });
-mount(App);
+mount({ component: App });
 `;
 
 /** The emitted static row template (the `__T(\`…\`)` of the list's `__tpl_bN`). */
 const rowTemplate = (js: string): string | undefined => /__tpl_b\d+ = __T\(`([^`]*)`\)/.exec(js)?.[1];
 
-describe('sole content through the build (TA-7)', () => {
+describe('sole content through the build', () => {
   test('a void sibling before: comment marker, the void element gets no id', async () => {
     const js = await buildAndReadJs(app('<li><img src="x">${item.name}</li>'));
     expect(rowTemplate(js)).toBe('<li><img src="x"><!----> <!----></li>');
@@ -32,7 +32,7 @@ describe('sole content through the build (TA-7)', () => {
     expect(rowTemplate(js)).toBe('<li><!-- c --><!----> <!----></li>');
   });
 
-  test('a < in an attribute value of the parent builds (it failed with THANE202 before TA-7)', async () => {
+  test('a < in an attribute value of the parent builds (it failed with THANE202 before the parse-tree rule)', async () => {
     const js = await buildAndReadJs(app('<li title="a<b">${item.name}</li>'));
     expect(rowTemplate(js)).toBe('<li title="a<b"></li>');
   });

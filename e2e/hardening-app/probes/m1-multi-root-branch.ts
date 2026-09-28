@@ -1,7 +1,7 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, whenElse } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// M1 (A1-3): whenElse() branches with more than one root node. The first section's then-branch has
+// M1: whenElse() branches with more than one root node. The first section's then-branch has
 // two root elements; the second section's then-branch is text only.
 export const M1 = defineComponent('hardening-m1', () => {
   const two = signal(true);

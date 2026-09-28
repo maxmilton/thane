@@ -149,13 +149,15 @@ const stripCssComments = (css: string): string => {
   return cursor === 0 ? css : out + css.slice(cursor);
 };
 
-const STATEMENT_AT_RULE = /^@(layer|charset|import)(?![\w-])/i;
+const STATEMENT_AT_RULE = /^@(layer|charset|import|namespace)(?![\w-])/i;
 
 /**
  * The statement at-rules the runtime scoper would read as the prelude of the next rule, which then
  * stays unscoped. `@layer a, b;` becomes `@layer a{}@layer b{}` (the same order declared);
  * `@charset` goes, as it means nothing in a style string; `@import` goes with a warning, since
- * Thane adopts every stylesheet as a constructed stylesheet, and those drop `@import`.
+ * Thane adopts every stylesheet as a constructed stylesheet, and those drop `@import`. `@namespace x
+ * url(…);` stays, followed by an empty block: the scoper then copies the statement as an at-rule, and
+ * the browser drops the stray `{}`, a rule with no selector.
  */
 const rewriteStatementAtRules = (css: string, file: string | undefined): string => {
   let out = '';
@@ -166,7 +168,8 @@ const rewriteStatementAtRules = (css: string, file: string | undefined): string 
       i = skipTo;
       continue;
     }
-    const name = css[i] === '@' ? STATEMENT_AT_RULE.exec(css.slice(i, i + 9))?.[1]?.toLowerCase() : undefined;
+    // `@namespace` and the character after it, the longest name the pattern must see
+    const name = css[i] === '@' ? STATEMENT_AT_RULE.exec(css.slice(i, i + 11))?.[1]?.toLowerCase() : undefined;
     if (!name) continue;
     // a statement ends at its `;`; a `{` or `}` first means a block (`@layer a { … }`), left alone
     let end = i + name.length + 1;
@@ -179,13 +182,15 @@ const rewriteStatementAtRules = (css: string, file: string | undefined): string 
     let replacement = '';
     if (name === 'layer') {
       for (const layer of prelude.split(',')) if (layer.trim()) replacement += `@layer ${layer.trim()}{}`;
+    } else if (name === 'namespace') {
+      replacement = `${css.slice(i, end + 1)}{}`;
     } else if (name === 'import') {
       const statement = css.slice(i, end + 1).replace(new RegExp(`${MASK_OPEN}\\d+${MASK_CLOSE}`, 'g'), '${…}');
       logger.warn(
         'css',
-        `${file ?? 'a stylesheet'}: ${statement.replace(/\s+/g, ' ')} was removed. @import is ignored in ` +
-          'component stylesheets (browsers drop it from constructed stylesheets): import that file globally ' +
-          'instead, with a <link> in index.html.',
+        `${file ?? 'a stylesheet'}: ${statement.replace(/\s+/g, ' ')} was removed. Thane applies every ` +
+          'stylesheet as a constructed stylesheet, and browsers ignore @import there: load that file with a ' +
+          '<link> in index.html instead.',
       );
     }
     out += css.slice(cursor, i) + replacement;
@@ -214,8 +219,9 @@ export const isCssTaggedTemplate = (node: ts.Node): node is ts.TaggedTemplateExp
 
 /**
  * True when the module brings its own `css` (another library's tag, a local helper). Thane's
- * `css` is a global, or an import from 'thane'; anything else is not Thane's to compile, and
- * is neither compiled nor counted as a stylesheet when selector renames are planned.
+ * `css` is the import from 'thane' (or an undeclared `css`, which the type checker reports);
+ * anything else is not Thane's to compile, and is neither compiled nor counted as a stylesheet
+ * when selector renames are planned.
  */
 export const declaresOwnCssTag = (sourceFile: ts.SourceFile): boolean => {
   for (const statement of sourceFile.statements) {

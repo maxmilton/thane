@@ -20,7 +20,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 describe('Rows without cleanups are bound by a standalone function and created in batches', () => {
@@ -34,7 +34,7 @@ describe('Rows without cleanups are bound by a standalone function and created i
     expect(js).toMatch(
       /\(item, _idx, _ref\) => \{\s*const _el = _cloneNode\.call\(_tc_b\d+, true\);\s*const _m = _bind_b\d+\(_el, item, _idx\);\s*_insertBefore\.call\(_ct_b\d+, _el, _ref\);\s*return _m;\s*\}/,
     );
-    // The reconciler gets the batch helper, built on the same template node (A2-1)
+    // The reconciler gets the batch helper, built on the same template node
     expect(js).toMatch(/"id",\s*__batchRows\(16, _tc_b\d+, _bind_b\d+, _update_b\d+\)/);
   });
 
@@ -73,7 +73,7 @@ describe('Rows without cleanups are bound by a standalone function and created i
   test('a row with a nested when() keeps the inline factory and no batching', async () => {
     const js = await buildAndReadJs(app('<li>${item.label}${when(flag(), html`<em>on</em>`)}</li>'));
     expect(js).not.toMatch(/_bind_b\d+/);
-    // No list batches, so the batch helper is not bundled (A2-1)
+    // No list batches, so the batch helper is not bundled
     expect(js).not.toContain('__batchRows');
     expect(js).toMatch(/\(item, _idx, _ref\) => \{\s*const _el = _cloneNode\.call/);
   });

@@ -1,16 +1,16 @@
 /**
  * Characterisation of the router's lifecycle, scroll restoration and route context with a fake
- * browser (before RT-10 and RT-11).
+ * browser.
  *
  * router.ts has little other unit coverage; the e2e router suite covers it in a
  * browser, but only with `scrollRestoration: true`. These tests pin, as an operation log over a fake
  * `window` / `document`, what `startRouter`, `navigate`, popstate and `stopRouter` do for every
- * shape of the scroll-restoration option (RT-11's `normalizeScrollRestoration`), for every shape
- * of `history.state` (RT-11's `readScrollPositionFromHistoryState`), the globals the router
+ * shape of the scroll-restoration option (`normalizeScrollRestoration`), for every shape
+ * of `history.state` (`readScrollPositionFromHistoryState`), the globals the router
  * installs, the route-context provider, and Modes B and C of `mount({ router })`.
  *
  * Not pinned on purpose: a scroll state whose `__thaneScroll` is a function. History states are
- * structured clones, which cannot hold functions (RT-11 removes that branch).
+ * structured clones, which cannot hold functions.
  *
  * Every test restores the module state it touched: `teardown()` stops the router with an empty
  * path and title, so `currentPath()` is '' again for router.test.ts.
@@ -248,13 +248,13 @@ describe('scroll restoration option', () => {
     expect(await scenario({ scrollRestoration: {} })).toEqual(enabledDefault);
   });
 
-  test('false: nothing is saved, reset or restored; navigate still pushes the default offsets', async () => {
+  test('false: nothing is saved, reset or restored, and navigate pushes no scroll state', async () => {
     expect(await scenario({ scrollRestoration: false })).toEqual([
       'addEventListener popstate',
       'outlet.innerHTML = ""',
       'mount A into outlet',
       '--- navigate /b',
-      'pushState {"__thaneScroll":{"left":0,"top":0}} /b',
+      'pushState null /b',
       'destroy A',
       'outlet.innerHTML = ""',
       'outlet.innerHTML = ""',
@@ -317,11 +317,8 @@ describe('scroll restoration option', () => {
     expect(await scenario({ scrollRestoration: 'yes' })).toEqual(enabledDefault);
   });
 
-  test('null throws a TypeError from startRouter', () => {
-    install('http://app.test/a');
-    expect(() => startRouter(routes(), new FakeElement('outlet') as any, { scrollRestoration: null as any })).toThrow(
-      TypeError,
-    );
+  test('null counts as enabled with the defaults', async () => {
+    expect(await scenario({ scrollRestoration: null })).toEqual(enabledDefault);
   });
 
   test('after stopRouter the defaults apply again', async () => {
@@ -511,7 +508,10 @@ describe('route context', () => {
     const seen: { route?: any } = {};
     install('http://app.test/users/42?x=1#h', { k: 1 });
     startRouter(
-      { routes: { '/users/:id': { component: page('U', seen), title: 'User' } }, notFound: { component: page('NF') } },
+      {
+        routes: { '/users/:id': { component: page('U', seen), meta: { title: 'User' } } },
+        notFound: { component: page('NF') },
+      },
       new FakeElement('outlet') as any,
       { scrollRestoration: false },
     );
@@ -526,6 +526,26 @@ describe('route context', () => {
     expect(r.title).toBe('User');
     expect(r.state).toEqual({ k: 1 });
     expect(g.document.title).toBe('User');
+  });
+
+  test('navigate(pattern, params) pushes the filled-in path, and the page gets the params back decoded', async () => {
+    const seen: { route?: any } = {};
+    install('http://app.test/');
+    startRouter(
+      {
+        routes: { '/': { component: page('H') }, '/users/:id/posts/:post': { component: page('P', seen) } },
+        notFound: { component: page('NF') },
+      },
+      new FakeElement('outlet') as any,
+      { scrollRestoration: false },
+    );
+    await settle();
+    log = [];
+    navigate('/users/:id/posts/:post', { id: 'a b/c', post: 7 });
+    await settle();
+    expect(log[0]).toBe('pushState null /users/a%20b%2Fc/posts/7');
+    expect(seen.route.params).toEqual({ id: 'a b/c', post: '7' });
+    expect(seen.route.pattern).toBe('/users/:id/posts/:post');
   });
 
   test('a route without a title reports the document title and leaves it alone', async () => {
@@ -545,7 +565,7 @@ describe('route context', () => {
     const seen: { route?: any } = {};
     install('http://app.test/nope');
     startRouter(
-      { routes: { '/a': { component: page('A') } }, notFound: { component: page('NF', seen), title: '404' } },
+      { routes: { '/a': { component: page('A') } }, notFound: { component: page('NF', seen), meta: { title: '404' } } },
       new FakeElement('outlet') as any,
       { scrollRestoration: false },
     );
@@ -588,7 +608,10 @@ describe('route context', () => {
   test('provider, with a window: the live location, the loaded route pattern and title', async () => {
     install('http://app.test/users/7?y=2#k', { s: 1 });
     startRouter(
-      { routes: { '/users/:id': { component: page('U'), title: 'User' } }, notFound: { component: page('NF') } },
+      {
+        routes: { '/users/:id': { component: page('U'), meta: { title: 'User' } } },
+        notFound: { component: page('NF') },
+      },
       new FakeElement('outlet') as any,
       { scrollRestoration: false },
     );
@@ -701,7 +724,7 @@ describe('mount({ router })', () => {
     expect(log).toContain('mount A into router-main');
   });
 
-  test('Mode B without an outlet throws, and the shell stays mounted', () => {
+  test('Mode B without an outlet throws, and the shell goes again', () => {
     install('http://app.test/a');
     expect(() =>
       mount({
@@ -714,6 +737,6 @@ describe('mount({ router })', () => {
         "In Mode B (shell + router), your shell component's template must contain " +
         'an element with id="router-outlet".',
     );
-    expect(log).toEqual(['mount Shell into body']);
+    expect(log).toEqual(['mount Shell into body', 'destroy Shell', 'body.innerHTML = ""']);
   });
 });

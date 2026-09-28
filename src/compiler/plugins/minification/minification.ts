@@ -20,6 +20,7 @@ import type { Plugin } from 'esbuild';
 import ts from 'typescript';
 import { SelectorMap, normalisePath, planSelectorRenames, renameSelectorsInHtml } from './selector-minifier.js';
 import { collectFilesRecursively, extractComponentDefinitions, logger } from '../../utils/index.js';
+import { collectModuleGraph, createModuleResolver } from '../../utils/module-graph.js';
 import type { BuildContext } from '../../types.js';
 
 const NAME = 'minification';
@@ -31,6 +32,8 @@ export interface MinificationOptions {
   htmlPath: string;
   /** The output directory, which may sit inside the project and must not be read as source */
   outDir: string;
+  /** The build's entry points: the components they reach are the ones whose selectors are planned */
+  entryPoints: string[];
 }
 
 const readAll = async (files: string[]): Promise<Array<{ path: string; text: string }>> =>
@@ -47,23 +50,31 @@ export const MinificationPlugin = (ctx: BuildContext, options: MinificationOptio
       const outPrefix = normalisePath(options.outDir) + path.sep;
       const isSource = (file: string): boolean => !normalisePath(file).startsWith(outPrefix);
 
+      // Every source and stylesheet of the project is read for the names that must stay (an e2e test
+      // or a global stylesheet that names a selector keeps it working). Only the components the entry
+      // points reach are planned, so a component elsewhere (another app, a test fixture) takes no
+      // short name and shifts none.
       const isTs = (file: string): boolean => file.endsWith('.ts') && !file.endsWith('.d.ts');
       const isCss = (file: string): boolean => file.endsWith('.css');
       const paths = (await collectFilesRecursively(projectRoot, (name) => isTs(name) || isCss(name))).filter(isSource);
-      const [tsFiles, cssFiles, html] = await Promise.all([
+      const [tsFiles, cssFiles, html, modules] = await Promise.all([
         readAll(paths.filter(isTs)),
         readAll(paths.filter(isCss)),
         fs.promises.readFile(options.htmlPath, 'utf8').catch(() => ''),
+        collectModuleGraph(options.entryPoints, createModuleResolver(projectRoot)),
       ]);
 
       // Only the project's own components are renamed. Every selector the build knows of is
       // reserved, so a generated name can never be one that a component outside the project uses.
-      const selectors = tsFiles.flatMap((file) =>
-        extractComponentDefinitions(
-          ts.createSourceFile(file.path, file.text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
-          file.path,
-        ).map((definition) => definition.selector),
-      );
+      const reached = new Set(modules.map(normalisePath));
+      const selectors = tsFiles
+        .filter((file) => reached.has(normalisePath(file.path)))
+        .flatMap((file) =>
+          extractComponentDefinitions(
+            ts.createSourceFile(file.path, file.text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
+            file.path,
+          ).map((definition) => definition.selector),
+        );
       const reserved = Array.from(ctx.componentsBySelector.keys());
 
       const readExternalStylesheet = (specifier: string, importer: string): string | undefined => {

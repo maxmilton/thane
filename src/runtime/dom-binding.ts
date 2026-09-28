@@ -232,7 +232,7 @@ export function createKeyedReconciler<T>(
     for (let i = 0; i < len; i++) runCleanups(managedItems[i]!);
     const anchorParent = anchor.parentNode;
     if (anchorParent) {
-      // Empty the container only when it holds nothing but the rows and the anchor (P18)
+      // Empty the container only when it holds nothing but the rows and the anchor
       if (container.childNodes.length === len + 1) {
         anchor.remove();
         (container as HTMLElement).textContent = '';
@@ -257,7 +257,7 @@ export function createKeyedReconciler<T>(
     if (count <= 0) return;
 
     const base = managedItems.length;
-    // Where the container is now, not at creation: later rows change a row's next sibling (P15)
+    // Where the container is now, not at creation: later rows change a row's next sibling
     const parent = base === 0 ? container.parentNode : null;
     const next = container.nextSibling;
     if (parent) container.remove();
@@ -277,16 +277,34 @@ export function createKeyedReconciler<T>(
     if (parent) parent.insertBefore(container, next);
   };
 
-  const applyOrder = (next: ManagedItem<T>[], currentEl: Element | null) => {
+  // Rows are single elements side by side, followed by the list's anchor (a comment). The walk goes
+  // node by node, so it ends at the anchor, and a row placed after the last one goes before it
+  const applyOrder = (next: ManagedItem<T>[], currentEl: ChildNode | null) => {
     const len = next.length;
     for (let i = 0; i < len; i++) {
       const wanted = next[i]!.el;
-      if (wanted === currentEl) currentEl = currentEl.nextElementSibling || null;
+      if (wanted === currentEl) currentEl = currentEl.nextSibling;
       else container.insertBefore(wanted, currentEl);
     }
     managedItems.length = len;
     for (let i = 0; i < len; i++) managedItems[i] = next[i]!;
     if (trackIndex) syncIndexes();
+  };
+
+  /**
+   * Match rows in place, from `from` up to `to`: the new item at i against the row `offset` places
+   * further. An identical item needs nothing, one with the row's key is updated at i. Returns the
+   * first index whose key differs, or `to`.
+   */
+  const matchInPlace = (newItems: T[], from: number, to: number, offset: number): number => {
+    for (let i = from; i < to; i++) {
+      const managed = managedItems[i + offset]!;
+      const newItem = newItems[i]!;
+      if (managed.value === newItem) continue;
+      if (keyFn(newItem, i) !== managed.key) return i;
+      updateRow(managed, newItem, i);
+    }
+    return to;
   };
 
   const reconcile = (newItems: T[]) => {
@@ -325,28 +343,11 @@ export function createKeyedReconciler<T>(
     }
 
     // Fast path: single item removed — find missing old key by linear scan. As in the in-place
-    // pass below, an identical item needs nothing and a changed one is updated at its new index (K22).
+    // pass below, an identical item needs nothing and a changed one is updated at its new index.
     if (oldLength === newLength + 1) {
-      let removedIdx = 0;
-      for (; removedIdx < newLength; removedIdx++) {
-        const managed = managedItems[removedIdx]!;
-        const newItem = newItems[removedIdx]!;
-        if (managed.value === newItem) continue;
-        if (keyFn(newItem, removedIdx) !== managed.key) break;
-        updateRow(managed, newItem, removedIdx);
-      }
-
-      // Every later key must be the next old row's, or this is not one row removed (K21)
-      let i = removedIdx;
-      for (; i < newLength; i++) {
-        const managed = managedItems[i + 1]!;
-        const newItem = newItems[i]!;
-        if (managed.value === newItem) continue;
-        if (keyFn(newItem, i) !== managed.key) break;
-        updateRow(managed, newItem, i);
-      }
-
-      if (i === newLength) {
+      const removedIdx = matchInPlace(newItems, 0, newLength, 0);
+      // Every later key must be the next old row's, or this is not one row removed
+      if (matchInPlace(newItems, removedIdx, newLength, 1) === newLength) {
         const removedManaged = managedItems[removedIdx]!;
         removeItem(removedManaged);
         if (keyMap !== null) keyMap.delete(removedManaged.key!);
@@ -364,15 +365,7 @@ export function createKeyedReconciler<T>(
       // touches the key map. The first position whose key differs means something moved,
       // and the keyed paths below take over from the start (rows already updated here are
       // skipped there because their value now matches).
-      let inPlace = 0;
-      for (; inPlace < newLength; inPlace++) {
-        const managed = managedItems[inPlace]!;
-        const newItem = newItems[inPlace]!;
-        if (managed.value === newItem) continue;
-        if (keyFn(newItem, inPlace) !== managed.key) break;
-        updateRow(managed, newItem, inPlace);
-      }
-      if (inPlace === newLength) return;
+      if (matchInPlace(newItems, 0, newLength, 0) === newLength) return;
 
       // Fast path: reorder with same keys (fused allKeysExist + update in single pass)
       let allKeysExist = true;
@@ -428,7 +421,7 @@ export function createKeyedReconciler<T>(
         const newManagedItems: ManagedItem<T>[] = new Array(newLength);
         const byKey = keys();
         for (let i = 0; i < newLength; i++) newManagedItems[i] = byKey.get(keyFn(newItems[i]!, i))!;
-        applyOrder(newManagedItems, managedItems[0]?.el || null);
+        applyOrder(newManagedItems, managedItems[0]!.el);
         return;
       }
 
@@ -474,11 +467,8 @@ export function createKeyedReconciler<T>(
       }
     }
 
-    // Not newManagedItems[0].el: a row whose root a when() replaced is outside the container
-    applyOrder(
-      newManagedItems,
-      newManagedItems[0]?.el.previousElementSibling?.nextElementSibling || container.firstElementChild,
-    );
+    // Every row element is in the container: a when() on a row's root, which replaced it, is THANE008
+    applyOrder(newManagedItems, newManagedItems[0]!.el);
   };
 
   return { reconcile, clearAll, get: find };

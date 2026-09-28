@@ -1,4 +1,4 @@
-import { defineComponent, signal, mount } from 'thane';
+import { defineComponent, signal, mount, html, whenElse, repeat } from 'thane';
 
 type CartItem = {
   id: number;

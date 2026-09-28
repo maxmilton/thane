@@ -1,5 +1,5 @@
 /**
- * Characterisation of the type sync inside a real build (before PL-1): a build of a project with a
+ * Characterisation of the type sync inside a real build: a build of a project with a
  * route table writes the hidden route types and logs the types-sync line once, `thane typecheck`
  * (runProjectTypeCheck) does not log that line, and a sync that cannot write its files fails the build.
  */
@@ -29,7 +29,7 @@ const TSCONFIG = JSON.stringify({
 });
 
 const ROUTED_APP = [
-  "import { defineComponent, mount } from 'thane';",
+  "import { defineComponent, html, mount } from 'thane';",
   "import { defineRoutes } from 'thane/router';",
   '',
   "export const Home = defineComponent('home-page', () => ({ template: html`<p>home</p>` }));",
@@ -84,7 +84,7 @@ describe('type sync in a build', () => {
     const r = await captureLog(() => runBuild(createTestBuildConfig(p)));
     expect(r.outcome).toBe('resolved');
     expect(r.log.filter((line) => line === SYNC_LINE)).toHaveLength(1);
-    // One sync, in the type checker's onStart: its line always comes before the check starts (PL-1)
+    // One sync, in the type checker's onStart: its line always comes before the check starts
     expect(r.log.indexOf(SYNC_LINE)).toBeLessThan(r.log.indexOf('[type-check] Running TypeScript type check...'));
     expect(existsSync(join(p.root, '.thane', 'types', 'router', 'src', 'main.generated.d.ts'))).toBe(true);
     expect(existsSync(join(p.root, '.thane', 'types', 'client.d.ts'))).toBe(true);

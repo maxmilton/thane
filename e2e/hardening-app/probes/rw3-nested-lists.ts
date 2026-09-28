@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, whenElse, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 import { CountingKid } from '../shared/counting-kid.js';
 import { ProbeCard } from '../shared/probe-card.js';
@@ -29,7 +29,7 @@ export const RW3_TOPS: Top[] = [
   { id: 3, title: 'C', mids: [] },
 ];
 
-// RW-3 (H-18): a list inside a row is generated like any other list, at any depth.
+// A list inside a row is generated like any other list, at any depth.
 // - three: three lists, each row reading the rows above it, a handler on each level's row, a .stop one
 //   on the innermost;
 // - idx: index bindings in inner rows, then a reorder;
@@ -39,13 +39,20 @@ export const RW3_TOPS: Top[] = [
 // - mixed: repeat › whenElse › repeat › when / whenElse;
 // - shadow: an inner list whose item has the outer item's name;
 // - after: a handler of the outer row on a static element after an inner list, in the list's container;
-// - oitem: a child in an inner row whose props read an outer item named `item` (found in RW-3).
+// - oitem: a child in an inner row whose props read an outer item named `item`;
+// - sigitem: rows whose items are signals and whose parameter is named `item`, read as `item()` in inner rows.
+type SigRow = { id: number; name: string; tags: string[] };
+
 export const RW3 = defineComponent('hardening-rw3', () => {
   const tops = signal<Top[]>(RW3_TOPS);
   const show = signal(true);
   const log = signal<string[]>([]);
+  const sigRows = signal([
+    signal<SigRow>({ id: 1, name: 'A', tags: ['x', 'y'] }),
+    signal<SigRow>({ id: 2, name: 'B', tags: ['z'] }),
+  ]);
   const bump = (what: string) => log([...log(), what]);
-  expose('rw3', { tops, show, log });
+  expose('rw3', { tops, show, log, sigRows });
   return {
     // prettier-ignore
     template: html`<div class="rw3">
@@ -58,6 +65,7 @@ export const RW3 = defineComponent('hardening-rw3', () => {
       <ul class="rw3-shadow">${repeat(tops(), (t) => html`<li><ol>${repeat(t.mids, (t) => html`<li class="rw3-sh-row">${t.name}</li>`, null, (t) => t.id)}</ol></li>`, null, (t) => t.id)}</ul>
       <ul class="rw3-after">${repeat(tops(), (t) => html`<li><ol>${repeat(t.mids, (m) => html`<li class="rw3-af-row">${m.name}</li>`, null, (m) => m.id)}<li class="rw3-af-btn" @click=${() => bump('after' + t.id)}>after</li></ol></li>`, null, (t) => t.id)}</ul>
       <ul class="rw3-oitem">${repeat(tops(), (item) => html`<li><ol>${repeat(item.mids, (m) => html`<li class="rw3-oi-row">${ProbeCard({ label: item.title + ':' + m.name })}</li>`, null, (m) => m.id)}</ol></li>`, null, (item) => item.id)}</ul>
+      <ul class="rw3-sigitem">${repeat(sigRows(), (item) => html`<li><ol>${repeat(item().tags, (tag) => html`<li class="rw3-si-row">${item().name}/${tag}</li>`)}</ol></li>`)}</ul>
     </div>`,
   };
 });

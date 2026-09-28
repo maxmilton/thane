@@ -155,7 +155,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
     });
   };
 
-  /** Record the attribute; a duplicate is ignored, as browsers keep the first (H-46). */
+  /** Record the attribute; a duplicate is ignored, as browsers keep the first. */
   const setAttribute = (value: string, end: number, valueStart: number, valueEnd: number) => {
     if (currentElement!.attributes.has(attrName)) {
       const message = `Duplicate attribute "${attrName}" on <${currentElement!.tagName}>: the first one is kept`;
@@ -243,6 +243,17 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
           currentElement = createEmptyElement(tagName, tagStart, pos);
           finishOpenTag(pos + 2, true);
           pos++;
+        } else {
+          // A character that cannot continue a tag name, most likely after a missing space
+          // (`<button@click=…>`): it is reported, and read again as the start of the attributes
+          diagnostics.push({
+            message: `Missing space after <${tagName}: "${char}" cannot be part of a tag name, and is read as the start of an attribute`,
+            position: pos,
+            severity: 'error',
+          });
+          currentElement = createEmptyElement(tagName, tagStart, pos);
+          state = PARSER_STATE.TAG_SPACE;
+          continue;
         }
         break;
 
@@ -311,15 +322,24 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
         break;
 
       case PARSER_STATE.ATTR_VALUE_Q:
-        if (char === quoteChar) {
-          setAttribute(attrValue, pos + 1, attrValueStart, pos);
-          state = PARSER_STATE.TAG_SPACE;
-        } else {
-          attrValue += char;
-        }
-        break;
-
       case PARSER_STATE.ATTR_VALUE_UQ:
+        if (char === '$' && nextChar === '{' && !isEscaped(html, pos)) {
+          // An expression is part of the value up to its closing brace, whatever quotes it holds:
+          // `class="${on() ? "a" : "b"}"` is one value
+          const end = templateExpressionEnd(html, pos);
+          attrValue += html.slice(pos, end === -1 ? html.length : end);
+          pos = end === -1 ? html.length : end;
+          continue;
+        }
+        if (state === PARSER_STATE.ATTR_VALUE_Q) {
+          if (char === quoteChar) {
+            setAttribute(attrValue, pos + 1, attrValueStart, pos);
+            state = PARSER_STATE.TAG_SPACE;
+          } else {
+            attrValue += char;
+          }
+          break;
+        }
         if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
           setAttribute(attrValue, pos, attrValueStart, pos);
           state = PARSER_STATE.TAG_SPACE;

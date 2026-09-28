@@ -80,7 +80,7 @@ interface Row {
 const setup = (layout: { before?: FakeNode[]; after?: FakeNode[]; trackIndex?: boolean } = {}) => {
   const host = new FakeNode('host');
   const list = new FakeNode('list');
-  const anchor = new FakeNode('anchor');
+  const anchor = new FakeNode('anchor', false);
   host.appendChild(list);
   for (const n of layout.before ?? []) list.appendChild(n);
   list.appendChild(anchor);
@@ -115,35 +115,24 @@ const setup = (layout: { before?: FakeNode[]; after?: FakeNode[]; trackIndex?: b
 
 const rows = (...ids: string[]): Row[] => ids.map((id) => ({ id, v: 0 }));
 
-describe('general path: a row element that is no longer in the container', () => {
-  // A when() on a row's root element replaces that element with a placeholder when it hides (and
-  // with a fresh clone when it shows again), so the row's record keeps an element that left the
-  // container. The general path then starts its order walk at the container's first element
-  // child, not at the first wanted row's element (checked in Chromium on simplify-w0: the detached
-  // rows are inserted before a static first element). RT-5 keeps this start.
-  test('the order walk starts at the first element child of the container', () => {
-    const head = new FakeNode('head');
-    const { list, reconcile, order } = setup({ before: [head] });
+describe('general path: the order walk starts at the first wanted row', () => {
+  // Every row element is in the container: a when() on a row's root element, which replaced the row
+  // element with a placeholder, is a build error (THANE008). So the walk starts at the first row the
+  // new order wants, and a static element before the rows is never moved.
+  test('a static element before the rows stays first', () => {
+    const { reconcile, order } = setup({ before: [new FakeNode('head')] });
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);
-    // what a hidden when() on each row root does: the row element leaves, a placeholder takes its place
-    for (const id of ['A', 'B', 'C']) {
-      const el = list.childNodes.find((n) => n.name === id)!;
-      list.insertBefore(new FakeNode(`tpl-${id}`), el);
-      el.remove();
-    }
-    expect(order()).toEqual(['head', 'tpl-A', 'tpl-B', 'tpl-C', 'anchor']);
-
-    expect(reconcile([c!, a!])).toEqual(['cleanup B', 'insert C before head', 'insert A before head']);
-    expect(order()).toEqual(['C', 'A', 'head', 'tpl-A', 'tpl-B', 'tpl-C', 'anchor']);
+    expect(reconcile([c!, a!])).toEqual(['cleanup B', 'remove B', 'insert A before anchor']);
+    expect(order()).toEqual(['head', 'C', 'A', 'anchor']);
   });
 });
 
 describe('creating rows in an empty list: the container is detached and put back where it is now', () => {
   // A list inside a row is created while that row is the last one; later rows go after it, so
-  // the container's next sibling changes. Until H-06 the reconciler put the container back before
-  // the sibling it had at creation, which reordered the outer rows (P15).
-  test('H-06: a sibling placed after the container since creation stays after it', () => {
+  // the container's next sibling changes. Until it was fixed, the reconciler put the container back before
+  // the sibling it had at creation, which reordered the outer rows.
+  test('a sibling placed after the container since creation stays after it', () => {
     const { list, reconcile, order } = setup();
     const host = list.parentNode!;
     // the next outer row, inserted after the list was created
@@ -159,7 +148,7 @@ describe('creating rows in an empty list: the container is detached and put back
     expect(host.childNodes.map((n) => n.name)).toEqual(['list', 'later']);
   });
 
-  test('H-06: a container moved to another parent is put back into that parent', () => {
+  test('a container moved to another parent is put back into that parent', () => {
     const { list, reconcile, order } = setup();
     const moved = new FakeNode('moved');
     moved.appendChild(new FakeNode('head'));
@@ -173,10 +162,10 @@ describe('creating rows in an empty list: the container is detached and put back
 });
 
 describe('same-length reorder pass: rows after the third displaced row', () => {
-  // Until H-48 the pass stopped updating after the third displaced row, and the move branch only
+  // Until it was fixed, the pass stopped updating after the third displaced row, and the move branch only
   // moves rows, so a row further on whose item changed (same key, new object) kept its old value
-  // (K17). The pass now updates every row whose item changed, before the moves.
-  test('H-48: an item changed after the third displaced row is updated', () => {
+  //. The pass now updates every row whose item changed, before the moves.
+  test('an item changed after the third displaced row is updated', () => {
     const { reconcile, order, reconciler } = setup();
     const [a, b, c, d, e] = rows('A', 'B', 'C', 'D', 'E');
     reconcile([a!, b!, c!, d!, e!]);
@@ -186,7 +175,7 @@ describe('same-length reorder pass: rows after the third displaced row', () => {
     expect(reconciler.get('E')!.value).toBe(e2);
   });
 
-  test('H-48: every changed row is updated once, at its new index, in list order', () => {
+  test('every changed row is updated once, at its new index, in list order', () => {
     const { reconcile, order } = setup({ trackIndex: true });
     const [a, b, c, d, e, f] = rows('A', 'B', 'C', 'D', 'E', 'F');
     reconcile([a!, b!, c!, d!, e!, f!]);
@@ -208,13 +197,13 @@ describe('same-length reorder pass: rows after the third displaced row', () => {
     expect(order()).toEqual(['D', 'C', 'B', 'A', 'F', 'E', 'anchor']);
   });
 
-  test('H-48: rows updated before a missing key are not updated again by the general path', () => {
+  test('rows updated before a missing key are not updated again by the general path', () => {
     const { reconcile, order } = setup();
     const [a, b, c, d, e] = rows('A', 'B', 'C', 'D', 'E');
     reconcile([a!, b!, c!, d!, e!]);
     const d2 = { id: 'D', v: 1 };
     expect(reconcile([c!, a!, b!, d2, ...rows('X')])).toEqual([
-      // before H-48 this update came from the general path, after 'remove E'
+      // before the fix this update came from the general path, after 'remove E'
       'update D@3 v1',
       'cleanup E',
       'remove E',
@@ -302,11 +291,11 @@ describe('one row removed: the remove-one fast path', () => {
     expect(reconciler.get('D')!.value).toBe(d);
   });
 
-  // Until H-51 this path updated no kept row, so a kept row whose item changed (same key, new object)
-  // kept its old item, and with index tracking the index update re-applied the old item (K22). Kept
+  // Until it was fixed, this path updated no kept row, so a kept row whose item changed (same key, new object)
+  // kept its old item, and with index tracking the index update re-applied the old item. Kept
   // rows are now matched as in the in-place pass: a changed item is updated at its new index, before
   // the removal.
-  test('H-51: kept rows whose item changed are updated at their new index', () => {
+  test('kept rows whose item changed are updated at their new index', () => {
     const { reconcile, reconciler, order } = setup();
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);
@@ -318,7 +307,7 @@ describe('one row removed: the remove-one fast path', () => {
     expect(reconciler.get('C')!.value).toBe(c2);
   });
 
-  test('H-51: with index tracking, a changed row is updated once, with its new item and index', () => {
+  test('with index tracking, a changed row is updated once, with its new item and index', () => {
     const { reconcile, reconciler, order } = setup({ trackIndex: true });
     const [a, b, c, d] = rows('A', 'B', 'C', 'D');
     reconcile([a!, b!, c!, d!]);
@@ -334,7 +323,7 @@ describe('one row removed: the remove-one fast path', () => {
     expect(reconciler.get('C')!.value).toBe(c2);
   });
 
-  test('H-51: a changed row before the removed one is updated once, at its unchanged index', () => {
+  test('a changed row before the removed one is updated once, at its unchanged index', () => {
     const { reconcile, order } = setup({ trackIndex: true });
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);
@@ -342,7 +331,7 @@ describe('one row removed: the remove-one fast path', () => {
     expect(order()).toEqual(['A', 'B', 'anchor']);
   });
 
-  test('H-51: a row updated before the general path takes over is not updated again', () => {
+  test('a row updated before the general path takes over is not updated again', () => {
     const { reconcile, order, reconciler } = setup({ trackIndex: true });
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);
@@ -362,11 +351,11 @@ describe('one row removed: the remove-one fast path', () => {
   });
 });
 
-describe('one row fewer, but not one row removed (K21)', () => {
-  // Until H-50 the remove-one fast path removed the first row whose key differed and returned without
+describe('one row fewer, but not one row removed', () => {
+  // Until it was fixed, the remove-one fast path removed the first row whose key differed and returned without
   // checking the rows after it. Every shape below is a list one row shorter whose remaining keys do not
   // match the old rows after the removed one; the fast path now sees that and the general path runs.
-  test('H-50: [A, B] → [G] removes both rows and creates G', () => {
+  test('[A, B] → [G] removes both rows and creates G', () => {
     const { reconcile, order } = setup();
     reconcile(rows('A', 'B'));
     expect(reconcile(rows('G'))).toEqual([
@@ -382,7 +371,7 @@ describe('one row fewer, but not one row removed (K21)', () => {
     expect(reconcile([])).toEqual(['cleanup G', 'remove anchor', 'clear list', 'insert anchor before end']);
   });
 
-  test('H-50: [A, B, C] → [B, X] removes A and C and creates X', () => {
+  test('[A, B, C] → [B, X] removes A and C and creates X', () => {
     const { reconcile, order, reconciler } = setup();
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);
@@ -406,7 +395,7 @@ describe('one row fewer, but not one row removed (K21)', () => {
     ]);
   });
 
-  test('H-50: [A, B, C] → [A, X] removes B and C and creates X', () => {
+  test('[A, B, C] → [A, X] removes B and C and creates X', () => {
     const { reconcile, order } = setup();
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);
@@ -421,7 +410,7 @@ describe('one row fewer, but not one row removed (K21)', () => {
     expect(order()).toEqual(['A', 'X', 'anchor']);
   });
 
-  test('H-50: [A, B, C] → [C, B] removes A and puts B after C', () => {
+  test('[A, B, C] → [C, B] removes A and puts B after C', () => {
     const { reconcile, order } = setup();
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);
@@ -429,7 +418,7 @@ describe('one row fewer, but not one row removed (K21)', () => {
     expect(order()).toEqual(['C', 'B', 'anchor']);
   });
 
-  test('H-50: with index tracking, a kept row at a new position is updated with its index', () => {
+  test('with index tracking, a kept row at a new position is updated with its index', () => {
     const { reconcile, order } = setup({ trackIndex: true });
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);

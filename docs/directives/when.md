@@ -13,7 +13,7 @@ template: html`<div ${when(isVisible())}>This content shows when isVisible is tr
 ## Basic Usage
 
 ```typescript
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when } from 'thane';
 
 export const Toggle = defineComponent(() => {
   const show = signal(true);

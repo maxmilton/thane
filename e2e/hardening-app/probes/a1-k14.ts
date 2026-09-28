@@ -1,7 +1,7 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// A1-2 (K14, H-45): an event on an element with an empty id attribute. The id lookup ran
+// An event on an element with an empty id attribute. The id lookup ran
 // querySelector('#'), which throws.
 export const A1K14 = defineComponent('hardening-a1-k14', () => {
   const clicks = signal(0);

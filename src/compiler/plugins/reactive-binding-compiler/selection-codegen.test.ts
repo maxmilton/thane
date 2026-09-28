@@ -17,7 +17,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 const count = (js: string, re: RegExp): number => (js.match(re) ?? []).length;
@@ -34,9 +34,9 @@ describe('Selection bindings are lifted to one subscription per list', () => {
     expect(js).toMatch(/\.el\.className = ""/);
     expect(js).toMatch(/\.el\.className = "danger"/);
     // Rows still compute the value on creation (guarded: an empty class skips the write)
-    expect(js).toMatch(/if \(\(_p\d+ = selected\(\) === item\.id \? "danger" : ""\) !== ""\) _m0\.className = _p\d+/);
+    expect(js).toMatch(/if \(\(_p\d+ = selected\(\) === row\.id \? "danger" : ""\) !== ""\) _m0\.className = _p\d+/);
     // The row update path no longer recomputes it
-    expect(js).not.toMatch(/item2\.id \? "danger"/);
+    expect(js).not.toMatch(/row2\.id \? "danger"/);
   });
 
   test('the swapped operand order and !== are recognised with the values exchanged', async () => {

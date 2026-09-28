@@ -99,10 +99,7 @@ Computed signals:
 - **Differential tracking** — if a re-evaluation reads different signals than before, subscriptions are updated automatically. New deps are added, old deps are removed.
 - **Subscribe** — computeds expose `.subscribe()` just like regular signals.
 
-A computed is only marked dirty when its dependency notifies it, so while that notification is still waiting, a read returns the previous value. That happens in two places:
-
-- **Inside a `batch()` function.** The batch holds every notification back until it ends, so a computed read inside the function is stale; read it after `batch()` returns.
-- **While subscribers run.** A subscriber that writes a signal and then reads a computed over it sees the old value, because the signal is notified only after the current subscribers finish. The same holds for a computed built on other computeds, read in a subscriber of their source.
+A read is always fresh. Inside a `batch()` function, and while subscribers run, a source can have changed without having notified the computed yet; a computed read there computes again when any signal was written since it last computed:
 
 ```typescript
 import { signal, computed, batch } from 'thane';
@@ -112,12 +109,11 @@ const doubled = computed(() => price() * 2);
 
 batch(() => {
   price(20);
-  doubled(); // 20 — the previous value
+  doubled(); // 40
 });
-doubled(); // 40
 ```
 
-Where the new value is needed at once, read the source signals directly.
+Its subscribers are still notified once, with the final value, after the batch or the cascade.
 
 ### Disposing a Computed
 
@@ -189,7 +185,7 @@ Key behaviors:
 - Notifications are **deferred** until the outermost batch ends. Each changed signal is then notified **once**, with its final value, in the order the signals were first set. An effect that reads several of them runs once per changed signal, and sees the final values every time; a `computed` over several of them notifies once.
 - Batches **nest** — only the outermost batch triggers notifications.
 - A `batch()` called inside a subscriber notifies its signals, and any signal the cascade set before it, before it returns. The follow-up writes their subscribers make wait, like any write inside a subscriber, until the outer notification has finished.
-- A `computed` read inside the batch function returns its previous value (see [Computed Signals](#computed-signals)).
+- A `computed` read inside the batch function returns the value its sources give it now (see [Computed Signals](#computed-signals)).
 
 ---
 
@@ -221,13 +217,13 @@ display(); // still 'Count: 5' — label wasn't tracked
 
 ## Circular Dependencies
 
-Thane does not detect cycles. When subscribers keep setting each other's signals, each round of the cascade runs one level deeper on the call stack, so a cycle that never settles ends in a stack overflow:
+When subscribers keep setting each other's signals, each round of the cascade runs one level deeper on the call stack. In a development build (`thane dev`, `thane build` without `--prod`), a cycle that has not settled after 500 rounds stops with an error that says so, and later writes notify as usual:
 
 ```
-RangeError: Maximum call stack size exceeded
+Error: [thane] Signals keep setting each other: a subscriber's write triggers itself again, 500 cascades deep.
 ```
 
-After that the runtime's bookkeeping can be left broken, so that later writes are never notified: treat a cycle as a bug to fix, not an error to catch. A cascade that settles, such as two signals that set each other until a limit is reached, runs to the end; a very long one can still overflow the stack.
+The same holds for a `computed` whose subscriber sets the computed's own source; that error is reported the way any subscriber's error is, asynchronously. A production build has no check, which would cost every app bytes: there a cycle that never settles ends in a stack overflow (`RangeError: Maximum call stack size exceeded`), and the runtime's bookkeeping can be left broken, so that later writes are never notified. Treat a cycle as a bug to fix, not an error to catch. A cascade that settles, such as two signals that set each other until a limit is reached, runs to the end.
 
 ---
 

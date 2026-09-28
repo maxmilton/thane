@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, repeat } from 'thane';
 
 /**
  * Nested-directive scenario for the benchmark harness (`bun run bench --app nested`).

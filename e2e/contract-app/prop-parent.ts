@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import { PropChild } from './prop-child.js';
 
 type PropParentProps = {

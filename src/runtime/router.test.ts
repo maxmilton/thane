@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { matchRoute, defineRoutes } from './router.js';
+import { matchRoute, defineRoutes, href } from './router.js';
 import type { Route, RoutesMap } from './router.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -9,11 +9,14 @@ import type { Route, RoutesMap } from './router.js';
 /** Stub route — the component fn is never called in these tests. */
 const stubRoute = (title?: string): Route => ({
   component: () => Promise.resolve({}),
-  title,
+  meta: { title },
 });
 
 /** Stub notFound route used by defineRoutes tests. */
 const stubNotFound = stubRoute('404');
+
+/** The title a stub route carries */
+const titleOf = (route: Route): string | undefined => (route.meta as { title?: string } | undefined)?.title;
 
 // ─────────────────────────────────────────────────────────────
 //  matchRoute()
@@ -33,21 +36,31 @@ describe('matchRoute', () => {
   test('matches root path exactly', () => {
     const result = matchRoute('/', routes);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('Home');
+    expect(titleOf(result!.route)).toBe('Home');
     expect(result!.params).toEqual({});
   });
 
   test('matches static path exactly', () => {
     const result = matchRoute('/about', routes);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('About');
+    expect(titleOf(result!.route)).toBe('About');
     expect(result!.params).toEqual({});
+  });
+
+  test('a trailing slash matches the route without it: a host serves a route page at /about/', () => {
+    expect(matchRoute('/about/', routes)).toEqual({ pattern: '/about', route: routes['/about']!, params: {} });
+    expect(matchRoute('/users/7/', routes)).toEqual({
+      pattern: '/users/:id',
+      route: routes['/users/:id']!,
+      params: { id: '7' },
+    });
+    expect(matchRoute('/', routes)!.pattern).toBe('/');
   });
 
   test('matches nested static path exactly', () => {
     const result = matchRoute('/docs/guide', routes);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('Guide');
+    expect(titleOf(result!.route)).toBe('Guide');
     expect(result!.params).toEqual({});
   });
 
@@ -56,21 +69,21 @@ describe('matchRoute', () => {
   test('matches single param route and extracts param', () => {
     const result = matchRoute('/users/42', routes);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('User');
+    expect(titleOf(result!.route)).toBe('User');
     expect(result!.params).toEqual({ id: '42' });
   });
 
   test('matches single param route with string value', () => {
     const result = matchRoute('/users/alice', routes);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('User');
+    expect(titleOf(result!.route)).toBe('User');
     expect(result!.params).toEqual({ id: 'alice' });
   });
 
   test('matches multi-param route and extracts all params', () => {
     const result = matchRoute('/posts/99/comments/7', routes);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('Comment');
+    expect(titleOf(result!.route)).toBe('Comment');
     expect(result!.params).toEqual({ postId: '99', commentId: '7' });
   });
 
@@ -102,7 +115,7 @@ describe('matchRoute', () => {
     const notFound = stubRoute('404');
     const result = matchRoute('/nonexistent', routes, notFound);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('404');
+    expect(titleOf(result!.route)).toBe('404');
     expect(result!.params).toEqual({});
   });
 
@@ -110,7 +123,7 @@ describe('matchRoute', () => {
     const notFound = stubRoute('Not Found');
     const result = matchRoute('/a/b/c/d', routes, notFound);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('Not Found');
+    expect(titleOf(result!.route)).toBe('Not Found');
   });
 
   // ── Edge cases ──
@@ -122,7 +135,7 @@ describe('matchRoute', () => {
     };
     const result = matchRoute('/users/me', routesWithOverlap);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('Current User');
+    expect(titleOf(result!.route)).toBe('Current User');
     expect(result!.params).toEqual({});
   });
 
@@ -135,13 +148,13 @@ describe('matchRoute', () => {
     const notFound = stubRoute('Empty 404');
     const result = matchRoute('/anything', {}, notFound);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('Empty 404');
+    expect(titleOf(result!.route)).toBe('Empty 404');
   });
 
-  test('param values can contain special characters (url-encoded segments)', () => {
-    const result = matchRoute('/users/hello%20world', routes);
-    expect(result).not.toBeNull();
-    expect(result!.params).toEqual({ id: 'hello%20world' });
+  test('param values are decoded; a malformed escape is kept as written', () => {
+    expect(matchRoute('/users/hello%20world', routes)!.params).toEqual({ id: 'hello world' });
+    expect(matchRoute('/users/caf%C3%A9', routes)!.params).toEqual({ id: 'café' });
+    expect(matchRoute('/users/100%', routes)!.params).toEqual({ id: '100%' });
   });
 
   test('matches route with trailing static and param', () => {
@@ -150,8 +163,22 @@ describe('matchRoute', () => {
     };
     const result = matchRoute('/api/v2/status', trailingRoutes);
     expect(result).not.toBeNull();
-    expect(result!.route.title).toBe('API Status');
+    expect(titleOf(result!.route)).toBe('API Status');
     expect(result!.params).toEqual({ version: 'v2' });
+  });
+});
+
+describe('href', () => {
+  test('fills in every parameter, URL-encoded, and keeps the static segments', () => {
+    expect(href('/users/:id', { id: 42 })).toBe('/users/42');
+    expect(href('/users/:id/posts/:post', { id: 'a b', post: 'x/y?z' })).toBe('/users/a%20b/posts/x%2Fy%3Fz');
+    expect(href('/:lang/about', { lang: 'en' })).toBe('/en/about');
+  });
+
+  test('what it gives, matchRoute reads back as the same params', () => {
+    const routes: RoutesMap = { '/users/:id/posts/:post': stubRoute('Post') };
+    const params = { id: 'café & co', post: '100%' };
+    expect(matchRoute(href('/users/:id/posts/:post', params), routes)!.params).toEqual(params);
   });
 });
 
@@ -163,7 +190,7 @@ describe('defineRoutes', () => {
   test('accepts eager component routes', () => {
     const eagerComponent = { __f: () => ({ root: {} as any }) } as any;
     const routes = defineRoutes({
-      '/': { component: eagerComponent, title: 'Home' },
+      '/': { component: eagerComponent, meta: { title: 'Home' } },
       'notFound': stubNotFound,
     });
 
@@ -274,14 +301,14 @@ describe('matchRoute + defineRoutes integration', () => {
     const { notFound, ...routeMap } = config;
 
     const homeResult = matchRoute('/', routeMap);
-    expect(homeResult!.route.title).toBe('Home');
+    expect(titleOf(homeResult!.route)).toBe('Home');
 
     const itemResult = matchRoute('/items/abc', routeMap);
-    expect(itemResult!.route.title).toBe('Item');
+    expect(titleOf(itemResult!.route)).toBe('Item');
     expect(itemResult!.params).toEqual({ id: 'abc' });
 
     const missResult = matchRoute('/nope', routeMap, notFound);
-    expect(missResult!.route.title).toBe('404');
+    expect(titleOf(missResult!.route)).toBe('404');
   });
 });
 

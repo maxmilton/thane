@@ -1,7 +1,7 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// A1-1: text bindings at the start, middle and end of mixed text, two in a row, next to developer
+// Text bindings at the start, middle and end of mixed text, two in a row, next to developer
 // comments, inside <pre>, as sole content, and at the top level of the template.
 export const A1Text = defineComponent('hardening-a1-text', () => {
   const a = signal('A');

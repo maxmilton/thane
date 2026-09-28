@@ -1,114 +1,97 @@
 /**
  * THANE411 — duplicate-mount-target
  *
- * Detects multiple `mount()` calls in the same file that target the same
- * element or use the default target (document.body). Mounting two components
- * to the same target appends duplicate content and causes binding collisions.
+ * Detects multiple `mount()` calls in the same scope that target the same element, the default
+ * target (document.body) included. Mounting two components to the same target appends duplicate
+ * content and causes binding collisions.
  *
  * This is a compile-time check — no runtime overhead is added.
  *
- *   mount(App);                                    // ✅ single mount
+ *   mount({ component: App });                                          // ✅ single mount
  *
- *   mount(App);                                    // ❌ THANE411
- *   mount(App);                                    //    duplicate default mount
+ *   mount({ component: App });                                          // ❌ THANE411
+ *   mount({ component: Other, target: document.body });                //    both document.body
  *
- *   mount(App, document.getElementById('app'));    // ✅ different target
- *   mount(Other, document.getElementById('nav'));  // ✅ different target
+ *   mount({ component: App, target: document.getElementById('app') }); // ✅ different targets
+ *   mount({ component: Nav, target: document.getElementById('nav') });
  *
- *   mount(App, el);                                // ❌ THANE411 if same variable
- *   mount(Other, el);
+ *   mount({ component: App, target: el });                             // ❌ THANE411
+ *   mount({ component: Other, target: el! });                          //    the same variable
  */
 
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
 import { ErrorCode } from '../../../errors.js';
+import { isFunctionCall } from '../../../utils/ast-utils.js';
 import { createReporter, locate } from './lint-utils.js';
 
-const isMountCall = (node: ts.CallExpression): boolean => {
-  return ts.isIdentifier(node.expression) && node.expression.text === 'mount';
+const DEFAULT_TARGET = 'document.body';
+
+/** A target expression without the parentheses, non-null assertions and casts around it */
+const unwrap = (expression: ts.Expression): ts.Expression =>
+  ts.isParenthesizedExpression(expression) || ts.isNonNullExpression(expression) || ts.isAsExpression(expression)
+    ? unwrap(expression.expression)
+    : expression;
+
+/** The key a target is compared by: a variable by its name, anything else by its source text. */
+const keyOf = (target: ts.Expression, sourceFile: ts.SourceFile): string => {
+  const inner = unwrap(target);
+  return ts.isIdentifier(inner) ? `var:${inner.text}` : inner.getText(sourceFile);
 };
 
 /**
- * Derive a "target key" from a mount() call.
- *
- * New API:   mount({ target: document.getElementById('app') })
- * Legacy:    mount(App, document.getElementById('app'))
- *
- * If no target, the target is 'document.body' (default). An identifier
- * target is keyed by its name (`var:el`), any other target by its source
- * text (`document.body`, `document.getElementById('app')`).
+ * The key of a `mount({ target, … })` call's target; document.body when it has none. A call whose
+ * options are not an object literal (`mount(options)`, `mount(...args)`) has a target the rule cannot
+ * know, and is not compared.
  */
-const getTargetKey = (call: ts.CallExpression, sourceFile: ts.SourceFile): string => {
-  const keyOf = (target: ts.Expression) =>
-    ts.isIdentifier(target) ? `var:${target.text}` : target.getText(sourceFile);
-  const firstArg = call.arguments[0];
-
-  // New API: mount({ component?, target?, ... })
-  if (firstArg && ts.isObjectLiteralExpression(firstArg)) {
-    for (const prop of firstArg.properties) {
-      if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name) && prop.name.text === 'target') {
-        return keyOf(prop.initializer);
-      }
-    }
-    return '__default_body__';
+const getTargetKey = (call: ts.CallExpression, sourceFile: ts.SourceFile): string | null => {
+  const options = call.arguments[0];
+  if (!options || !ts.isObjectLiteralExpression(options)) return null;
+  for (const prop of options.properties) {
+    const name = prop.name && (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name)) ? prop.name.text : '';
+    if (name !== 'target') continue;
+    if (ts.isShorthandPropertyAssignment(prop)) return `var:${prop.name.text}`;
+    if (ts.isPropertyAssignment(prop)) return keyOf(prop.initializer, sourceFile);
   }
-
-  // Legacy: mount(Component, target)
-  const target = call.arguments[1];
-  return target ? keyOf(target) : '__default_body__';
+  return DEFAULT_TARGET;
 };
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
   const { diagnostics, report } = createReporter(sourceFile, filePath, ErrorCode.DUPLICATE_MOUNT_TARGET, 'warning');
 
-  // Only check entry-point files (files that call mount())
-  // Collect all mount() calls, scoped to the function/arrow body they appear in.
-  // mount() calls inside different closures may legally use variables with the
-  // same name (e.g. `const t = document.createElement('div')` in three separate
-  // arrow functions) — these must NOT be flagged as duplicates.
-
+  // mount() calls are compared within the function they appear in: calls in different closures may
+  // legally use variables of the same name (a `const t = document.createElement('div')` in each)
   const scopeStack: Array<Map<string, ts.CallExpression>> = [new Map()];
 
-  const currentScope = () => scopeStack[scopeStack.length - 1]!;
-
   const visit = (node: ts.Node) => {
-    // Push a new scope for function-like boundaries (function declarations,
-    // arrow functions, method declarations). This means mount() calls inside
-    // different closures get independent duplicate tracking.
     const isScopeBoundary =
       ts.isFunctionDeclaration(node) ||
       ts.isFunctionExpression(node) ||
       ts.isArrowFunction(node) ||
       ts.isMethodDeclaration(node);
+    if (isScopeBoundary) scopeStack.push(new Map());
 
-    if (isScopeBoundary) {
-      scopeStack.push(new Map());
-    }
-
-    if (ts.isCallExpression(node) && isMountCall(node)) {
-      const targetKey = getTargetKey(node, sourceFile);
-      const scope = currentScope();
+    const targetKey =
+      ts.isCallExpression(node) && isFunctionCall(node, 'mount') ? getTargetKey(node, sourceFile) : null;
+    if (targetKey !== null) {
+      const scope = scopeStack[scopeStack.length - 1]!;
       const existing = scope.get(targetKey);
       if (existing) {
-        const targetDesc = targetKey === '__default_body__' ? 'document.body (default)' : targetKey;
         report(
           node,
-          `Duplicate mount() call targeting ${targetDesc}. ` +
+          `Duplicate mount() call targeting ${targetKey}. ` +
             `A previous mount() to the same target was found at line ${locate(sourceFile, existing).line}. ` +
             'Mounting multiple components to the same target appends duplicate content ' +
             'and causes binding collisions. Use a different target element for each mount().',
         );
       } else {
-        scope.set(targetKey, node);
+        scope.set(targetKey, node as ts.CallExpression);
       }
     }
 
     ts.forEachChild(node, visit);
-
-    if (isScopeBoundary) {
-      scopeStack.pop();
-    }
+    if (isScopeBoundary) scopeStack.pop();
   };
 
   visit(sourceFile);

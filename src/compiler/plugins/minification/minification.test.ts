@@ -154,7 +154,8 @@ export const App = defineComponent('test-app', () => ({
 }));
 mount({ component: App });
 `);
-    expect(js).toContain('<section><h1>Title</h1></section>');
+    // Whitespace on one line between tags is one space; with a line break in it, it would go
+    expect(js).toContain('<section> <h1>Title</h1> </section>');
     expect(js).toContain('.card{padding:1rem}');
   });
 });
@@ -227,7 +228,7 @@ export const ChildCard = defineComponent(() => ({
 }));
 `;
 
-  // The child's host element is in the parent's template (A1-4), so host creation is the template's tag
+  // The child's host element is in the parent's template, so host creation is the template's tag
   test('component selectors are renamed consistently in registration, host creation and CSS', async () => {
     const js = await prod(
       `
@@ -348,5 +349,29 @@ mount({ component: AppRoot });
     expect(html).not.toContain('app-root');
     expect(html).toMatch(/<([a-z]+-[a-z]+)><\/\1>/);
     expect(html).toContain('<script>\n// boot note\nwindow.booted = true;\n</script>');
+  });
+});
+
+describe('Selector plan', () => {
+  // The selectors planned are the components the entry points reach: another component anywhere under
+  // the project (a second app, a test fixture) used to take a short name, and shift everyone else's
+  const main =
+    "import { mount } from 'thane';\nimport { App } from './app.js';\nmount({ component: App, target: document.getElementById('app')! });\n";
+  const component = (name: string, selector: string, template: string, imports = '') =>
+    `import { defineComponent } from 'thane';\n${imports}export const ${name} = defineComponent('${selector}', () => ({ template: html\`${template}\`, styles: css\`:host { display: block; }\` }));\n`;
+  const app = {
+    'src/app.ts': component('App', 'zz-app', '<main>${Kid({})}</main>', "import { Kid } from './kid.js';\n"),
+    'src/kid.ts': component('Kid', 'zz-kid', '<b>kid</b>'),
+  };
+
+  test('a component the entry does not reach changes no selector name', async () => {
+    const alone = await prod(main, app);
+    const withOthers = await prod(main, {
+      ...app,
+      'src/other/a.ts': component('A', 'aa-first', '<i>a</i>'),
+      'src/other/b.ts': component('B', 'ab-second', '<i>b</i>'),
+    });
+    expect(alone).not.toContain('zz-kid');
+    expect(withOthers).toBe(alone);
   });
 });

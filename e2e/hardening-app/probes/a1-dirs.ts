@@ -1,8 +1,8 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, whenElse } from 'thane';
 import { expose } from '../shared/expose.js';
 import { CountingKid } from '../shared/counting-kid.js';
 
-// A1-1: when() / whenElse() as the only child of an element, next to text, and nested three deep,
+// when() / whenElse() as the only child of an element, next to text, and nested three deep,
 // each with bindings, an event and a child component inside. The spec toggles each one five times
 // and counts the children's onMount / onDestroy calls.
 export const A1Dirs = defineComponent('hardening-a1-dirs', () => {

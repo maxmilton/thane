@@ -1,8 +1,8 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, whenElse, repeat } from 'thane';
 import { expose } from './expose.js';
 
 /**
- * A1-1: developer ids on bound elements, on directive roots, on a repeat container and on an element
+ * Developer ids on bound elements, on directive roots, on a repeat container and on an element
  * inside a hidden branch. The a1ids probe places two instances of it and one IdsB on one page, so
  * every id is duplicated; each instance must bind its own elements.
  */

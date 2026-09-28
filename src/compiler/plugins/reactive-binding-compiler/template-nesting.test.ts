@@ -18,7 +18,7 @@ export const FixtureApp = defineComponent('fixture-app', () => ({
   template: html\`<main data-testid="fixture-root">\${shell}</main>\`,
 }));
 
-mount(FixtureApp);
+mount({ component: FixtureApp });
 `;
 
   const project = await createTempProject(source);
@@ -40,7 +40,7 @@ export const FixtureApp = defineComponent('fixture-app', () => ({
   template: html\`<main>\${html\`<div data-testid="bad-nested">nested</div>\`}</main>\`,
 }));
 
-mount(FixtureApp);
+mount({ component: FixtureApp });
 `;
 
   const project = await createTempProject(source);

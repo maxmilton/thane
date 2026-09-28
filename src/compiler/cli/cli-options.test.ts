@@ -1,6 +1,6 @@
 /**
  * Characterisation of CLI option handling that the golden matrix (cli-matrix.test.ts) does not
- * reach (before CL-1): the help text verbatim, arguments named like Object.prototype members,
+ * reach: the help text verbatim, arguments named like Object.prototype members,
  * config files with unusual value shapes, and a repeated --config.
  */
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
@@ -69,7 +69,7 @@ describe('arguments named like Object.prototype members', () => {
     });
   }
   for (const arg of ['constructor', 'toString', '__proto__', 'valueOf']) {
-    test(`${arg} is a stray positional (warned about since H-24)`, () => {
+    test(`${arg} is a stray positional, and is warned about`, () => {
       const warn = spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const opts = parseArgs([arg]);
@@ -103,7 +103,12 @@ describe('config files', () => {
       command: 'dev',
     };
     const { dir, result, warnings } = resolveWith({ 'thane.config.json': JSON.stringify(cfg) }, []);
-    expect(warnings).toEqual([]);
+    // The CLI-only keys are not read from a config file, and each is reported
+    expect(warnings).toEqual(
+      ['logLevel', 'configPath', 'exitRequested', 'serve', 'command'].map(
+        (key) => `Warning: Unknown key '${key}' in thane.config.json is ignored.`,
+      ),
+    );
     expect(result).toEqual({
       command: 'build',
       prod: false,
@@ -180,7 +185,7 @@ describe('config files', () => {
   });
 });
 
-describe('H-24: one rule for bare value flags, with or without a config file', () => {
+describe('one rule for bare value flags, with or without a config file', () => {
   const CONFIG = { 'thane.config.json': JSON.stringify({ host: 'cfg-host', port: 5000, entry: './cfg.ts' }) };
 
   for (const [label, files] of [
@@ -217,7 +222,7 @@ describe('H-24: one rule for bare value flags, with or without a config file', (
   }
 });
 
-describe('H-34: --help and --version with a config file', () => {
+describe('help and --version with a config file', () => {
   const CONFIG = { 'thane.config.json': JSON.stringify({ port: 1 }) };
 
   test('each flag is carried over', () => {
@@ -250,5 +255,39 @@ describe('H-34: --help and --version with a config file', () => {
       log.mockRestore();
       info.mockRestore();
     }
+  });
+});
+
+describe('config file keys nothing reads are reported', () => {
+  const warningsFor = (cfg: unknown) => resolveWith({ 'thane.config.json': JSON.stringify(cfg) }, []).warnings;
+
+  test('a misspelled key, with the key it most likely means', () => {
+    expect(warningsFor({ outdir: 'dist', portt: 1, dropconsole: false })).toEqual([
+      "Warning: Unknown key 'outdir' in thane.config.json is ignored; did you mean 'outDir'?",
+      "Warning: Unknown key 'portt' in thane.config.json is ignored; did you mean 'port'?",
+      "Warning: Unknown key 'dropconsole' in thane.config.json is ignored; did you mean 'dropConsole'?",
+    ]);
+  });
+
+  test('the removed app key, and a key that is nothing like an option', () => {
+    expect(warningsFor({ app: 'x', whatever: 1 })).toEqual([
+      "Warning: Unknown key 'app' in thane.config.json is ignored.",
+      "Warning: Unknown key 'whatever' in thane.config.json is ignored.",
+    ]);
+  });
+
+  test('commands: an unknown command, a section that is not an object, a misspelled key in a section', () => {
+    expect(warningsFor({ commands: { biuld: {}, dev: 5, serve: { hots: 'x' }, types: null } })).toEqual([
+      "Warning: Unknown command 'biuld' in 'commands' in thane.config.json is ignored; did you mean 'build'?",
+      "Warning: 'commands.dev', which is not an object, in thane.config.json is ignored.",
+      "Warning: Unknown key 'hots' in 'commands.serve' in thane.config.json is ignored; did you mean 'host'?",
+    ]);
+    expect(warningsFor({ commands: ['build'] })).toEqual([
+      "Warning: 'commands', which is not an object of command names, in thane.config.json is ignored.",
+    ]);
+  });
+
+  test('$schema and every option are read without a warning', () => {
+    expect(warningsFor({ $schema: './schema.json', prod: true, commands: { build: { outDir: 'd' } } })).toEqual([]);
   });
 });

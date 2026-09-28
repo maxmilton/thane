@@ -78,7 +78,7 @@ export const createBuildContext = async (projectRoot?: string): Promise<BuildCon
   const workspaceRoot = process.cwd();
   const tsFilter = (name: string) => name.endsWith('.ts') && !name.endsWith('.d.ts');
 
-  const componentsByName = new Map<string, ComponentDefinition>();
+  const components: ComponentDefinition[] = [];
   const componentsBySelector = new Map<string, ComponentDefinition>();
 
   sourceCache.clear();
@@ -94,13 +94,13 @@ export const createBuildContext = async (projectRoot?: string): Promise<BuildCon
     if (cached) {
       const definitions = extractComponentDefinitions(cached.sourceFile, filePath);
       for (const def of definitions) {
-        componentsByName.set(def.name, def);
+        components.push(def);
         componentsBySelector.set(def.selector, def);
       }
     }
   }
 
-  return { tsFiles, componentsByName, componentsBySelector };
+  return { tsFiles, projectRoot: projectRoot ?? workspaceRoot, components, componentsBySelector };
 };
 
 /**
@@ -120,4 +120,18 @@ export const resolveProjectRoot = (entryFile: string): string => {
     if (parent === dir) return entryDir;
     dir = parent;
   }
+};
+
+/**
+ * A warning when the project root lies above the folder Thane runs in. That folder has no package.json
+ * or tsconfig.json of its own, so it builds as part of the enclosing one (a scratch app inside a
+ * repository), which is rarely what was meant. Null when the root is that folder or elsewhere.
+ */
+export const projectRootWarning = (projectRoot: string, cwd: string = process.cwd()): string | null => {
+  const inside = path.relative(path.resolve(projectRoot), path.resolve(cwd));
+  if (!inside || inside.startsWith('..') || path.isAbsolute(inside)) return null;
+  return (
+    `${cwd} has no package.json or tsconfig.json, so it builds as part of ${projectRoot}: the type check ` +
+    'and the generated .thane types cover that whole folder. Add a package.json here to build this folder on its own.'
+  );
 };

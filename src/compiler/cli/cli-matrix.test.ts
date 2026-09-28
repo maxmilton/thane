@@ -1,5 +1,5 @@
 /**
- * Golden matrix of CLI option resolution (F0-2 item 5, before CL-1 and CL-5).
+ * Golden matrix of CLI option resolution.
  *
  * `resolveCLIOptions(args)` is run for every flag `parseArgs` knows, with and without a value,
  * plus repeated flags, negation pairs in both orders, bare value flags followed by another flag,
@@ -26,7 +26,6 @@ const GOLDEN = join(import.meta.dir, 'cli-matrix.golden.json');
 const CONFIG_TRUE = {
   prod: true,
   gzip: true,
-  app: 'cfg-app',
   entry: './cfg/main.ts',
   outDir: './cfg-dist',
   assetsDir: './cfg-assets',
@@ -47,7 +46,6 @@ const CONFIG_TRUE = {
   splitting: true,
   legalComments: 'linked',
   analyze: true,
-  notAnOption: 1,
   commands: {
     build: { base: '/cfg-build/' },
     dev: { port: 5001, entry: './cfg/dev.ts', prod: true },
@@ -59,7 +57,6 @@ const CONFIG_FALSE_JSONC = `{
   // every boolean false, every value different from the other config
   "prod": false,
   "gzip": false,
-  "app": "cfg2-app",
   "entry": "./cfg2/main.ts",
   "outDir": "./cfg2-dist",
   "assetsDir": "./cfg2-assets",
@@ -240,7 +237,7 @@ const normalise = (value: unknown, cwd: string): Json => {
   return value as Json;
 };
 
-/** The resolved options, or `{ "(error)": message }` when resolving throws (H-24: `--port abc`). */
+/** The resolved options, or `{ "(error)": message }` when resolving throws (`--port abc`). */
 const resolveIn = (state: State, args: string[]): { result: Json; warnings: string[] } => {
   process.chdir(dirs[state]);
   const cwd = process.cwd();

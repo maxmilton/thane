@@ -4,6 +4,7 @@ import type { OnStartResult, Plugin } from 'esbuild';
 import { syncProjectTypes } from '../router-typegen/router-typegen.js';
 import { collectFilesRecursively, logger, PLUGIN_NAME } from '../../utils/index.js';
 import { ErrorCode, createError } from '../../errors.js';
+import { EVENT_TYPES_DECLARATION, rewriteEventHandlers, type RewrittenSource } from './event-handler-types.js';
 
 const NAME = PLUGIN_NAME.TYPE_CHECK;
 
@@ -49,13 +50,12 @@ async function checkProject(strict: boolean, projectRoot: string): Promise<void>
   const generatedTypeFiles = await collectFilesRecursively(generatedTypesRoot, (fileName) =>
     fileName.endsWith('.d.ts'),
   );
-  const rootNames = Array.from(new Set([...parsedConfig.fileNames, ...generatedTypeFiles]));
+  const options: ts.CompilerOptions = { ...parsedConfig.options, noEmit: true };
+  const { host, rootNames: eventTypesRoots, mapDiagnostic } = eventTypedHost(options, generatedTypesRoot);
+  const rootNames = Array.from(new Set([...parsedConfig.fileNames, ...generatedTypeFiles, ...eventTypesRoots]));
 
-  const program = ts.createProgram({
-    rootNames,
-    options: { ...parsedConfig.options, noEmit: true },
-  });
-  const diagnostics = ts.getPreEmitDiagnostics(program);
+  const program = ts.createProgram({ rootNames, options, host });
+  const diagnostics = ts.getPreEmitDiagnostics(program).map(mapDiagnostic);
 
   if (diagnostics.length === 0) {
     return;
@@ -81,6 +81,58 @@ async function checkProject(strict: boolean, projectRoot: string): Promise<void>
   console.error(formatted);
   console.error('---------------------------------------------------------------');
 }
+
+/**
+ * A compiler host that serves each project source with its template event handlers typed
+ * (event-handler-types.ts), the declaration of their type as one more root file, and the way to
+ * map a diagnostic in a rewritten source back to the source as written. A program without the DOM
+ * library has no event types, so nothing is rewritten.
+ */
+const eventTypedHost = (
+  options: ts.CompilerOptions,
+  generatedTypesRoot: string,
+): { host: ts.CompilerHost; rootNames: string[]; mapDiagnostic: (d: ts.Diagnostic) => ts.Diagnostic } => {
+  const host = ts.createCompilerHost(options);
+  const hasDom = !options.lib || options.lib.some((lib) => lib.toLowerCase().includes('dom'));
+  if (!hasDom) return { host, rootNames: [], mapDiagnostic: (d) => d };
+
+  const declarationFile = path.join(generatedTypesRoot, 'event-handlers.d.ts').replace(/\\/g, '/');
+  const rewritten = new Map<string, { rewrite: RewrittenSource; text: string; original?: ts.SourceFile }>();
+  const getSourceFile = host.getSourceFile;
+  const fileExists = host.fileExists;
+  host.fileExists = (fileName) => fileName === declarationFile || fileExists.call(host, fileName);
+  host.getSourceFile = (fileName, languageVersion, onError, shouldCreateNewSourceFile) => {
+    if (fileName === declarationFile) return ts.createSourceFile(fileName, EVENT_TYPES_DECLARATION, languageVersion);
+    if (fileName.endsWith('.ts') && !fileName.endsWith('.d.ts') && !fileName.includes('/node_modules/')) {
+      const text = host.readFile(fileName);
+      const rewrite = text === undefined ? null : rewriteEventHandlers(fileName, text);
+      if (rewrite) {
+        rewritten.set(fileName, { rewrite, text: text! });
+        return ts.createSourceFile(fileName, rewrite.text, languageVersion);
+      }
+    }
+    return getSourceFile.call(host, fileName, languageVersion, onError, shouldCreateNewSourceFile);
+  };
+
+  /** A diagnostic's file and span, moved from a rewritten source to the source as written. */
+  const mapLocation = <
+    T extends { file: ts.SourceFile | undefined; start: number | undefined; length: number | undefined },
+  >(
+    located: T,
+  ): T => {
+    const entry = located.file && rewritten.get(located.file.fileName);
+    if (!entry || located.start === undefined) return located;
+    entry.original ??= ts.createSourceFile(located.file!.fileName, entry.text, ts.ScriptTarget.Latest);
+    return { ...located, file: entry.original, ...entry.rewrite.toOriginal(located.start, located.length ?? 0) };
+  };
+  const mapDiagnostic = (diagnostic: ts.Diagnostic): ts.Diagnostic => {
+    const mapped = mapLocation(diagnostic);
+    return diagnostic.relatedInformation
+      ? { ...mapped, relatedInformation: diagnostic.relatedInformation.map(mapLocation) }
+      : mapped;
+  };
+  return { host, rootNames: [declarationFile], mapDiagnostic };
+};
 
 export const TSCTypeCheckerPlugin = (options?: { strict?: boolean; projectRoot?: string | undefined }): Plugin => {
   const strict = options?.strict ?? true;

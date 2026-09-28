@@ -1,14 +1,12 @@
 /**
- * Characterisation of sole-content analysis for row text bindings (F0-2 item 9, before TA-7).
+ * Characterisation of sole-content analysis for row text bindings.
  *
  * A row text binding that is the only content of its element is rendered through that
  * element's text node (`textNode`, the element gets the mark); otherwise a comment marker is
- * placed before it (`commentMarker`). Until TA-7 the decision was made by
- * `analyzeTextBindingContext`, which scanned the raw row template; since TA-7 it is read from
- * the parse tree (`soleContentParent`, repeat-analysis.ts). The table pins, for each row
+ * placed before it (`commentMarker`). The decision used to be made by a scan of the raw row
+ * template; it is read from the parse tree (`soleContentParent`, repeat-analysis.ts). The table pins, for each row
  * template, the processed row template (where the id or marker goes) and each item binding's
- * mode. Rows marked "defect" show today's behaviour where it is wrong; rows marked "TA-7"
- * changed with the parse-tree rule (see the TA-7 commits).
+ * mode. Rows marked "defect" show today's behaviour where it is wrong.
  */
 import { describe, expect, test } from 'bun:test';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
@@ -50,9 +48,9 @@ describe('sole content: text node', () => {
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
-      'surrounded by whitespace',
+      'surrounded by whitespace, which goes: the row writes the whole text',
       '<li>  ${item.name}  </li>',
-      '<li data-thane-ref="i1"> ${item.name} </li>',
+      '<li data-thane-ref="i1">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
@@ -169,43 +167,43 @@ describe('sole content: comment marker', () => {
 describe('sole content: defects pinned as they are', () => {
   table([
     [
-      // Before TA-7 the scan took `<img …>` as the parent and put the text into the void element (H-32)
-      'TA-7: a void sibling before gets a comment marker',
+      // Before the parse-tree rule, the scan took `<img …>` as the parent and put the text into the void element
+      'a void sibling before gets a comment marker',
       '<li><img src="x">${item.name}</li>',
       '<li><img src="x"><!--i1-->${item.name}</li>',
       [['i1', 'text', 'item.name', 'commentMarker']],
     ],
     [
-      // Before TA-7 the scan took the comment as the parent tag: text-node mode with no element id (H-32)
-      'TA-7: a comment before gets a comment marker',
+      // Before the parse-tree rule, the scan took the comment as the parent tag: text-node mode with no element id
+      'a comment before gets a comment marker',
       '<li><!-- c -->${item.name}</li>',
       '<li><!-- c --><!--i1-->${item.name}</li>',
       [['i1', 'text', 'item.name', 'commentMarker']],
     ],
     [
       // The parser leaves a <p> closed by its parent unclosed, so the parent is <li>, which has a
-      // child element. Before TA-7 the scan accepted </li> as the <p>'s close: a text node on <p>
-      'TA-7: an element closed by its parent holds nothing',
+      // child element. Before the parse-tree rule, the scan accepted </li> as the <p>'s close: a text node on <p>
+      'an element closed by its parent holds nothing',
       '<li><p>${item.a}</li>',
       '<li><p><!--i1-->${item.a}</li>',
       [['i1', 'text', 'item.a', 'commentMarker']],
     ],
     [
-      // Until H-12 the row-expression regex stopped at the first `}`: the expression was cut and `)}`
-      // was left as row text (K3)
-      'H-12: nested braces in the expression',
+      // Until it was fixed, the row-expression regex stopped at the first `}`: the expression was cut and `)}`
+      // was left as row text
+      'nested braces in the expression',
       '<li>${fmt({ a: item.a })}</li>',
       '<li data-thane-ref="i1">${fmt({ a: item.a })}</li>',
       [['i1', 'text', 'fmt({ a: item.a })', 'textNode']],
     ],
     [
-      'H-12: a nested template literal in the expression',
+      'a nested template literal in the expression',
       '<li>${`x${item.a}`}</li>',
       '<li data-thane-ref="i1">${`x${item.a}`}</li>',
       [['i1', 'text', '`x${item.a}`', 'textNode']],
     ],
     [
-      'H-12: a brace in a string in the expression, and two levels of braces',
+      'a brace in a string in the expression, and two levels of braces',
       "<li>${item.on ? '}' : fmt({ a: { b: item.a } })}</li>",
       '<li data-thane-ref="i1">${item.on ? \'}\' : fmt({ a: { b: item.a } })}</li>',
       [['i1', 'text', "item.on ? '}' : fmt({ a: { b: item.a } })", 'textNode']],
@@ -213,41 +211,40 @@ describe('sole content: defects pinned as they are', () => {
   ]);
 });
 
-// Shapes outside the F0-2 table where the scanner's text heuristics misread the parent's tag,
-// added before TA-7. The parse tree reads the tag correctly: each binding is the sole content.
+// Shapes where the old scanner's text heuristics misread the parent's tag. The parse tree reads the tag correctly: each binding is the sole content.
 describe('sole content: the parent tag as the parser reads it', () => {
   table([
     [
-      // Before TA-7 the scan for the end of the open tag stopped at the `>` in the value: comment marker
-      'TA-7: a > in a quoted attribute value of the parent',
+      // Before the parse-tree rule, the scan for the end of the open tag stopped at the `>` in the value: comment marker
+      'a > in a quoted attribute value of the parent',
       '<li title="a>b">${item.name}</li>',
       '<li data-thane-ref="i1" title="a>b">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
-      'TA-7: a /> in a quoted attribute value of the parent',
+      'a /> in a quoted attribute value of the parent',
       '<li title="a/>">${item.name}</li>',
       '<li data-thane-ref="i1" title="a/>">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
-      // Before TA-7 the backward scan took `<b">` as the parent: no element got the id, and the
+      // Before the parse-tree rule, the backward scan took `<b">` as the parent: no element got the id, and the
       // build failed in generateStaticRepeatTemplate (THANE202, element path)
-      'TA-7: a < in a quoted attribute value of the parent',
+      'a < in a quoted attribute value of the parent',
       '<li title="a<b">${item.name}</li>',
       '<li data-thane-ref="i1" title="a<b">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
       // The same with the < inside an attribute expression; the li's id comes from that binding
-      'TA-7: a < in an attribute expression of the parent',
+      'a < in an attribute expression of the parent',
       '<li title="${a() < 1}">${item.name}</li>',
       '<li data-thane-ref="b1" title="${a() < 1}">${item.name}</li>',
       [['b1', 'text', 'item.name', 'textNode']],
     ],
     [
-      // Before TA-7 the forward scan only accepted `</name>`: comment marker
-      'TA-7: whitespace in the closing tag',
+      // Before the parse-tree rule, the forward scan only accepted `</name>`: comment marker
+      'whitespace in the closing tag',
       '<li>${item.name}</li >',
       '<li data-thane-ref="i1">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],

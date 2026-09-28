@@ -45,7 +45,7 @@ describe('parseArgs', () => {
     expect(parseArgs(['--gzip']).gzip).toBe(true);
   });
 
-  test('--app is an unknown flag and its value a stray positional (CL-5), warned about since H-24', () => {
+  test('--app is an unknown flag and its value a stray positional, and is warned about', () => {
     const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
     const opts = parseArgs(['--app', 'my-app']);
     expect(warnSpy.mock.calls).toEqual([

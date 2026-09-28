@@ -165,7 +165,7 @@ describe('compileCssTemplate', () => {
   });
 });
 
-describe('H-19 (ii): :host-context(X) becomes X &', () => {
+describe('(ii): :host-context(X) becomes X &', () => {
   test('in every build, before the runtime scoper sees it', () => {
     const css = ':host-context(.dark) .title { color: red; }';
     expect(transformCss(css, {})).toBe('.dark & .title { color: red; }');
@@ -186,7 +186,7 @@ describe('H-19 (ii): :host-context(X) becomes X &', () => {
     expect(transformCss(':host-context(:not([data-x=")"])) .a { }', {})).toBe(':not([data-x=")"]) & .a { }');
   });
 
-  test('strings are left alone, and so is an unclosed argument (comments go, see H-19 (iii))', () => {
+  test('strings are left alone, and so is an unclosed argument (comments go)', () => {
     const untouched = [
       '.a::before { content: ":host-context(.x)"; }',
       ".a { background: url(':host-context(.x)'); }",
@@ -202,7 +202,7 @@ describe('H-19 (ii): :host-context(X) becomes X &', () => {
   });
 });
 
-describe('H-19 (iii): comments go in a development build too', () => {
+describe('(iii): comments go in a development build too', () => {
   const css = ".a {\n  /* it's a note */\n  color: blue;\n}\n.b { color: red; }\n";
 
   test('each comment becomes a space, and the runtime scoper then scopes every rule', () => {
@@ -229,7 +229,7 @@ describe('H-19 (iii): comments go in a development build too', () => {
   });
 });
 
-describe('H-36c: statement at-rules never reach the runtime scoper', () => {
+describe('statement at-rules never reach the runtime scoper', () => {
   /** transformCss with console.warn captured. */
   const transform = (css: string, options: Parameters<typeof transformCss>[1] = {}) => {
     const warn = spyOn(console, 'warn').mockImplementation(() => {});
@@ -260,9 +260,9 @@ describe('H-36c: statement at-rules never reach the runtime scoper', () => {
     expect(css).toBe('\n.a { }');
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(
-      'src/card.css: @import url("x.css") layer(base) supports(display: grid); was removed. @import is ignored in ' +
-        'component stylesheets (browsers drop it from constructed stylesheets): import that file globally ' +
-        'instead, with a <link> in index.html.',
+      'src/card.css: @import url("x.css") layer(base) supports(display: grid); was removed. Thane applies every ' +
+        'stylesheet as a constructed stylesheet, and browsers ignore @import there: load that file with a ' +
+        '<link> in index.html instead.',
     );
     expect(transform("@import 'y.css'; .a { }").css).toBe(' .a { }');
   });
@@ -274,10 +274,20 @@ describe('H-36c: statement at-rules never reach the runtime scoper', () => {
     expect(transform('@LAYER a; .b { }').css).toBe('@layer a{} .b { }');
   });
 
-  test('blocks, @namespace, strings and look-alike names are left alone', () => {
+  test('@namespace stays, followed by an empty block, so the rule after it is scoped', () => {
+    const css = '@namespace svg url(http://www.w3.org/2000/svg); svg|rect { fill: red; } .a { }';
+    expect(transform(css).css).toBe('@namespace svg url(http://www.w3.org/2000/svg);{} svg|rect { fill: red; } .a { }');
+    expect(transform(css, { minify: true }).css).toBe(
+      '@namespace svg url(http://www.w3.org/2000/svg);{}svg|rect{fill:red}.a{}',
+    );
+    expect(scopeCssRules(transform(css).css, '.sel')).toBe(
+      '@namespace svg url(http://www.w3.org/2000/svg);{}.sel svg|rect{ fill: red; }.sel .a{ }',
+    );
+  });
+
+  test('blocks, strings and look-alike names are left alone', () => {
     const untouched = [
       '@layer base { .a { } }',
-      '@namespace svg url(http://www.w3.org/2000/svg); .a { }',
       '.a::before { content: "@import x; @layer y;"; }',
       '@layer-x a; .b { }',
       '@importer a; .b { }',

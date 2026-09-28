@@ -19,63 +19,40 @@ function createHandler(root: string) {
       return new Response(file);
     }
 
+    // A static route's own page (a production build writes one with the route's head)
+    const routePage = Bun.file(resolve(filePath, 'index.html'));
+    if (await routePage.exists()) {
+      return new Response(routePage);
+    }
+
     // SPA fallback — return index.html for unmatched routes
     return new Response(Bun.file(resolve(root, 'index.html')));
   };
 }
 
-const contractRoot = resolve(process.cwd(), 'e2e', '.build', 'contract');
-const routerRoot = resolve(process.cwd(), 'e2e', '.build', 'router');
-const cartRoot = resolve(process.cwd(), 'e2e', '.build', 'cart');
-const hardeningRoot = resolve(process.cwd(), 'e2e', '.build', 'hardening');
-
-if (!existsSync(contractRoot)) {
-  throw new Error(`Contract app build output missing at ${contractRoot}. Run e2e:build first.`);
-}
-
-if (!existsSync(routerRoot)) {
-  throw new Error(`Router app build output missing at ${routerRoot}. Run e2e:build first.`);
-}
-
-if (!existsSync(cartRoot)) {
-  throw new Error(`Cart app build output missing at ${cartRoot}. Run e2e:build first.`);
-}
-
-if (!existsSync(hardeningRoot)) {
-  throw new Error(`Hardening app build output missing at ${hardeningRoot}. Run e2e:build first.`);
-}
-
-// Ports derive from E2E_PORT_BASE (default 4173), as in playwright.config.ts
+// Each app is served twice: its development build from e2e/.build on base+0 to base+4, and its production
+// build from e2e/.build-prod ten ports higher. Ports derive from E2E_PORT_BASE (default 4173), as in
+// playwright.config.ts.
 const portBase = process.env.E2E_PORT_BASE ? Number(process.env.E2E_PORT_BASE) : 4173;
-const contractPort = portBase;
-const routerPort = portBase + 1;
-const cartPort = portBase + 2;
-const hardeningPort = portBase + 3;
+const apps = ['contract', 'router', 'cart', 'hardening', 'meta'];
+const builds = [
+  { dir: '.build', offset: 0 },
+  { dir: '.build-prod', offset: 10 },
+];
 
-serve({
-  port: contractPort,
-  development: false,
-  routes: { '/*': createHandler(contractRoot) },
-});
+const urls: string[] = [];
+for (const { dir, offset } of builds) {
+  apps.forEach((app, i) => {
+    const root = resolve(process.cwd(), 'e2e', dir, app);
+    if (!existsSync(root)) {
+      throw new Error(
+        `The ${app} app build output is missing at ${root}; the e2e web server command in playwright.config.ts builds it.`,
+      );
+    }
+    const port = portBase + offset + i;
+    serve({ port, development: false, routes: { '/*': createHandler(root) } });
+    urls.push(`http://localhost:${port} (${app}${offset ? ', production' : ''})`);
+  });
+}
 
-serve({
-  port: routerPort,
-  development: false,
-  routes: { '/*': createHandler(routerRoot) },
-});
-
-serve({
-  port: cartPort,
-  development: false,
-  routes: { '/*': createHandler(cartRoot) },
-});
-
-serve({
-  port: hardeningPort,
-  development: false,
-  routes: { '/*': createHandler(hardeningRoot) },
-});
-
-console.log(
-  `E2E servers running on http://localhost:${contractPort} (contract), http://localhost:${routerPort} (router), http://localhost:${cartPort} (cart), and http://localhost:${hardeningPort} (hardening)`,
-);
+console.log(`E2E servers running on ${urls.join(', ')}`);

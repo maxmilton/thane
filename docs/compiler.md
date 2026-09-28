@@ -6,13 +6,15 @@ Thane's compiler is an esbuild-based plugin pipeline that transforms your TypeSc
 
 Before esbuild starts, the build finds the project (the nearest folder above the entry file with a `tsconfig.json` or `package.json`) and scans the working directory, and the project folder when it lies outside it, for every exported `defineComponent()`. That list is how the compiler recognises a child component call such as `${Card({ … })}` in a template. The scan runs once per `thane` command, so a component file added while `thane dev` runs is only recognised after a restart.
 
+A folder without its own `tsconfig.json` or `package.json` therefore builds as part of the enclosing project, whose type check and generated types then cover it; the build warns when that project lies above the folder `thane` runs in (a scratch app inside a repository, for example). Add a `package.json` to build such a folder on its own.
+
 esbuild then runs these plugins, in this order:
 
 ```
 Source (.ts, .css)
   │
   ├─ 1. Type Checker       → (build start) writes .thane/types, then runs the TypeScript check
-  ├─ 2. Thane Linter       → 12 lint rules (THANE400–THANE412) on each component and entry file
+  ├─ 2. Thane Linter       → 13 lint rules (THANE400–THANE413) on each component and entry file
   ├─ 3. Component Compiler → html`` → static template + __b() binding function; css`` compiled
   ├─ 4. Global CSS Bundler → .css imports → string exports
   ├─ 5. Minification       → (build start, prod only) plans selector renames from the sources
@@ -22,9 +24,9 @@ Source (.ts, .css)
 Output (dist/)
 ```
 
-- **Type Checker.** At the start of every build it generates the hidden type files in `.thane/types` (the `.css` declarations and the route types) and then type-checks the project with its own `tsconfig.json`. esbuild waits for it. Type errors are warnings, or fail the build with `--strict-type-check`.
+- **Type Checker.** At the start of every build it generates the hidden type files in `.thane/types` (the `.css` declarations and the route types) and then type-checks the project with its own `tsconfig.json`, with each template event handler typed for its event ([Event Handling](event-handling.md#event-object)). esbuild waits for it. Type errors are warnings, or fail the build with `--strict-type-check`.
 - **Thane Linter.** Runs the lint rules on each `.ts` file that defines a component or calls `mount()`. An error stops that file; warnings are printed.
-- **Component Compiler** (log tag `component-ctfe`). For each `.ts` file that holds an `html` template it replaces child component calls with anchors, compiles the component (see [Template Compilation](#template-compilation)), compiles its `css` templates and removes the `html` tags. A module that holds only `css` templates has them compiled too. In a file without templates that calls `mount({ component })` once (usually the entry file), it rewrites the call to a direct mount that leaves the router out of the bundle. A component it cannot compile fails the build with the error, once.
+- **Component Compiler** (log tag `component-compiler`). For each `.ts` file that holds an `html` template it replaces child component calls with anchors, compiles the component (see [Template Compilation](#template-compilation)), compiles its `css` templates and removes the `html` tags. A module that holds only `css` templates has them compiled too. In a file without templates that calls `mount({ component })` once (usually the entry file), it rewrites the call to a direct mount that leaves the router out of the bundle. A component it cannot compile fails the build with the error, once.
 - **Global CSS Bundler.** Loads every imported `.css` file, applies the same stylesheet transforms as `css` templates, and exports the result as a string.
 - **Minification.** In production builds, decides before anything is compiled which component selectors can be shortened (see [Selector minification](#selector-minification)).
 - **Post-Build.** At the start it empties the output directory (unless `--no-empty-out-dir`). At the end it copies the assets, writes `index.html` with a `<script>` for each entry, compresses the output with `--gzip`, prints the size report and starts the server for `dev` and `serve`.

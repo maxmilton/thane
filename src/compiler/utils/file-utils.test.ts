@@ -1,13 +1,13 @@
 /**
- * Characterisation of createBuildContext (before CL-3): it scans the working directory, skips the
+ * Characterisation of createBuildContext: it scans the working directory, skips the
  * excluded folders and .d.ts files, and indexes every exported defineComponent by name and by
- * selector. Since H-15 it also scans the project root when that lies outside the working directory.
+ * selector. It also scans the project root when that lies outside the working directory.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
-import { createBuildContext } from './file-utils.js';
+import { createBuildContext, projectRootWarning } from './file-utils.js';
 
 const FILES: Record<string, string> = {
   'src/main.ts': `import { AppShell } from './app-shell';\nconsole.log(AppShell);\n`,
@@ -59,8 +59,9 @@ test('createBuildContext scans the working directory', async () => {
     'src/main.ts',
     'src/widgets/card.ts',
   ]);
-  expect(Object.keys(ctx).sort()).toEqual(['componentsByName', 'componentsBySelector', 'tsFiles']);
-  const byName = Object.fromEntries([...ctx.componentsByName].map(([k, d]) => [k, [d.selector, rel(d.filePath)]]));
+  expect(Object.keys(ctx).sort()).toEqual(['components', 'componentsBySelector', 'projectRoot', 'tsFiles']);
+  expect(relative(root, ctx.projectRoot)).toBe('');
+  const byName = Object.fromEntries(ctx.components.map((d) => [d.name, [d.selector, rel(d.filePath)]]));
   const bySelector = Object.fromEntries([...ctx.componentsBySelector].map(([k, d]) => [k, [d.name, rel(d.filePath)]]));
   expect(byName).toEqual({
     AppShell: ['app-shell', 'src/app-shell.ts'],
@@ -87,7 +88,7 @@ const scanFrom = async (cwd: string, projectRoot?: string): Promise<string[]> =>
   }
 };
 
-describe('H-15: the project root is scanned too when it lies outside the working directory', () => {
+describe('the project root is scanned too when it lies outside the working directory', () => {
   test('a project root inside the working directory adds nothing', async () => {
     expect(await scanFrom(root, join(root, 'src'))).toEqual(await scanFrom(root));
     expect(await scanFrom(root, root)).toEqual(await scanFrom(root));
@@ -103,5 +104,21 @@ describe('H-15: the project root is scanned too when it lies outside the working
     const files = await scanFrom(join(root, 'src', 'widgets'), root);
     expect(files[0]).toBe('src/widgets/card.ts');
     expect(files.slice(1).sort()).toEqual(['deep/a/b/c/leaf.ts', 'src/app-shell.ts', 'src/main.ts']);
+  });
+});
+
+describe('projectRootWarning', () => {
+  const root = join(tmpdir(), 'thane-root-warning', 'repo');
+
+  test('the root above the folder Thane runs in: a warning that names both', () => {
+    const cwd = join(root, 'scratch', 'app');
+    const warning = projectRootWarning(root, cwd);
+    expect(warning).toContain(`${cwd} has no package.json or tsconfig.json, so it builds as part of ${root}`);
+  });
+
+  test('the root is the folder, or not above it: no warning', () => {
+    expect(projectRootWarning(root, root)).toBeNull();
+    expect(projectRootWarning(join(root, 'apps', 'site'), root)).toBeNull();
+    expect(projectRootWarning(join(root, 'other'), join(root, 'scratch'))).toBeNull();
   });
 });

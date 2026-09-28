@@ -1,8 +1,8 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 import { ProbeCard } from '../shared/probe-card.js';
 
-// K13 (H-44): a row that is a component call with a template literal in its props.
+// K13: a row that is a component call with a template literal in its props.
 export const K13 = defineComponent('hardening-k13', () => {
   const rows = signal([
     { id: 1, label: 'a' },

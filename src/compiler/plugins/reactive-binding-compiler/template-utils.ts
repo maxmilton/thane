@@ -15,11 +15,12 @@ import {
   walkElements,
   getElementHtml,
   escapeRawTemplateLiteral,
+  parseHtmlTemplate,
   type HtmlElement,
   type ParsedTemplate,
   type BindingInfo as ParsedBindingInfo,
 } from '../../utils/html-parser/index.js';
-import { outsideVerbatim } from '../minification/template-minifier.js';
+import { condenseBetweenTags, outsideVerbatim } from '../minification/template-minifier.js';
 import { safeEvaluateCondition } from './template-processing.js';
 import type { processItemTemplate } from './repeat-analysis.js';
 
@@ -37,7 +38,7 @@ export interface IdState {
 }
 
 /**
- * The attribute that marks a bound element while its template is compiled (A1-2): the element's
+ * The attribute that marks a bound element while its template is compiled: the element's
  * position in the emitted template is computed from it, and the emitted HTML carries none. It is
  * never the developer's `id`, which stays on its element and is not used to find it.
  */
@@ -45,8 +46,8 @@ export const BOUND_MARK = 'data-thane-ref';
 
 /**
  * The comment that marks an anchor while its template is compiled: a `when()` sits between `(` and
- * `)`, a `whenElse()` has `(` then-branch `|` else-branch `)` (A1-3), and `.` is a single anchor, the
- * end of a list or the place of a child component (A1-4), each with the directive's id. A text
+ * `)`, a `whenElse()` has `(` then-branch `|` else-branch `)`, and `.` is a single anchor, the
+ * end of a list or the place of a child component, each with the directive's id. A text
  * binding's marker is the id alone (`<!--b3-->`, the text node after it is the binding's). The
  * emitted HTML carries the same comments without data (`<!---->`).
  */
@@ -55,7 +56,7 @@ export const anchorMark = (id: string, kind: '(' | '|' | ')' | '.'): string => `
 /** A template without its bound-element marks. */
 export const stripBoundMarks = (html: string): string => html.replace(/ data-thane-ref="[^"]*"/g, '');
 
-/** A template without its compile-time marks: the HTML that is emitted, which holds no id (A1-4). */
+/** A template without its compile-time marks: the HTML that is emitted, which holds no id. */
 export const stripMarks = (html: string): string => stripBoundMarks(html).replace(/<!--[ib]\d+[(|).]?-->/g, '<!---->');
 
 export interface TemplateEdit {
@@ -78,8 +79,11 @@ export interface SubTemplateResult {
   nextId: number;
 }
 
-/** Processes a directive sub-template; `parentId` is the directive's (or branch's) id. */
-export type SubTemplateProcessor = (template: string, parentId: string) => SubTemplateResult;
+/**
+ * Processes a directive sub-template; `parentId` is the directive's (or branch's) id. `report` shows its
+ * parse diagnostics: a whenElse() branch is a template of its own, a when() element's content is not.
+ */
+export type SubTemplateProcessor = (template: string, parentId: string, report?: boolean) => SubTemplateResult;
 
 // ============================================================================
 // Directive nesting helpers
@@ -179,7 +183,7 @@ export const collectConditionalBlocks = (
     const signalNames = [
       ...new Set([...(whenBinding.signalNames || [whenBinding.signalName]), ...(rewritten?.extraSignals ?? [])]),
     ].filter((s) => s !== '');
-    // The directive's id is the compiler's: a developer's id stays on the element (A1-3)
+    // The directive's id is the compiler's: a developer's id stays on the element
     const conditionalId = `b${state.idCounter++}`;
     state.elementIdMap.set(condEl, conditionalId);
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
@@ -239,14 +243,14 @@ export const collectWhenElseBlocks = (
     const signalNames = [
       ...new Set([...(binding.signalNames || [binding.signalName]), ...(rewritten?.extraSignals ?? [])]),
     ].filter((s) => s !== '');
-    // The branches' ids are the compiler's; a branch's root keeps any id of its own (A1-3)
+    // The branches' ids are the compiler's; a branch's root keeps any id of its own
     const thenId = `b${state.idCounter++}`;
     const elseId = `b${state.idCounter++}`;
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
 
-    const thenProcessed = processSubTemplate(binding.thenTemplate, thenId);
+    const thenProcessed = processSubTemplate(binding.thenTemplate, thenId, true);
     state.idCounter = thenProcessed.nextId;
-    const elseProcessed = processSubTemplate(binding.elseTemplate, elseId);
+    const elseProcessed = processSubTemplate(binding.elseTemplate, elseId, true);
     state.idCounter = elseProcessed.nextId;
 
     whenElseBlocks.push({
@@ -282,14 +286,14 @@ export const collectWhenElseBlocks = (
 
 /** A repeat()'s empty template with its whitespace collapsed (outside verbatim elements). */
 export const collapseEmptyTemplate = (template: string): string =>
-  outsideVerbatim(template, (t) => t.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim());
+  outsideVerbatim(template, (t) => condenseBetweenTags(t).replace(/\s+/g, ' ').replace(/\s+>/g, '>').trim());
 
 const _componentRowRe = /^\s*([A-Za-z_$][\w$]*)\((.*)\)\s*$/s;
 
 /**
  * A row that is a component call (`(item) => Card({ item })`): the component and its props as
  * written. Read from the row template before processing, which treats every `${…}` in it as row
- * markup (H-44).
+ * markup.
  */
 const componentRowOf = (rowTemplate: string): RepeatBlock['componentRow'] => {
   const match = _componentRowRe.exec(rowTemplate.trim());
@@ -297,9 +301,12 @@ const componentRowOf = (rowTemplate: string): RepeatBlock['componentRow'] => {
 };
 
 /**
- * A repeat()'s empty template, its third argument, collapsed. A function there is a key function
- * written third, which would become the empty template's markup and leave the list keyed by index:
- * it is a build error (H-54).
+ * A repeat()'s empty template, its third argument, collapsed. It is inserted as one static element
+ * while the list is empty, so anything else is a build error:
+ * - a function: a key function written third, which would become the markup and leave the list keyed
+ *   by index (THANE010);
+ * - more than one root, or text outside an element: only the first element was shown, and text alone
+ *   threw when the list emptied; a `${…}`, which was shown as written (THANE011).
  */
 const emptyTemplateOf = (binding: ParsedBindingInfo): string | undefined => {
   if (!binding.emptyTemplate) return undefined;
@@ -311,7 +318,21 @@ const emptyTemplateOf = (binding: ParsedBindingInfo): string | undefined => {
       `${ErrorCode.REPEAT_EMPTY_TEMPLATE_FUNCTION}: the third argument of repeat() is the empty template, shown while the list is empty, not a key function. Pass the key function fourth: repeat(items, row, null, ${third.getText()}).`,
     );
   }
-  return collapseEmptyTemplate(binding.emptyTemplate);
+  const template = collapseEmptyTemplate(binding.emptyTemplate);
+  if (/(^|[^\\])\$\{/.test(template)) {
+    throw new Error(
+      `${ErrorCode.REPEAT_EMPTY_TEMPLATE_SHAPE}: repeat()'s empty template is static, so a \${…} in it would be shown as written: ${template}. Compute the text outside the template, or put a when() next to the list.`,
+    );
+  }
+  const { roots } = parseHtmlTemplate(template);
+  const root = roots[0];
+  const end = root ? (root.isSelfClosing || root.closeTagEnd === 0 ? root.openTagEnd : root.closeTagEnd) : 0;
+  if (roots.length !== 1 || template.slice(0, root!.tagStart).trim() || template.slice(end).trim()) {
+    throw new Error(
+      `${ErrorCode.REPEAT_EMPTY_TEMPLATE_SHAPE}: repeat()'s empty template must be one element, like a row: ${template}. Wrap its content in one element, for example html\`<li class="empty">No items</li>\`.`,
+    );
+  }
+  return template;
 };
 
 /**
@@ -379,16 +400,15 @@ export const applyTemplateEdits = (source: string, edits: TemplateEdit[]): strin
   for (const edit of edits) {
     result = result.substring(0, edit.start) + edit.replacement + result.substring(edit.end);
   }
-  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style> (H-03).
-  // Between a tag and an anchor comment it goes as it does between two tags: anchors stand where
-  // `<template>` placeholders stood before A1, and a list's container must hold only its rows and
-  // its anchor for a clear to empty it at once (H-05). A text marker keeps the whitespace before it,
-  // which is text, and so does a binding's boundary (`<!---->`) before an element or an anchor (H-53);
-  // before its parent's end tag it goes.
+  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style>. Between two
+  // tags it is condensed: gone when it holds a line break, one space when it does not. Next to an
+  // anchor comment it goes: a list's container must hold only its rows and its anchor for a clear to
+  // empty it at once. A text marker keeps the whitespace before it, which is text, and so does a
+  // binding's boundary (`<!---->`) before an element or an anchor; before its parent's end tag it goes.
   return outsideVerbatim(result, (html) =>
-    html
+    condenseBetweenTags(html)
       .replace(/\s+/g, ' ')
-      .replace(/(?<!<!----)>\s+<(?![!-])|>\s+<(?=\/)/g, '><')
+      .replace(/(?<=--)(?<!<!----)>\s+<(?![!-])|(?<=--)>\s+<(?=\/)/g, '><')
       .replace(/(?<!<!----)>\s+(?=<!--[ib]\d+[(|).]-->)/g, '>')
       .replace(/(<!--[ib]\d+-->)(<!---->)/g, '$1 $2')
       .replace(/\s+>/g, '>')

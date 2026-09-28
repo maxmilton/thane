@@ -15,7 +15,7 @@ import { ErrorCode } from '../../errors.js';
  * Shared argument parser for both whenElse and repeat expressions.
  *
  * Parses a comma-separated argument list from a `${directive(` call: strings and template
- * literals are skipped whole by the expression scanner (H-12), and a comma splits only outside
+ * literals are skipped whole by the expression scanner, and a comma splits only outside
  * every bracket.
  *
  * @param text - full text being parsed
@@ -125,7 +125,7 @@ export function stripTemplateExpressions(value: string): string {
 
 /**
  * End (exclusive) of the `${…}` that starts at `start`, or -1 when it is not closed. The one
- * expression scanner (H-12): braces count in code only, so a brace inside a string or a nested
+ * expression scanner: braces count in code only, so a brace inside a string or a nested
  * template literal (whose own `${…}` are scanned the same way, at any depth) never ends it.
  */
 export function templateExpressionEnd(text: string, start: number): number {

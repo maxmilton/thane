@@ -1,4 +1,4 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 
 const adjectives = [
   'pretty',

@@ -12,7 +12,7 @@ export const App = defineComponent('test-app', ({ props }) => {
     template: html\`<div>${markup}</div>\`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 describe('A prop read as props.x() in a template is a signal read', () => {

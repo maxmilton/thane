@@ -1,6 +1,6 @@
 # Directives
 
-Directives extend Thane's template syntax with conditional rendering and list rendering. They are global functions available inside `html` templates — the compiler transforms them into optimized DOM operations.
+Directives extend Thane's template syntax with conditional rendering and list rendering. They are imported from `thane` (`import { when, whenElse, repeat } from 'thane'`) and used inside `html` templates, where the compiler transforms them into optimized DOM operations. The examples leave the imports out.
 
 ## Overview
 

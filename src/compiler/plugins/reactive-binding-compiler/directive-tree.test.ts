@@ -144,7 +144,7 @@ describe('walkDirectives', () => {
   });
 
   test('walks the blocks template processing produces', () => {
-    // (the row's when() is on an inner element: on the row's root it is a build error, H-47)
+    // (the row's when() is on an inner element: on the row's root it is a build error, THANE008)
     const result = processHtmlTemplateWithConditionals(
       '<div ${when(a())}>${repeat(items(), (it) => html`<li><b ${when(it.on)}>${it.name}</b></li>`)}</div>' +
         '${whenElse(b(), html`<p ${when(c())}>t</p>`, html`<p>e</p>`)}',

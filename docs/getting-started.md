@@ -11,18 +11,15 @@
 bun add thane
 ```
 
-Add the Thane client types to your `tsconfig.json` so TypeScript recognizes `.css` imports:
+Include Thane's generated types in your `tsconfig.json`:
 
 ```json
 {
-  "compilerOptions": {
-    "types": ["thane/client"]
-  },
   "include": ["src/**/*.ts", ".thane/types/**/*.d.ts"]
 }
 ```
 
-Every `thane` command writes hidden type files to `.thane/types`: the route types that make `navigate()` and `route.params` type-safe, and a reference to the same `.css` declarations. Including that folder lets your editor see them; Thane's own type check always includes it.
+Every `thane` command writes hidden type files to `.thane/types`: the route types that make `navigate()` and `route.params` type-safe. Including that folder lets your editor see them; Thane's own type check always includes it. The types of `.css` imports come with `thane` itself.
 
 ## Project Structure
 
@@ -78,7 +75,7 @@ mount({ component: Counter, target: document.getElementById('app')! });
 Define a component using `defineComponent`. The compiler auto-derives the CSS selector from the export name (`Counter` → `counter`):
 
 ```typescript
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html } from 'thane';
 
 export const Counter = defineComponent(() => {
   const count = signal(0);
@@ -99,6 +96,8 @@ export const Counter = defineComponent(() => {
 });
 ```
 
+`html` is imported like the rest: it and the other template markers (`css`, `when`, `whenElse`, `repeat`) exist only at build time, where the compiler turns them into DOM code, so they add nothing to the bundle.
+
 ## Running the Dev Server
 
 ```bash
@@ -107,10 +106,10 @@ thane dev
 
 This starts a development server at `http://localhost:4200` with:
 
-- A rebuild whenever a source file changes (reload the page to load it)
+- A rebuild whenever a source file changes, after which the open pages reload
 - Source maps enabled
 - Browser errors relayed to the terminal — `console.error`, uncaught errors and unhandled rejections
-- All 12 lint rules active
+- All 13 lint rules active
 
 ## Building for Production
 

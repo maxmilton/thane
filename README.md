@@ -125,7 +125,7 @@ No Shadow DOM. Components render as regular DOM elements with auto-scoped CSS vi
 <td width="33%" valign="top">
 
 ### 🛡️ TypeScript-First
-Full IDE autocompletion, type-safe routing, and 12 compile-time lint rules that catch silent failures.
+Full IDE autocompletion, type-safe routing, and 13 compile-time lint rules that catch silent failures.
 
 </td>
 </tr>
@@ -140,7 +140,7 @@ bun add thane
 ```
 
 ```typescript
-import { defineComponent, signal, mount } from 'thane';
+import { defineComponent, signal, mount, html } from 'thane';
 
 export const MyCounter = defineComponent(() => {
   const count = signal(0);

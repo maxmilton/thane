@@ -19,7 +19,7 @@ describe('Dev server request paths', () => {
   });
 });
 
-describe('H-23: the browser-error relay names locations the way requests are resolved', () => {
+describe('the browser-error relay names locations the way requests are resolved', () => {
   const dist = join(process.cwd(), 'some', 'dist');
 
   /** The lines the relay prints for one page error. */

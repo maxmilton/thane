@@ -1,7 +1,7 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// A1-1: a component whose template starts with text and holds a list, bindings and an event,
+// A component whose template starts with text and holds a list, bindings and an event,
 // mounted into document.body after the nodes the page already has (Mode A, `&target=body`).
 export const A1Body = defineComponent('hardening-a1-body', () => {
   const t = signal('t0');

@@ -1,5 +1,5 @@
 import { defineComponent, signal, registerGlobalStyles } from 'thane';
-import { batch, computed, effect } from 'thane';
+import { batch, computed, effect, html, css, when, whenElse, repeat } from 'thane';
 import { mountComponent } from 'thane/runtime';
 import type { MountHandle } from 'thane';
 import { ChildCounter } from './child-counter.js';
@@ -909,7 +909,7 @@ export const ContractApp = defineComponent('contract-app', () => {
                     ${repeat(
                       item.children,
                       (child, childIndex) => html`<li data-testid="nested-child">${child}-${childIndex}</li>`,
-                      html`<li data-testid="nested-child-empty">empty-${item.id}</li>`,
+                      html`<li data-testid="nested-child-empty">empty</li>`,
                     )}
                   </ol>
                 </li>

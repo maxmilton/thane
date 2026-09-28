@@ -1,6 +1,6 @@
 # Lint Rules
 
-Thane includes 12 compile-time lint rules (THANE400–THANE412; THANE406 is retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
+Thane includes 13 compile-time lint rules (THANE400–THANE413; THANE406 is retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
 
 The compiler reports a few more problems itself, while it compiles a template: see [Template Errors](#template-errors).
 
@@ -20,6 +20,7 @@ The compiler reports a few more problems itself, while it compiles a template: s
 | THANE410 | [no-cross-file-html-template](#thane410--no-cross-file-html-template)       | Warning  |
 | THANE411 | [duplicate-mount-target](#thane411--duplicate-mount-target)                 | Warning  |
 | THANE412 | [single-return-object](#thane412--single-return-object)                     | Error    |
+| THANE413 | [no-aliased-thane-import](#thane413--no-aliased-thane-import)               | Error    |
 
 ---
 
@@ -313,6 +314,27 @@ export const Card = defineComponent(() => {
 
 ---
 
+## THANE413 — no-aliased-thane-import
+
+**Severity:** Error
+
+The compiler finds the template markers (`html`, `css`, `when`, `whenElse`, `repeat`) and `defineComponent` by their names. Import them from `thane` under those names: a renamed import, or one read through a namespace import, is never compiled.
+
+```typescript
+// ❌ BAD — renamed: h`…` is not compiled
+import { defineComponent, html as h } from 'thane';
+
+// ❌ BAD — read through a namespace import
+import * as thane from 'thane';
+export const App = thane.defineComponent(() => ({ template: thane.html`<p>Hi</p>` }));
+
+// ✅ GOOD — imported under their own names
+import { defineComponent, html } from 'thane';
+export const App = defineComponent(() => ({ template: html`<p>Hi</p>` }));
+```
+
+---
+
 ## Template Errors
 
 These are reported by the compiler while it compiles a template, as build errors.
@@ -324,6 +346,8 @@ These are reported by the compiler while it compiles a template, as build errors
 | THANE008 | A `when()` on the root element of a `repeat()` row. Filter the list, or put `when()` on an inner element        |
 | THANE009 | A template the compiler cannot bind reliably: markup the browser rebuilds (text directly in a table, an `<a>` inside an `<a>`, non-option content in a `<select>`), or a comment written like one of the compiler's own markers (`<!--b0-->`) |
 | THANE010 | A function as `repeat()`'s third argument, which is the empty template. Pass the key function fourth: `repeat(items, row, null, (it) => it.id)` |
+| THANE011 | A `repeat()` empty template that is not one static element: two roots, text outside an element, or a `${…}` in it. It is inserted as one element while the list is empty |
+| THANE012 | A template reads a name that the compiled bindings declare for themselves (a name starting with `_`, an element name such as `b3`, or `e` and `item` in a row), so it would read the compiler's value. Rename the variable |
 
 ### THANE007 — one root element per row
 
@@ -353,6 +377,32 @@ ${repeat(items(), (item) => html`<li>${item.name}</li>`, (item) => item.id)}
 
 // ✅ GOOD
 ${repeat(items(), (item) => html`<li>${item.name}</li>`, null, (item) => item.id)}
+```
+
+### THANE012 — names the compiled bindings keep for themselves
+
+The binding code the compiler writes into each component declares variables of its own. Their names start with `_`, or are element names such as `b3`; in a list row the event parameter is `e`, and an item the source leaves unnamed is `item`. A template that reads a setup variable, import or global with one of those names would read the compiler's variable, so the build stops instead:
+
+```typescript
+// ❌ BAD — `_subs` is a name of the compiled bindings
+const _subs = signal(0);
+return { template: html`<p>${_subs()}</p>` };
+
+// ✅ GOOD
+const subscribers = signal(0);
+return { template: html`<p>${subscribers()}</p>` };
+```
+
+### THANE011 — the empty template is one static element
+
+```typescript
+// ❌ BAD — text alone, two roots, a binding
+${repeat(items(), (item) => html`<li>${item.name}</li>`, html`No items`)}
+${repeat(items(), (item) => html`<li>${item.name}</li>`, html`<li>No</li><li>items</li>`)}
+${repeat(items(), (item) => html`<li>${item.name}</li>`, html`<li>No ${noun()}</li>`)}
+
+// ✅ GOOD
+${repeat(items(), (item) => html`<li>${item.name}</li>`, html`<li class="empty">No items</li>`)}
 ```
 
 ← [Back to Docs](README.md)

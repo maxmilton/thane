@@ -1,9 +1,9 @@
 /**
- * Characterisation of the size report printed after a build (before PB-3).
+ * Characterisation of the size report printed after a build.
  *
  * A real build runs with console.info captured. Every line of the report is checked against the
  * sizes of the files on disk: per-file raw size, colour band, gzip and brotli sizes, and the
- * totals. Since H-25 the colours come from `ansi` (empty without colour), so the expected text
+ * totals. The colours come from `ansi` (empty without colour), so the expected text
  * follows the colour decision of this process; the CLI runs below pin both modes.
  */
 import { describe, expect, test } from 'bun:test';
@@ -14,7 +14,7 @@ import { createTempProject, createTestBuildConfig, removeTempProject } from '../
 import { ansi, consoleColors } from '../../utils/index.js';
 
 const APP = `
-import { defineComponent, mount } from 'thane';
+import { defineComponent, html, mount } from 'thane';
 
 export const App = defineComponent('test-app', () => ({
   template: html\`<div>size report</div>\`,
@@ -110,7 +110,7 @@ describe('Size report', () => {
   });
 });
 
-describe('H-25: the CLI output follows NO_COLOR and never prints %s', () => {
+describe('the CLI output follows NO_COLOR and never prints %s', () => {
   const CLI = join(import.meta.dir, '..', '..', 'cli', 'thane.ts');
 
   /** `thane build --gzip` in a fresh project with the given colour variables; its whole output. */

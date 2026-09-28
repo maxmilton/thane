@@ -1,4 +1,4 @@
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import styles from './NotFound.module.css';
 import type { RouteError } from '../../models/router.models.js';
 

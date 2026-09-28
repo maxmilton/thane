@@ -61,25 +61,13 @@ For the same reason a row's root element cannot carry `when()` (THANE008): filte
 
 Inside the row, anything a component template can hold works, at any depth: bindings, event handlers, child components, `when()`, `whenElse()` and further lists.
 
-### Signal Items Named `item` in Nested Lists
-
-In a list whose items are signals (`Signal<Signal<T>[]>`) and whose rows hold a list of their own, the inner rows cannot call the outer item if its parameter is named `item`:
-
-```typescript
-// ❌ inside the inner rows, item() reads the inner row's item
-${repeat(groups(), (item) => html`<li>${repeat(item().tags, (tag) => html`<b>${item().name}: ${tag}</b>`)}</li>`)}
-
-// ✅ any other name works
-${repeat(groups(), (group) => html`<li>${repeat(group().tags, (tag) => html`<b>${group().name}: ${tag}</b>`)}</li>`)}
-```
-
 ### Empty Templates Are Static
 
-The empty template of a `repeat()`, its third argument, is inserted as written: it holds no bindings or event handlers, and a `${…}` inside it is shown as text. It must be a single element, like a row.
+The empty template of a `repeat()`, its third argument, is inserted as written, as one element: it holds no bindings or event handlers. An empty template with a `${…}`, more than one root, or text outside an element is a build error (THANE011). For an empty state that changes, put a `when()` next to the list.
 
 ### Whitespace Between Elements
 
-Whitespace-only text between two elements is removed from compiled templates, so `<b>x</b> <i>y</i>` renders as "xy", where a browser would show "x y". Put the space inside one of the elements (`<b>x </b><i>y</i>`) or write it as `&#32;`. Whitespace next to a text binding is kept; see [Templates](templates.md#whitespace).
+Whitespace-only text between two tags that holds a line break is removed from compiled templates: two elements written on separate lines render without a space between them, where a browser would show one. Write them on one line (`<b>x</b> <i>y</i>` keeps its space), put the space inside one of the elements, or write it as `&#32;`. See [Templates](templates.md#whitespace).
 
 ## Runtime Constraints
 
@@ -143,11 +131,11 @@ Only one router instance is supported. Calling `mount()` with a `router` option 
 
 ### Circular Signal Dependencies
 
-Cycles are not detected. When subscribers keep setting each other's signals, every round of the cascade runs one level deeper, so a cycle that never settles ends in a stack overflow (`RangeError: Maximum call stack size exceeded`), and afterwards later writes may never be notified. A cascade that settles runs to the end, but a very long one can overflow the stack as well. See [Signals](signals.md#circular-dependencies).
+Cycles are detected in development builds only: when subscribers keep setting each other's signals, a development build stops the cycle with an error after 500 rounds. A production build has no check, so there a cycle that never settles ends in a stack overflow (`RangeError: Maximum call stack size exceeded`), and afterwards later writes may never be notified. See [Signals](signals.md#circular-dependencies).
 
-### Stale `computed` Reads in a Batch or a Cascade
+### A Signal Notified Twice in One Cascade
 
-A `computed` is marked dirty when one of its sources notifies it, and re-evaluates on its next read; until then a read returns the previous value. Inside a `batch()` function, and while subscribers run, those notifications can still be waiting: a read in the batch function, in a subscriber that has just set one of the computed's sources, or of a `computed` built on other `computed`s in a subscriber of their source, returns the old value. Read the computed after the batch, or read the source signals directly there. See [Signals](signals.md#computed-signals).
+When a cascade has several signals waiting, they are notified one after the other. A signal that one of the earlier ones sets again is notified at once, with its new value, and then once more in its own turn, with the same value. A subscriber that must run once per change can compare the value with the one it saw last.
 
 ## Missing Features
 

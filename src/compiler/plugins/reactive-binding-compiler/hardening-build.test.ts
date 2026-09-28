@@ -5,7 +5,7 @@
  * by e2e/tests/hardening.spec.ts where a browser is needed.
  */
 import { describe, expect, test } from 'bun:test';
-import { buildAndReadJs } from '../../testing/build-project.js';
+import { buildAndReadJs, PROD_BUILD } from '../../testing/build-project.js';
 
 const DEV = { config: { strictTypeCheck: false } };
 
@@ -16,7 +16,7 @@ import { defineComponent, signal, mount } from 'thane';
 export const App = defineComponent('test-app', () => {
 ${body}
 });
-mount(App);
+mount({ component: App });
 `;
 
 /** The component's static template (the `__T(\`…\`)` of `__tpl`). */
@@ -28,7 +28,7 @@ const LITERAL = '`((?:\\\\[\\s\\S]|[^`\\\\])*)`';
 /** The string a template literal body evaluates to, which is what the runtime hands to innerHTML. */
 const cooked = (body: string | undefined): string => new Function(`return \`${body}\`;`)() as string;
 
-describe('H-02 template text reads back as the source means it', () => {
+describe('template text reads back as the source means it', () => {
   // Written out, the component is:
   //   const v = signal('v\\1 `2` ${3}');
   //   template: html`<div><p>C:\\dir \${notExpr} \`q\`</p><b ${when(on())}>w\\x</b><i>${v()}</i>
@@ -56,9 +56,23 @@ describe('H-02 template text reads back as the source means it', () => {
     // `notExpr` is text, not a binding: nothing reads it
     expect(js).not.toMatch(/[^{]notExpr/);
   });
+
+  test('an escape that is invalid outside a tagged template is shown as written', async () => {
+    // html`<p>C:\users \x1 \u12 \u{zz} \08 \9 ok</p>` is valid source (a tagged template may hold
+    // invalid escapes), but each of these fails in the untagged literal the template is emitted into
+    const source = app(
+      '  return { template: html`<p>C:\\users \\x1 \\u12 \\u{zz} \\08 \\9 ok \\u0041 \\x42 \\0</p>` };',
+    );
+    const js = await buildAndReadJs(source, DEV);
+    const main = cooked(new RegExp(`\\b__tpl = __T\\(${LITERAL}\\)`).exec(js)?.[1]);
+    expect(main).toBe('<p>C:\\users \\x1 \\u12 \\u{zz} \\08 \\9 ok A B \0</p>');
+    // A production build minifies the template before emitting it, through the same escaper
+    const prod = await buildAndReadJs(source, { config: { ...PROD_BUILD } });
+    expect(prod).toContain('C:\\\\users \\\\x1');
+  });
 });
 
-describe('H-03 whitespace inside verbatim elements', () => {
+describe('whitespace inside verbatim elements', () => {
   const body = [
     '  const on = signal(true);',
     "  const items = signal(['a']);",
@@ -84,7 +98,7 @@ describe('H-03 whitespace inside verbatim elements', () => {
   }
 });
 
-describe('H-12 quote-aware expression scanning', () => {
+describe('quote-aware expression scanning', () => {
   test('rows with braces in strings or two levels deep, and a branch with an escaped backtick', async () => {
     const body = [
       '  const on = signal(true);',
@@ -97,8 +111,8 @@ describe('H-12 quote-aware expression scanning', () => {
     const js = await buildAndReadJs(app(body), DEV);
     const rows = [...js.matchAll(new RegExp(`__tpl_b\\d+ = __T\\(${LITERAL}\\)`, 'g'))].map((m) => cooked(m[1]));
     expect(rows).toEqual(['<li></li>', '<li></li>']);
-    expect(js).toMatch(/item\.on \? ["']\}["'] : ["']\{["']/);
-    expect(js).toContain('fmt({ a: { b: item.a } })');
+    expect(js).toMatch(/it\.on \? ["']\}["'] : ["']\{["']/);
+    expect(js).toContain('fmt({ a: { b: it.a } })');
     const branch = cooked(
       new RegExp(`__bindIfExpr\\(_ws_b\\d+, _wm_b\\d+, \\[on\\], \\(\\) => on\\(\\), ${LITERAL}`).exec(js)?.[1],
     );
@@ -107,14 +121,14 @@ describe('H-12 quote-aware expression scanning', () => {
   });
 });
 
-describe('H-40 child components in the rows of a list inside a directive', () => {
+describe('child components in the rows of a list inside a directive', () => {
   // A name of its own: the build context scans the whole working directory, where the hardening app
   // has a `Kid` too
   const kid =
     "import { defineComponent } from 'thane';\nexport const H40Kid = defineComponent<{ label: string }>('x-h40-kid', ({ props }) => ({ template: html`<b>${props.label}</b>` }));\n";
   const withKid = (template: string): string =>
     `import { defineComponent, signal, mount } from 'thane';\nimport { H40Kid } from './kid.js';\n` +
-    `export const App = defineComponent('test-app', () => {\n  const on = signal(true);\n  const items = signal([{ id: 1, n: 'a' }]);\n  return { template: html\`${template}\` };\n});\nmount(App);\n`;
+    `export const App = defineComponent('test-app', () => {\n  const on = signal(true);\n  const items = signal([{ id: 1, n: 'a' }]);\n  return { template: html\`${template}\` };\n});\nmount({ component: App });\n`;
 
   for (const [shape, template] of [
     [
@@ -129,9 +143,9 @@ describe('H-40 child components in the rows of a list inside a directive', () =>
     test(`inside ${shape}: the row factory mounts the child with the row's item`, async () => {
       const js = await buildAndReadJs(withKid(template), { ...DEV, extraFiles: { 'src/kid.ts': kid } });
       // The mount is in the row factory (the row element `_el` holds the child's host, reached by
-      // path, A1-4) and reads the row's item
+      // path) and reads the row's item
       expect(js).toMatch(
-        /const (_cm\d+) = _el\.(?:first|last)ElementChild;[\s\S]*H40Kid\.__f\(\1, \{ label: item\.n \}\)/,
+        /const (_cm\d+) = _el\.(?:first|last)ElementChild;[\s\S]*H40Kid\.__f\(\1, \{ label: it\.n \}\)/,
       );
       expect(js).not.toMatch(/querySelector\("#/);
       // and nothing looks for the anchor at component level
@@ -140,14 +154,14 @@ describe('H-40 child components in the rows of a list inside a directive', () =>
   }
 });
 
-describe('H-44 a row that is a component call with a template literal in its props', () => {
+describe('a row that is a component call with a template literal in its props', () => {
   test('the props are emitted as written', async () => {
     const card =
       "import { defineComponent } from 'thane';\nexport const H44Card = defineComponent<{ label: string }>('x-h44-card', ({ props }) => ({ template: html`<b>${props.label}</b>` }));\n";
     const js = await buildAndReadJs(
       "import { defineComponent, signal, mount } from 'thane';\nimport { H44Card } from './card.js';\n" +
         "export const App = defineComponent('test-app', () => {\n  const rows = signal([{ id: 1, label: 'a' }]);\n" +
-        '  return { template: html`<ul>${repeat(rows(), (item) => H44Card({ label: `x${item.label}` }))}</ul>` };\n});\nmount(App);\n',
+        '  return { template: html`<ul>${repeat(rows(), (item) => H44Card({ label: `x${item.label}` }))}</ul>` };\n});\nmount({ component: App });\n',
       { ...DEV, extraFiles: { 'src/card.ts': card } },
     );
     expect(js).toContain('H44Card.__f(_el, { label: `x${item.label}` })');
@@ -155,7 +169,7 @@ describe('H-44 a row that is a component call with a template literal in its pro
   });
 });
 
-describe("H-47 when() on a repeat() row's root element", () => {
+describe("when() on a repeat() row's root element", () => {
   const rows = (row: string): string =>
     app(
       "  const on = signal(true);\n  const items = signal([{ id: 1, on: true, n: 'a' }]);\n" +
@@ -179,7 +193,7 @@ describe("H-47 when() on a repeat() row's root element", () => {
   });
 });
 
-describe('H-46 duplicate attributes', () => {
+describe('duplicate attributes', () => {
   test('the first of two is kept: a bound first keeps its binding, a bound second leaves nothing live', async () => {
     const js = await buildAndReadJs(
       app(
@@ -193,9 +207,37 @@ describe('H-46 duplicate attributes', () => {
     const main = cooked(new RegExp(`\\b__tpl = __T\\(${LITERAL}\\)`).exec(js)?.[1]);
     expect(main).toMatch(/^<div><input class="k" checked><button disabled disabled=\$\{d\(\)\}>b<\/button><\/div>$/);
   });
+
+  test('the duplicate is reported once for every template it is in: component, whenElse() branch and row', async () => {
+    const logged: string[] = [];
+    const capture = (...args: unknown[]) => void logged.push(args.map(String).join(' '));
+    const { info, log, warn } = console;
+    console.info = capture;
+    console.log = capture;
+    console.warn = capture;
+    try {
+      await buildAndReadJs(
+        app(
+          '  const on = signal(true);\n  const rows = signal([1]);\n' +
+            '  return { template: html`<div><p title="a" title="b">c</p>' +
+            '<section ${when(on())}><i lang="a" lang="b">w</i></section>' +
+            '${whenElse(on(), html`<b dir="a" dir="b">t</b>`, html`<u>e</u>`)}' +
+            '<ul>${repeat(rows(), (r) => html`<li id="a" id="b">${r}</li>`)}</ul></div>` };',
+        ),
+        DEV,
+      );
+    } finally {
+      console.info = info;
+      console.log = log;
+      console.warn = warn;
+    }
+    const duplicates = logged.filter((line) => line.includes('Duplicate attribute'));
+    const count = (name: string) => duplicates.filter((line) => line.includes(`"${name}"`)).length;
+    expect([count('title'), count('lang'), count('dir'), count('id')]).toEqual([1, 1, 1, 1]);
+  });
 });
 
-describe('H-42 a literal < in template text', () => {
+describe('a literal < in template text', () => {
   test('text and bindings after the < keep their places', async () => {
     const js = await buildAndReadJs(
       app(
@@ -209,10 +251,10 @@ describe('H-42 a literal < in template text', () => {
   });
 });
 
-describe('A1-4 whitespace between a tag and an anchor comment', () => {
+describe('whitespace between a tag and an anchor comment', () => {
   // Anchors stand where <template> placeholders stood: the whitespace between a tag and an anchor goes
   // as it does between two tags, so a list's container holds only its rows and its anchor (the
-  // reconciler then clears it at once, H-05). Whitespace before a text marker is text and stays.
+  // reconciler then clears it at once). Whitespace before a text marker is text and stays.
   const body =
     "  const on = signal(true);\n  const t = signal('t');\n  const items = signal(['a']);\n" +
     '  return { template: html`<div>\n  <table><tbody>\n    ${repeat(items(), (it) => html`<tr><td>${it}</td></tr>`)}\n  </tbody></table>\n' +

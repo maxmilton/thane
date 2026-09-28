@@ -4,6 +4,7 @@ node_modules
 # Build output
 dist
 e2e/.build
+e2e/.build-prod
 
 # Package tarballs and the benchmark's local install of one
 *.tgz

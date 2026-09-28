@@ -112,7 +112,7 @@ styles: css`
 - `@charset` is removed: it means nothing in a stylesheet string.
 - `@import` is removed, and the build prints a warning. Thane applies every stylesheet as a constructed stylesheet (`adoptedStyleSheets`), and browsers ignore `@import` there. Load such a stylesheet with a `<link>` in `index.html` instead.
 - `@keyframes` and `@font-face` are copied as written, so keyframe names are global: give them a prefix of your own.
-- `@namespace` is not supported in component stylesheets: the rule after it is not scoped.
+- `@namespace svg url(http://www.w3.org/2000/svg);` works as usual, so `svg|rect` selects the SVG `rect` in the component. The compiler writes an empty `{}` after the statement, which the browser ignores, so the rule after it is scoped like any other.
 
 Comments are removed from stylesheets at build time, in development and production builds.
 
@@ -129,17 +129,7 @@ export const Card = defineComponent('ui-card', () => ({
 }));
 ```
 
-The compiler bundles the CSS file and exports its content as a string. Add `thane/client` to your `tsconfig.json` types to get proper TypeScript support for `.css` imports:
-
-```json
-{
-  "compilerOptions": {
-    "types": ["thane/client"]
-  }
-}
-```
-
-The `client.d.ts` file declares:
+The compiler bundles the CSS file and exports its content as a string. TypeScript knows `.css` imports as soon as the project imports `thane`: its declarations include `client.d.ts`, which declares:
 
 ```typescript
 declare module '*.css' {
@@ -153,7 +143,7 @@ declare module '*.css' {
 Use `registerGlobalStyles()` for styles that apply globally — resets, typography, theme variables:
 
 ```typescript
-import { registerGlobalStyles } from 'thane';
+import { registerGlobalStyles, css } from 'thane';
 
 const resetStyles = css`
   *,

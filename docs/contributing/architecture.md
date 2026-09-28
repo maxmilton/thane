@@ -13,11 +13,11 @@ src/
       post-build-processor/    # Final output processing (assets, index.html, gzip, size report, dev server)
       reactive-binding-compiler/ # Core: compiles html`` templates → DOM bindings (+ its tests)
       router-typegen/          # Generates .thane/types (route types, .css declarations)
-      thane-linter/            # 12 compile-time lint rules (THANE400–THANE412) (+ its tests)
+      thane-linter/            # 13 compile-time lint rules (THANE400–THANE413) (+ its tests)
       tsc-type-checker/        # Type sync and TypeScript type checking at build start
     testing/                   # Shared helpers for build-through tests (not published)
     utils/                     # Shared compiler utilities (HTML parser, AST helpers, file scan, logger)
-    errors.ts                  # Diagnostic codes (THANE006–THANE010, THANE200, THANE202, THANE400–THANE412)
+    errors.ts                  # Diagnostic codes (THANE006–THANE012, THANE200, THANE202, THANE400–THANE413)
   contracts/                   # Names shared by the compiler and the runtime's compiled-output contract
     compiler/                  # Binding kinds, parser states, the code generator's result type
     runtime/                   # Runtime helper names, package entry specifiers
@@ -64,9 +64,9 @@ Unit tests sit next to the code they cover (`*.test.ts`); they are excluded from
 
 The build is then an **esbuild plugin pipeline**, registered in this order. esbuild runs the `onStart` callbacks concurrently and waits for all of them before it loads a file, and for each file the first `onLoad` callback that returns contents wins.
 
-1. **TSC Type Checker** (`onStart`) — syncs `.thane/types` (`syncProjectTypes`: the `.css` declaration file and one route-type file per `defineRoutes()` table), then type-checks the project with `ts.createProgram`. esbuild waits for it. A failed sync fails the build under the `types-sync` label
+1. **TSC Type Checker** (`onStart`) — syncs `.thane/types` (`syncProjectTypes`: the `.css` declaration file and one route-type file per `defineRoutes()` table), then type-checks the project with `ts.createProgram`. Its compiler host serves each source with the template event handlers typed (`event-handler-types.ts`: `(handler) satisfies ThaneEventListener<'click'>`, for the checker only), and the diagnostics are mapped back to the source as written. esbuild waits for it. A failed sync fails the build under the `types-sync` label
 2. **Thane Linter** (`onLoad` `.ts`) — runs the rules on component files (THANE411 on files that call `mount()`); returns errors, otherwise nothing, so the next plugin loads the file
-3. **Component Precompiler** (`onLoad` `.ts`, label `component-ctfe`) — the mount-call optimiser for files without templates; `css`-only modules; for files with `html` templates: replaces `${Child(…)}` calls with anchor comments, calls the reactive binding compiler (`transformDefineComponentSource`), compiles `css` templates and strips the `html` tags. An exception becomes the file's build error
+3. **Component Precompiler** (`onLoad` `.ts`, label `component-compiler`) — the mount-call optimiser for files without templates; `css`-only modules; for files with `html` templates: replaces `${Child(…)}` calls with anchor comments, calls the reactive binding compiler (`transformDefineComponentSource`), compiles `css` templates and strips the `html` tags. An exception becomes the file's build error
 4. **Global CSS Bundler** (`onLoad` `.css`) — `transformCss` on the file (`:host-context`, statement at-rules, planned renames, minify in prod or strip comments in dev), exported as a string
 5. **Minification** (`onStart`, prod only) — reads the project's sources and plans selector renames into `buildContext.selectorMap`. Templates and stylesheets are minified by the compiler where it emits them; emitted JavaScript is minified by esbuild and never edited
 6. **Post-Build Processor** (`onStart`, `onEnd`, `onDispose`) — `onStart` clears the source cache and empties the output directory (unless `emptyOutDir` is off); `onEnd` copies assets, writes `index.html` with the entry `<script>` tags from the metafile, compresses, prints the size report and starts the dev server

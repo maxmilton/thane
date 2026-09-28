@@ -194,88 +194,41 @@ export const toCamelCase = (str: string): string => {
 // ============================================================================
 
 /**
- * Rename all occurrences of an identifier in a JS expression using the TS AST.
- * Unlike regex, this only renames actual identifier tokens — not inside strings,
- * template literals, or property-access chains.
+ * `expr` with each reference to the variable `name` replaced by `replacement`. A string, a property
+ * name or a property access is not a reference. Everything else keeps its text: printed again, an
+ * html`` template inside would read `html \`…\``, which the template parser takes for markup. A
+ * function inside that declares its own `name` shadows it there, as in JavaScript.
  */
-export const renameIdentifierInExpression = (expression: string, oldName: string, newName: string): string => {
-  const wrapped = `const __expr__ = (${expression});`;
-  const sf = ts.createSourceFile('__expr.ts', wrapped, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-
-  const stmt = sf.statements[0];
-  if (!stmt || !ts.isVariableStatement(stmt)) return expression;
-  const decl = stmt.declarationList.declarations[0];
-  if (!decl?.initializer) return expression;
-
-  // Parse the replacement expression once (not per-visitor-call) to avoid
-  // re-creating a SourceFile on every matched identifier.
-  const replacementExpr: ts.Expression = (() => {
-    const replacementSf = ts.createSourceFile(
-      '__replacement.ts',
-      `const __replacement__ = (${newName});`,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS,
+export const replaceReferences = (expr: string, name: string, replacement: string): string => {
+  const sf = ts.createSourceFile('__expr.ts', `(${expr})`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const edits: [start: number, end: number, text: string][] = [];
+  const binds = (n: ts.BindingName): boolean =>
+    ts.isIdentifier(n) ? n.text === name : n.elements.some((e) => !ts.isOmittedExpression(e) && binds(e.name));
+  const isPropertyName = (node: ts.Identifier): boolean => {
+    const p = node.parent;
+    return (
+      ((ts.isPropertyAccessExpression(p) || ts.isPropertyAssignment(p) || ts.isMethodDeclaration(p)) &&
+        p.name === node) ||
+      ((ts.isGetAccessorDeclaration(p) || ts.isSetAccessorDeclaration(p)) && p.name === node) ||
+      (ts.isBindingElement(p) && p.propertyName === node)
     );
-    const replacementStmt = replacementSf.statements[0];
-    if (!replacementStmt || !ts.isVariableStatement(replacementStmt)) {
-      return ts.factory.createIdentifier(newName);
-    }
-    const replacementDecl = replacementStmt.declarationList.declarations[0];
-    if (!replacementDecl?.initializer) {
-      return ts.factory.createIdentifier(newName);
-    }
-    return ts.isParenthesizedExpression(replacementDecl.initializer)
-      ? replacementDecl.initializer.expression
-      : replacementDecl.initializer;
-  })();
-
-  const shouldSkipIdentifierRename = (node: ts.Identifier): boolean => {
-    const parent = node.parent;
-    if (!parent) return false;
-
-    if (ts.isPropertyAccessExpression(parent) && parent.name === node) return true;
-    if (ts.isPropertyAssignment(parent) && parent.name === node) return true;
-    if (ts.isShorthandPropertyAssignment(parent)) return true;
-    if (ts.isBindingElement(parent) && parent.propertyName === node) return true;
-    if (ts.isMethodDeclaration(parent) && parent.name === node) return true;
-    if (ts.isGetAccessorDeclaration(parent) && parent.name === node) return true;
-    if (ts.isSetAccessorDeclaration(parent) && parent.name === node) return true;
-
-    return false;
   };
-
-  const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
-    const visit: ts.Visitor = (node) => {
-      if (ts.isShorthandPropertyAssignment(node) && node.name.text === oldName) {
-        return ts.factory.createPropertyAssignment(ts.factory.createIdentifier(oldName), replacementExpr);
-      }
-
-      if (ts.isIdentifier(node) && node.text === oldName) {
-        if (shouldSkipIdentifierRename(node)) {
-          return node;
-        }
-        return replacementExpr;
-      }
-
-      return ts.visitEachChild(node, visit, context);
-    };
-
-    return (node) => ts.visitNode(node, visit) as ts.SourceFile;
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) && node.parameters.some((p) => binds(p.name))) return;
+    if (ts.isShorthandPropertyAssignment(node) && node.name.text === name) {
+      // `{ name }` keeps its key: `{ name: replacement }`
+      edits.push([node.name.end, node.name.end, `: ${replacement}`]);
+      return;
+    }
+    if (ts.isIdentifier(node) && node.text === name && !isPropertyName(node)) {
+      edits.push([node.getStart(sf), node.end, replacement]);
+    }
+    ts.forEachChild(node, visit);
   };
-
-  const transformed = ts.transform(sf, [transformer]).transformed[0] as ts.SourceFile;
-  const transformedStmt = transformed.statements[0];
-  if (!transformedStmt || !ts.isVariableStatement(transformedStmt)) return expression;
-  const transformedDecl = transformedStmt.declarationList.declarations[0];
-  if (!transformedDecl?.initializer) return expression;
-
-  const outExpr = ts.isParenthesizedExpression(transformedDecl.initializer)
-    ? transformedDecl.initializer.expression
-    : transformedDecl.initializer;
-
-  const printer = ts.createPrinter({ removeComments: false });
-  return printer.printNode(ts.EmitHint.Expression, outExpr, transformed);
+  visit(sf);
+  let out = `(${expr})`;
+  for (const [start, end, text] of edits.reverse()) out = out.slice(0, start) + text + out.slice(end);
+  return out.slice(1, -1);
 };
 
 /** Check whether an expression references a given identifier (AST-based, not regex). */
@@ -300,10 +253,21 @@ export const expressionReferencesIdentifier = (expression: string, identifierNam
   return found;
 };
 
+/** The expression `expression` is, parentheses removed, and its source file; null when it is not one expression. */
+const parseWholeExpression = (expression: string): { node: ts.Expression; sf: ts.SourceFile } | null => {
+  const sf = ts.createSourceFile('__expr.ts', `(${expression})`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const statement = sf.statements.length === 1 ? sf.statements[0] : undefined;
+  if (!statement || !ts.isExpressionStatement(statement)) return null;
+  let node = statement.expression;
+  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  return { node, sf };
+};
+
 /**
  * Parse an arrow function expression and return its parameter list and body.
  * Uses TS AST to correctly handle destructuring, defaults, and nested parens.
- * Returns null if the expression is not an arrow function.
+ * Returns null if the expression is not an arrow function, including one that only
+ * contains an arrow, such as a call with an arrow argument.
  */
 export const parseArrowFunction = (
   expression: string,
@@ -312,22 +276,18 @@ export const parseArrowFunction = (
   body: string;
   isBlockBody: boolean;
 } | null => {
-  const wrapped = `(${expression})`;
-  const sf = ts.createSourceFile('__expr.ts', wrapped, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-
-  let result: { params: string; body: string; isBlockBody: boolean } | null = null;
-
-  const visit = (node: ts.Node) => {
-    if (result) return;
-    if (ts.isArrowFunction(node)) {
-      const params = node.parameters.map((p) => p.getText(sf)).join(', ');
-      const body = node.body.getText(sf);
-      const isBlockBody = ts.isBlock(node.body);
-      result = { params, body, isBlockBody };
-      return;
-    }
-    ts.forEachChild(node, visit);
+  const parsed = parseWholeExpression(expression);
+  if (!parsed || !ts.isArrowFunction(parsed.node)) return null;
+  const { node, sf } = parsed;
+  return {
+    params: node.parameters.map((p) => p.getText(sf)).join(', '),
+    body: node.body.getText(sf),
+    isBlockBody: ts.isBlock(node.body),
   };
-  visit(sf);
-  return result;
+};
+
+/** True when the expression is an arrow function or a function expression. */
+export const isFunctionExpressionText = (expression: string): boolean => {
+  const parsed = parseWholeExpression(expression);
+  return parsed !== null && (ts.isArrowFunction(parsed.node) || ts.isFunctionExpression(parsed.node));
 };

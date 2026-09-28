@@ -16,7 +16,7 @@ const VERBATIM_CLOSE = '';
 
 /**
  * Apply `transform` to the HTML outside verbatim elements, which are masked while it runs and put
- * back as written. Every place that collapses a template's whitespace goes through it (H-03).
+ * back as written. Every place that collapses a template's whitespace goes through it.
  */
 export const outsideVerbatim = (html: string, transform: (html: string) => string): string => {
   const verbatim: string[] = [];
@@ -32,14 +32,23 @@ export const outsideVerbatim = (html: string, transform: (html: string) => strin
   );
 };
 
+/**
+ * Whitespace between two tags, by Vue's "condense" rule: whitespace-only text that holds a line break
+ * goes (it is the template's own formatting), and one that does not stays as one space, which the
+ * browser shows (`<b>x</b> <i>y</i>` reads "x y"). Whitespace next to a comment is left to the
+ * caller: anchors, markers and boundaries have rules of their own.
+ */
+export const condenseBetweenTags = (html: string): string =>
+  html.replace(/(?<!--)>(\s+)<(?!!)/g, (_match, space: string) => (/[\n\r]/.test(space) ? '><' : '> <'));
+
 export const minifyHTML = (html: string): string => outsideVerbatim(html, collapseHTML);
 
 const collapseHTML = (html: string): string => {
   return (
-    html
+    condenseBetweenTags(html)
       .replace(/\s+/g, ' ')
-      // A binding's boundary keeps the space before an element, which is text (H-53)
-      .replace(/(?<!<!----)>\s+<(?![!-])|>\s+<(?=\/)/g, '><')
+      // Next to a comment: a binding's boundary keeps the space before an element, which is text
+      .replace(/(?<=--)(?<!<!----)>\s+<(?![!-])|(?<=--)>\s+<(?=\/)/g, '><')
       // Strip non-binding HTML comments (preserve <!--bN-->, <!--iN-->, <!--[if]-->, and <!----> boundary)
       .replace(/<!--(?!b\d)(?!i\d)(?!\[)(?!--)[\s\S]*?-->/g, '')
       // Repair: aggressive strip may have merged binding markers with boundary comments;

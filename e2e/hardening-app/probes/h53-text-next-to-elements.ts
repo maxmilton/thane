@@ -1,7 +1,7 @@
-import { defineComponent, signal } from 'thane';
+import { defineComponent, signal, html, when, whenElse, repeat } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// H-53 (K24, K25): the whitespace between a text binding and an element or directive next to it,
+// The whitespace between a text binding and an element or directive next to it,
 // rendered. Rows first, then the same at component level and in a whenElse() branch. The last
 // paragraph is whitespace between two elements, which is not text and still goes.
 export const H53 = defineComponent('hardening-h53', () => {
@@ -23,6 +23,8 @@ export const H53 = defineComponent('hardening-h53', () => {
       <p class="h53-cwhenelse">${a()} ${whenElse(on(), html`<i>y</i>`, html`<i>n</i>`)} ${b()}</p>
       ${whenElse(on(), html`<p class="h53-branch">${a()} <b>x</b></p>`, html`<p class="h53-branch">none</p>`)}
       <p class="h53-elements"><b>x</b> <i>y</i></p>
+      <p class="h53-lines"><b>x</b>
+        <i>y</i></p>
     </div>`,
   };
 });

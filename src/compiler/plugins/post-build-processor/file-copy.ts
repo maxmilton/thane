@@ -55,7 +55,33 @@ export const watchAndRecursivelyCopyAssetsIntoDist = (
 
   recursivelyCopyAssetsIntoDist(src, dest);
 
-  const watcher = fs.watch(src, { recursive: true }, (eventType: string, filename: string | null) => {
+  // One path is synchronised at a time, in the order its debounce ends: a deleted folder and a file
+  // inside it are reported together, and removing both at once can fail on Windows
+  let pending: Promise<void> = Promise.resolve();
+
+  const sync = async (filename: string): Promise<void> => {
+    const srcPath = path.join(src, filename);
+    const destPath = path.join(dest, filename);
+    try {
+      // A path that has gone is removed from the output, whichever event came last: the debounce
+      // keeps one, and Windows can report a deleted folder's `change` after its `rename`
+      const stat = await fs.promises.lstat(srcPath).catch(() => null);
+      if (stat?.isDirectory()) {
+        await recursivelyCopyAssetsIntoDist(srcPath, destPath);
+      } else if (stat) {
+        await fs.promises.copyFile(srcPath, destPath);
+      } else {
+        // Windows can hold a just-deleted entry for a moment (EBUSY, ENOTEMPTY, EPERM)
+        await fs.promises.rm(destPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+      }
+      onUpdate?.();
+    } catch (error) {
+      // Race conditions during rapid file changes
+      logger.verbose(`[file-copy] Watcher error for ${filename}: ${error instanceof Error ? error.message : error}`);
+    }
+  };
+
+  const watcher = fs.watch(src, { recursive: true }, (_eventType: string, filename: string | null) => {
     if (!filename) return;
 
     // Debounce rapid saves to avoid redundant rebuilds
@@ -66,29 +92,9 @@ export const watchAndRecursivelyCopyAssetsIntoDist = (
 
     debounceTimers.set(
       filename,
-      setTimeout(async () => {
+      setTimeout(() => {
         debounceTimers.delete(filename);
-
-        const srcPath = path.join(src, filename);
-        const destPath = path.join(dest, filename);
-
-        try {
-          // fs.watch reports only `change` and `rename`; a path that has gone is removed on `rename`
-          const stat = await fs.promises.lstat(srcPath).catch(() => null);
-          if (stat?.isDirectory()) {
-            await recursivelyCopyAssetsIntoDist(srcPath, destPath);
-          } else if (stat) {
-            await fs.promises.copyFile(srcPath, destPath);
-          } else if (eventType === 'rename') {
-            await fs.promises.rm(destPath, { recursive: true, force: true }).catch(() => {});
-          }
-          onUpdate?.();
-        } catch (error) {
-          // Race conditions during rapid file changes
-          logger.verbose(
-            `[file-copy] Watcher error for ${filename}: ${error instanceof Error ? error.message : error}`,
-          );
-        }
+        pending = pending.then(() => sync(filename));
       }, DEBOUNCE_MS),
     );
   });

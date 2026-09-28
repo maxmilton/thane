@@ -1,5 +1,5 @@
 /**
- * Characterisation of signal notification order (F0-2 item 10, before RT-2 and A2-2).
+ * Characterisation of signal notification order.
  *
  * Each test logs subscriber calls and pins the exact order observed on e4a17f1. The runtime's
  * rules, as they show up here:
@@ -13,11 +13,16 @@
  *   drains in that moment, at depth > 0, so the cascades it causes wait for the outer drain.
  * - A computed is dirty-marked when a source notifies, and notifies its own subscribers from a
  *   queue that runs when the outermost notification ends. Read before its source has notified
- *   (inside a cascade or a batch), it returns its previous value.
+ *   (inside a cascade or a batch), it computes again when a signal was written since: the read
+ *   is fresh.
  *
- * Throwing subscribers are re-thrown through queueMicrotask; the tests capture those.
+ * Throwing subscribers are re-thrown through queueMicrotask; the tests capture those. Signals that
+ * keep setting each other stop with an error in development builds and overflow the stack in production.
  */
 import { describe, expect, test } from 'bun:test';
+import { buildSync } from 'esbuild';
+import { rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { batch, computed, signal } from './signal.js';
@@ -196,33 +201,92 @@ describe('circular dependencies', () => {
     expect(log).toEqual(['b:2', 'a=3 ca()=30', 'b:4', 'b:6', 'ca:70', 'done']);
   });
 
-  // Runs in a child process: the overflow unwinds through the runtime's module state, which bun
-  // shares between test files, and where the stack runs out decides what is left behind.
-  test('a pair that never settles overflows the stack; "Circular signal dependency" is never thrown', () => {
-    const signalUrl = pathToFileURL(join(dirname(import.meta.path), 'signal.ts')).href;
-    const script = `
-      const { signal } = await import(${JSON.stringify(signalUrl)});
-      const a = signal(0), b = signal(0);
-      let calls = 0;
-      a.subscribe((v) => { calls++; b(v + 1); }, true);
-      b.subscribe((v) => { calls++; a(v + 1); }, true);
-      const queued = [];
-      globalThis.queueMicrotask = (cb) => void queued.push(cb);
-      const errors = [];
-      try { a(1); } catch (e) { errors.push({ name: e.name, message: e.message, sync: true }); }
-      for (const cb of queued) { try { cb(); } catch (e) { errors.push({ name: e.name, message: e.message, sync: false }); } }
-      console.log(JSON.stringify({ calls, errors: errors.slice(0, 5) }));
-    `;
-    const run = Bun.spawnSync([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' });
-    const out = run.stdout.toString().trim().split('\n').at(-1) ?? '';
-    const { calls, errors } = JSON.parse(out) as {
-      calls: number;
-      errors: Array<{ name: string; message: string; sync: boolean }>;
-    };
+  // The cycle tests run in a child process: a cycle unwinds through the runtime's module state, which
+  // bun shares between test files.
+  const runCycle = (script: string, define?: Record<string, string>) => {
+    const signalPath = join(dirname(import.meta.path), 'signal.ts');
+    const source = define
+      ? // the runtime as a production build bundles it: esbuild, with the build's constants
+        buildSync({ entryPoints: [signalPath], bundle: true, format: 'esm', write: false, define }).outputFiles[0]!.text
+      : null;
+    const file = source ? join(tmpdir(), `thane-signal-${process.pid}-${Date.now()}.mjs`) : signalPath;
+    if (source) writeFileSync(file, source);
+    try {
+      const run = Bun.spawnSync(
+        [
+          process.execPath,
+          '-e',
+          `const { signal, computed } = await import(${JSON.stringify(pathToFileURL(file).href)});\n` +
+            'const queued = []; globalThis.queueMicrotask = (cb) => void queued.push(cb);\n' +
+            'const errors = []; const note = (e, sync) => errors.push({ name: e.name, message: e.message, sync });\n' +
+            script +
+            '\nfor (const cb of queued) { try { cb(); } catch (e) { note(e, false); } }\n' +
+            'console.log(JSON.stringify({ calls, errors: errors.slice(0, 5), after }));',
+        ],
+        { stdout: 'pipe', stderr: 'pipe' },
+      );
+      const out = run.stdout.toString().trim().split('\n').at(-1) ?? '';
+      return JSON.parse(out) as {
+        calls: number;
+        errors: Array<{ name: string; message: string; sync: boolean }>;
+        after: string[];
+      };
+    } finally {
+      if (source) rmSync(file, { force: true });
+    }
+  };
 
+  const PAIR = `
+    const a = signal(0), b = signal(0);
+    let calls = 0;
+    a.subscribe((v) => { calls++; b(v + 1); }, true);
+    b.subscribe((v) => { calls++; a(v + 1); }, true);
+    try { a(1); } catch (e) { note(e, true); }
+    // afterwards another signal notifies as usual
+    const after = []; const c = signal(0); c.subscribe((v) => after.push('c:' + v), true); c(1);
+  `;
+
+  test('a pair that never settles stops with an error that says what it is; writes notify afterwards', () => {
+    const { calls, errors, after } = runCycle(PAIR);
+    expect(calls).toBe(501);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ name: 'Error', sync: true });
+    expect(errors[0]!.message).toContain('[thane] Signals keep setting each other');
+    expect(after).toEqual(['c:1']);
+  });
+
+  test("a computed whose subscriber sets the computed's own source stops with the same error", () => {
+    const { errors, after } = runCycle(`
+      const s = signal(0);
+      const c = computed(() => s());
+      let calls = 0;
+      c.subscribe((v) => { calls++; s(v + 1); }, true);
+      try { s(1); } catch (e) { note(e, true); }
+      const after = []; const d = signal(0); d.subscribe((v) => after.push('d:' + v), true); d(1);
+    `);
+    // Thrown inside the computed's subscriber, it is rethrown as every subscriber error is
+    expect(errors.some((e) => e.message.includes('[thane] Signals keep setting each other'))).toBe(true);
+    expect(errors.some((e) => e.name === 'RangeError')).toBe(false);
+    expect(after).toEqual(['d:1']);
+  });
+
+  test('a production build has no check: the pair overflows the stack', () => {
+    const { calls, errors } = runCycle(PAIR, { __THANE_DEV__: 'false' });
     expect(calls).toBeGreaterThan(1000);
     expect(errors.some((e) => e.name === 'RangeError')).toBe(true);
-    expect(errors.some((e) => e.message === 'Circular signal dependency')).toBe(false);
+    expect(errors.some((e) => e.message.includes('keep setting each other'))).toBe(false);
+  });
+
+  test('a long cascade that settles is no cycle', () => {
+    const { calls, errors } = runCycle(`
+      const chain = Array.from({ length: 300 }, () => signal(0));
+      let calls = 0;
+      chain.forEach((sig, i) => sig.subscribe((v) => { calls++; if (chain[i + 1]) chain[i + 1](v); }, true));
+      try { chain[0](1); } catch (e) { note(e, true); }
+      const after = [];
+    `);
+    expect(errors).toEqual([]);
+    expect(calls).toBe(300);
   });
 });
 
@@ -415,7 +479,7 @@ describe('batch', () => {
 });
 
 describe('computed in each situation', () => {
-  test('cascade: read before its source has notified it returns the previous value', () => {
+  test('cascade: a read before its source has notified it is fresh', () => {
     const log: string[] = [];
     const a = signal(1);
     const b = signal(1);
@@ -434,9 +498,9 @@ describe('computed in each situation', () => {
     log.push(`after cb()=${cb()} unobserved()=${unobserved()}`);
 
     expect(log).toEqual([
-      'a1 b()=6 cb()=10 unobserved()=100',
-      'a2 cb()=10',
-      // b's notification dirty-marks both computeds first (they subscribed first), so this read is fresh
+      // b was written and has not notified yet: the computeds compute again on read
+      'a1 b()=6 cb()=60 unobserved()=600',
+      'a2 cb()=60',
       'b:6 cb()=60',
       // the computed's own subscribers run when the outermost notification ends
       'cb notified:60',
@@ -444,7 +508,7 @@ describe('computed in each situation', () => {
     ]);
   });
 
-  test('diamond of computeds: the join notifies once, glitch-free; a downstream read inside the source notification is stale', () => {
+  test('diamond of computeds: the join notifies once; a downstream read inside the source notification is fresh', () => {
     const log: string[] = [];
     const a = signal(1);
     const b = computed(() => {
@@ -471,16 +535,18 @@ describe('computed in each situation', () => {
       'eval c',
       'eval d',
       '--set',
-      // b and c are dirty, d is not yet: reading d here returns the old 4, not 7
-      'a:2 d()=4',
-      // queued computed notifications, in the order their sources marked them: b first
-      'eval b',
+      // b and c are dirty and d is not yet, but a was written since d computed: d computes again,
+      // reading b and c fresh, and the read gives 7
       'eval d',
+      'eval b',
       'eval c',
+      'a:2 d()=7',
+      // queued computed notifications, in the order their sources marked them: d is dirty again
+      'eval d',
       'd:7',
+      // b is current: notified with the value its subscribers have not seen, without computing again
       'b:4',
-      // c's queued notification re-evaluates c and d; d is unchanged, so nothing is notified
-      'eval c',
+      // c's notification dirty-marks d, which computes to the same 7 and notifies nothing
       'eval d',
     ]);
   });
@@ -504,10 +570,10 @@ describe('computed in each situation', () => {
 
     a(1);
 
-    expect(log).toEqual(['eval cb', '--', 'a1 cb()=0', 'eval cb', 'b:3 cb()=30', 'eval cb', 'cb:30']);
+    expect(log).toEqual(['eval cb', '--', 'eval cb', 'a1 cb()=30', 'eval cb', 'b:3 cb()=30', 'cb:30']);
   });
 
-  test('top-level batch: a read inside the batch is stale; the computed notifies between two batched sources', () => {
+  test('top-level batch: a read inside the batch is fresh; the computed notifies between two batched sources', () => {
     const log: string[] = [];
     const a = signal(0);
     const b = signal(0);
@@ -530,7 +596,8 @@ describe('computed in each situation', () => {
     expect(log).toEqual([
       'eval sum',
       '--',
-      'in batch a()=1 sum()=0',
+      'eval sum',
+      'in batch a()=1 sum()=3',
       'a:1',
       // the computed queue runs at the end of a's notification, before b is notified;
       // the value is already final because b was written during the batch
@@ -542,7 +609,7 @@ describe('computed in each situation', () => {
     ]);
   });
 
-  test('nested batch: reads inside either batch are stale; one notification after the outer one', () => {
+  test('nested batch: reads inside either batch are fresh; one notification after the outer one', () => {
     const log: string[] = [];
     const a = signal(0);
     const ca = computed(() => a() + 1);
@@ -557,7 +624,7 @@ describe('computed in each situation', () => {
     });
     log.push(`after ca()=${ca()}`);
 
-    expect(log).toEqual(['inner ca()=1', 'outer ca()=1', 'ca:6', 'after ca()=6']);
+    expect(log).toEqual(['inner ca()=6', 'outer ca()=6', 'ca:6', 'after ca()=6']);
   });
 
   test('batch inside a subscriber: the read after the batch is fresh; notification waits for the outer end', () => {

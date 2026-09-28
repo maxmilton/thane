@@ -1,4 +1,4 @@
-import { computed, defineComponent } from 'thane';
+import { computed, defineComponent, html, when, whenElse, repeat } from 'thane';
 import styles from './Cart.module.css';
 import { cartCount, products, removeFromCart } from '../../state/global-state.js';
 

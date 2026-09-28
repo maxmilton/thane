@@ -1,5 +1,5 @@
 /**
- * The compiled component imports exactly what its registration uses (CE-3, H-33): the
+ * The compiled component imports exactly what its registration uses: the
  * registration function it calls (lean or full), and `__enableComponentStyles` exactly when it
  * calls it. Checked on transformDefineComponentSource's output, before esbuild could drop an
  * unused import.
@@ -54,7 +54,7 @@ describe('registration import follows the registration call', () => {
 
   for (const [label, open, close] of [
     ['parenthesised once', '(', ')'],
-    ['parenthesised twice (H-33)', '((', '))'],
+    ['parenthesised twice', '((', '))'],
     ['parenthesised three times', '(((', ')))'],
   ] as const) {
     test(`styles, concise body ${label}: full, called and imported`, () => {
@@ -73,7 +73,7 @@ describe('registration import follows the registration call', () => {
     expect([r.called, r.stylesCalled]).toEqual(['__registerComponent', true]);
   });
 
-  test('styles only in a later return: detection reads the last return (H-07), so called and imported', () => {
+  test('styles only in a later return: detection reads the last return, so called and imported', () => {
     const r = compile(`() => {
   if (flag) {
     return { template: html\`<p>a</p>\` };

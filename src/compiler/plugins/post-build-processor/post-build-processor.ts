@@ -1,6 +1,6 @@
 /**
  * Post-Build Processor — orchestrates file copying, compression, HTML templating,
- * dev server, live reload, and console reporting after esbuild completes.
+ * dev server, page reloads, and console reporting after esbuild completes.
  */
 
 import fs from 'node:fs';
@@ -19,6 +19,7 @@ import { DevServer } from './dev-server.js';
 import { collectFileSizes, printAllFileSizes, printTotalSizes } from './console-reporting.js';
 import { minifySelectorsInHTML } from '../minification/minification.js';
 import { minifyHTML } from '../minification/template-minifier.js';
+import { routePages, routeTablesOf } from '../router-typegen/route-head.js';
 
 const NAME = PLUGIN_NAME.POST_BUILD;
 
@@ -89,21 +90,48 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
   };
 
   /**
-   * Re-process the HTML template and notify live reload clients.
+   * Write the output index.html. A production build writes every static route's own page too
+   * (`about/index.html`), with the route's head in it, for crawlers and link-preview bots that do not
+   * run JavaScript; the root index.html gets the head of `/`. Returns what the root index.html holds.
+   */
+  const writeIndexPages = async (html: string): Promise<string> => {
+    let root = html;
+    if (config.isProd && config.buildContext) {
+      const { tables } = await routeTablesOf(config.entryPoints, config.buildContext.projectRoot);
+      let written = 0;
+      for (const table of tables) {
+        for (const note of table.notes) logger.verbose(`[route-head] ${path.basename(table.file)}: ${note}`);
+        for (const page of routePages(html, table)) {
+          if (page.file === 'index.html') {
+            root = page.html;
+            continue;
+          }
+          const file = path.join(config.distDir, page.file);
+          await fs.promises.mkdir(path.dirname(file), { recursive: true });
+          await fs.promises.writeFile(file, page.html, 'utf8');
+          written++;
+        }
+      }
+      if (written > 0) logger.info(NAME, `Wrote the head of ${written} static route(s) into their own index.html`);
+    }
+    await fs.promises.writeFile(config.outputHTMLFilePath, root, 'utf8');
+    return root;
+  };
+
+  /**
+   * Re-process the HTML template and reload the open pages.
    * Used by file watchers when index.html or assets change.
    */
   const reprocessAndReloadHTML = async (): Promise<void> => {
-    await fs.promises.writeFile(config.outputHTMLFilePath, await renderIndexHtml(cachedHashedFileNames), 'utf8');
-    devServer.notifyLiveReloadClients();
+    await writeIndexPages(await renderIndexHtml(cachedHashedFileNames));
+    devServer.reloadPages();
   };
 
   const copyIndexHTMLIntoDistAndStartServer = async (
     hashedFileNames: Record<string, string | undefined>,
   ): Promise<void> => {
-    const { outputHTMLFilePath, isProd, serve, useGzip, distDir } = config;
-    const updatedData = await renderIndexHtml(hashedFileNames);
-
-    await fs.promises.writeFile(outputHTMLFilePath, updatedData, 'utf8');
+    const { isProd, serve, useGzip, distDir } = config;
+    const updatedData = await writeIndexPages(await renderIndexHtml(hashedFileNames));
 
     const sizeInBytes = Buffer.byteLength(updatedData, 'utf8');
     totalBundleSizeInBytes += sizeInBytes;
@@ -121,7 +149,7 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     if (serve && !devServer.isStarted) {
       devServer.start();
     } else if (serve && !isProd) {
-      devServer.notifyLiveReloadClients();
+      devServer.reloadPages();
     }
   };
 
@@ -182,7 +210,7 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
           if (serve && !watchersStarted) {
             cleanupCallbacks.add(
               watchAndRecursivelyCopyAssetsIntoDist(assetsInputDir, assetsOutputDir, () => {
-                devServer.notifyLiveReloadClients();
+                devServer.reloadPages();
               }),
             );
           } else {

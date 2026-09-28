@@ -117,13 +117,13 @@ import ProductDetailsPage from './pages/ProductDetails/ProductDetails.js';
 import NotFound from './pages/NotFound/NotFound.js';
 
 const Routes = defineRoutes({
-  '/':            { component: ProductsPage,        title: 'Products' },
-  '/my-cart':     { component: CartPage,             title: 'My Cart' },
+  '/':            { component: ProductsPage,        meta: { title: 'Products' } },
+  '/my-cart':     { component: CartPage,             meta: { title: 'My Cart' } },
   '/product-details/:productID': {
     component: ProductDetailsPage,
-    title: 'Product Details',
+    meta: { title: 'Product Details' },
   },
-  'notFound':     { component: NotFound,             title: 'Not Found' },
+  'notFound':     { component: NotFound,             meta: { title: 'Not Found' } },
 });
 
 export default Routes;
@@ -147,7 +147,7 @@ Key points:
 **`app.ts`**
 
 ```ts
-import { defineComponent } from 'thane';
+import { defineComponent, html } from 'thane';
 import appStyles from './App.module.css';
 import { Navbar } from './components/Navbar/Navbar.js';
 

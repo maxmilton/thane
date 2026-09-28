@@ -21,7 +21,7 @@ export const App = defineComponent('test-app', () => ({
   template: html\`\${ProductGrid({ products: items })}\`,
 }));
 
-mount(App);
+mount({ component: App });
 `;
 
     const js = await buildAndReadJs(source, {
@@ -71,7 +71,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // The fill writes textContent (through the guard variable) and keeps the Text node it
@@ -95,7 +95,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Template should have empty <li></li>; the text node is created when the row is filled
@@ -123,7 +123,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Both td cells keep the Text node created by the fill and write nodeValue on update
@@ -153,10 +153,10 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
-    // The text node after the marker is reached by path once per row (A1-4), no TreeWalker, and
+    // The text node after the marker is reached by path once per row, no TreeWalker, and
     // written through `.data`
     expect(js).not.toContain('createTreeWalker');
     expect(js).toContain('<li>Name: <!----> <!----></li>');
@@ -178,11 +178,11 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Two comment markers means two text nodes, each written in fill and update; the space between
-    // the bindings stays (H-52)
+    // the bindings stays
     expect(js).toContain('<li><!----> <!----> <!----> <!----></li>');
     expect(js).not.toContain('createTreeWalker');
     const dataWrites = js.match(/\.data\s*=/g);
@@ -205,7 +205,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Both bindings need comment markers since they share an element with multiple bindings
@@ -237,7 +237,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Update path: `if (_m.p !== (_m.p = expr)) write(_m.p)` — the guard (a field on the row's
@@ -274,7 +274,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Main template should have no "> <" whitespace between elements
@@ -305,7 +305,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Row template should be compact: <tr><td></td><td></td></tr>
@@ -327,7 +327,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // After removing @click attribute, the trailing space before > should be stripped
@@ -363,7 +363,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // The second binding should reference the first variable, not navigate from root again
@@ -395,7 +395,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Should compile without errors
@@ -424,7 +424,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Should compile without errors
@@ -456,11 +456,11 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // The marker and the boundary comment survive in the template, the marker without its id
-    // (A1-4), with the text node between them, which the binding writes
+    //, with the text node between them, which the binding writes
     expect(js).not.toMatch(/<!--b\d+-->/);
     expect(js).toContain('Hello <!---->World<!----> World');
     expect(js).toMatch(/\.data ?=/);
@@ -480,7 +480,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Should compile without errors — conditional markers must survive stripping
@@ -502,7 +502,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     expect(js).toContain('<!----> <!----></span>');

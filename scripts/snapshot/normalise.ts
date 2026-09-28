@@ -5,8 +5,8 @@
  *  - temp project folders carry a random or keyed suffix
  *  - the repository root (the current working directory) appears in some messages
  *
- * Generated ids are per-file counters since A1-5, so they no longer depend on the checkout
- * path and are compared as they are (the renaming that used to live here was dropped then).
+ * Generated ids are per-file counters, so they do not depend on the checkout path and are
+ * compared as they are.
  *
  * Used by scripts/snapshot/preload.ts and scripts/snapshot/apps.ts (see scripts/snapshot/output.ts).
  */
