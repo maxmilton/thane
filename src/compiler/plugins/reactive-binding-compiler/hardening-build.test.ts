@@ -97,8 +97,8 @@ describe('H-12 quote-aware expression scanning', () => {
     const js = await buildAndReadJs(app(body), DEV);
     const rows = [...js.matchAll(new RegExp(`__tpl_b\\d+ = __T\\(${LITERAL}\\)`, 'g'))].map((m) => cooked(m[1]));
     expect(rows).toEqual(['<li></li>', '<li></li>']);
-    expect(js).toMatch(/item\.on \? ["']\}["'] : ["']\{["']/);
-    expect(js).toContain('fmt({ a: { b: item.a } })');
+    expect(js).toMatch(/it\.on \? ["']\}["'] : ["']\{["']/);
+    expect(js).toContain('fmt({ a: { b: it.a } })');
     const branch = cooked(
       new RegExp(`__bindIfExpr\\(_ws_b\\d+, _wm_b\\d+, \\[on\\], \\(\\) => on\\(\\), ${LITERAL}`).exec(js)?.[1],
     );
@@ -131,7 +131,7 @@ describe('H-40 child components in the rows of a list inside a directive', () =>
       // The mount is in the row factory (the row element `_el` holds the child's host, reached by
       // path, A1-4) and reads the row's item
       expect(js).toMatch(
-        /const (_cm\d+) = _el\.(?:first|last)ElementChild;[\s\S]*H40Kid\.__f\(\1, \{ label: item\.n \}\)/,
+        /const (_cm\d+) = _el\.(?:first|last)ElementChild;[\s\S]*H40Kid\.__f\(\1, \{ label: it\.n \}\)/,
       );
       expect(js).not.toMatch(/querySelector\("#/);
       // and nothing looks for the anchor at component level

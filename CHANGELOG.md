@@ -108,6 +108,7 @@ The simplification and hardening round fixed these defects in valid code:
 - Two text bindings separated by a space in a `repeat()` row keep the space: `${it.first} ${it.last}` rendered "JohnDoe".
 - A space between a text binding and an element or directive next to it is kept, in rows, components and branches, development and production (see Changed).
 - A child component call in a template, `${Kid(…)}`, mounts the component the file declares or imports under that name. It was matched by name against every component in the project, so two components exported under one name from different folders collided, and a plain function named like a component elsewhere was compiled as a child mount. Imports are followed through re-exports, aliases and tsconfig `paths`.
+- In nested lists, an inner row reads an outer row's item under the name the source gives it, whatever that name is. Compiled rows called every item `item`, so with a list of signal items named `item`, `item()` in an inner row read the inner item and threw.
 
 ### Removed
 

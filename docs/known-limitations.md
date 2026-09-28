@@ -61,18 +61,6 @@ For the same reason a row's root element cannot carry `when()` (THANE008): filte
 
 Inside the row, anything a component template can hold works, at any depth: bindings, event handlers, child components, `when()`, `whenElse()` and further lists.
 
-### Signal Items Named `item` in Nested Lists
-
-In a list whose items are signals (`Signal<Signal<T>[]>`) and whose rows hold a list of their own, the inner rows cannot call the outer item if its parameter is named `item`:
-
-```typescript
-// ❌ inside the inner rows, item() reads the inner row's item
-${repeat(groups(), (item) => html`<li>${repeat(item().tags, (tag) => html`<b>${item().name}: ${tag}</b>`)}</li>`)}
-
-// ✅ any other name works
-${repeat(groups(), (group) => html`<li>${repeat(group().tags, (tag) => html`<b>${group().name}: ${tag}</b>`)}</li>`)}
-```
-
 ### Empty Templates Are Static
 
 The empty template of a `repeat()`, its third argument, is inserted as written: it holds no bindings or event handlers, and a `${…}` inside it is shown as text. It must be a single element, like a row.

@@ -1357,4 +1357,14 @@ test.describe('RW nested lists in rows: an outer item named item', () => {
     await expect.poll(() => texts(page, '.rw3-oi-row .card')).toEqual(['A:a1', 'A:a2', 'B:b1', 'C:c1']);
     expect(probe.pageErrors).toEqual([]);
   });
+
+  test('rows whose items are signals and are named `item`: inner rows read item() and follow it', async ({ page }) => {
+    // Row factories used to call every row's item `item`, so an inner row's own item hid the outer one
+    // and item() threw. They keep the source's names now, and scoping works as in the source.
+    const probe = await mountProbe(page, 'rw3');
+    await expect.poll(() => texts(page, '.rw3-si-row')).toEqual(['A/x', 'A/y', 'B/z']);
+    await page.evaluate(() => (window as any).__probe.rw3.sigRows()[0]({ id: 1, name: 'C', tags: ['x', 'y'] }));
+    await expect.poll(() => texts(page, '.rw3-si-row')).toEqual(['C/x', 'C/y', 'B/z']);
+    expect(probe.pageErrors).toEqual([]);
+  });
 });

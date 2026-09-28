@@ -35,15 +35,13 @@ mount(App);
     expect(js).toMatch(/let _row = e\.target,\s*_cell = null;/);
     expect(js).toMatch(/\{\s*_cell = _row;\s*_row = _row\.parentNode;\s*\}/);
     // A handler on the cell itself needs no containment check
-    expect(js).toMatch(
-      /if \(_cell !== null && _cell === _row\.firstElementChild\) \{\s*inspect\(item\.id\);\s*return;/,
-    );
+    expect(js).toMatch(/if \(_cell !== null && _cell === _row\.firstElementChild\) \{\s*inspect\(row\.id\);\s*return;/);
     // Handlers below a cell compare the cell first, then check containment from the cell down
     expect(js).toMatch(
-      /if \(_cell !== null && _cell === _row\.firstElementChild\.nextElementSibling && _cell\.firstElementChild\?\.contains\(e\.target\)\) \{\s*select\(item\.id\);\s*return;/,
+      /if \(_cell !== null && _cell === _row\.firstElementChild\.nextElementSibling && _cell\.firstElementChild\?\.contains\(e\.target\)\) \{\s*select\(row\.id\);\s*return;/,
     );
     expect(js).toMatch(
-      /if \(_cell !== null && _cell === _row\.firstElementChild\.nextElementSibling\.nextElementSibling && _cell\.firstElementChild\?\.contains\(e\.target\)\) \{\s*remove\(item\.id\);\s*return;/,
+      /if \(_cell !== null && _cell === _row\.firstElementChild\.nextElementSibling\.nextElementSibling && _cell\.firstElementChild\?\.contains\(e\.target\)\) \{\s*remove\(row\.id\);\s*return;/,
     );
     // No handler re-navigates from the row for its containment check
     expect(js).not.toMatch(/_row\.firstElementChild[.\w]*\?\.contains\(/);
