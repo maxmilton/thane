@@ -1,0 +1,174 @@
+/**
+ * Characterisation of dev-server request routing and compression (F0-2 item 6, before PB-1 and
+ * PB-2).
+ *
+ * Real `DevServer` instances on port 0 serve a temporary dist directory. Each request pins the
+ * status, the headers the server sets, and the body (decoded, for compressed responses: PB-1 may
+ * change the compressed bytes but not what they decode to).
+ */
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { brotliDecompressSync, gunzipSync } from 'node:zlib';
+import { DevServer, type DevServerOptions } from './dev-server.js';
+
+const INDEX = '<!doctype html><p>index</p>';
+const MAIN_JS = 'console.log(1);'.repeat(50);
+
+let root = '';
+let dist = '';
+
+beforeAll(() => {
+  root = mkdtempSync(join(tmpdir(), 'thane-dev-server-'));
+  dist = join(root, 'dist');
+  mkdirSync(join(dist, 'assets'), { recursive: true });
+  mkdirSync(join(dist, 'dir.d'), { recursive: true });
+  writeFileSync(join(dist, 'index.html'), INDEX);
+  writeFileSync(join(dist, 'main.js'), MAIN_JS);
+  writeFileSync(join(dist, 'assets', 'My Logo.png'), 'PNGDATA');
+  writeFileSync(join(dist, 'café.txt'), 'cafe');
+  writeFileSync(join(root, 'secret.txt'), 'secret');
+});
+
+afterAll(() => {
+  rmSync(root, { recursive: true, force: true });
+});
+
+interface Served {
+  status: number;
+  /** The headers the server sets itself */
+  headers: Record<string, string>;
+  /** The body, decoded according to Content-Encoding */
+  body: string;
+}
+
+const OWN_HEADERS = ['cache-control', 'content-encoding', 'content-type', 'vary'];
+
+/** Start a server for the duration of `fn`, with its console output silenced. */
+const withServer = async (
+  options: Omit<DevServerOptions, 'distDir'>,
+  fn: (get: (path: string, acceptEncoding?: string) => Promise<Served>) => Promise<void>,
+) => {
+  const info = console.info;
+  console.info = () => {};
+  const server = new DevServer({ distDir: dist, host: 'localhost', port: 0, ...options });
+  try {
+    server.start(0);
+  } finally {
+    console.info = info;
+  }
+  const base = (server as unknown as { server: { url: URL } }).server.url.href.replace(/\/$/, '');
+  const get = async (path: string, acceptEncoding = 'identity'): Promise<Served> => {
+    const res = await fetch(base + path, {
+      headers: { 'accept-encoding': acceptEncoding },
+      decompress: false,
+    } as RequestInit);
+    const raw = new Uint8Array(await res.arrayBuffer());
+    const encoding = res.headers.get('content-encoding');
+    const decoded = encoding === 'br' ? brotliDecompressSync(raw) : encoding === 'gzip' ? gunzipSync(raw) : raw;
+    const headers: Record<string, string> = {};
+    for (const name of OWN_HEADERS) {
+      const value = res.headers.get(name);
+      if (value !== null && (res.status === 200 || name !== 'content-type')) headers[name] = value;
+    }
+    return { status: res.status, headers, body: new TextDecoder().decode(decoded) };
+  };
+  try {
+    await fn(get);
+  } finally {
+    server.stop();
+  }
+};
+
+const IMMUTABLE = 'public, max-age=31536000, immutable';
+const file = (contentType: string, body: string, extra: Record<string, string> = {}): Served => ({
+  status: 200,
+  headers: { 'cache-control': IMMUTABLE, 'content-type': contentType, ...extra },
+  body,
+});
+const index = (extra: Record<string, string> = {}): Served => ({
+  status: 200,
+  headers: { 'cache-control': 'no-cache', 'content-type': 'text/html', ...extra },
+  body: INDEX,
+});
+const status = (code: number, body: string): Served => ({ status: code, headers: {}, body });
+
+/** Routes whose outcome does not depend on the server options, apart from compression headers. */
+const routes = (vary: Record<string, string>): Array<[string, Served]> => [
+  ['/', index(vary)],
+  ['/main.js', file('text/javascript', MAIN_JS, vary)],
+  ['/main.js?v=1', file('text/javascript', MAIN_JS, vary)],
+  // A directory without an extension falls back to index.html; with an extension it is a 404
+  ['/assets', index(vary)],
+  ['/assets/', index(vary)],
+  ['/dir.d', status(404, 'Not Found')],
+  // Extension-less paths are client routes
+  ['/about', index(vary)],
+  ['/nested/route/x', index(vary)],
+  ['/v1.2/users', index(vary)],
+  ['/missing.js', status(404, 'Not Found')],
+  ['/missing.css', status(404, 'Not Found')],
+  // Percent-encoded names are decoded before the lookup
+  ['/assets/My%20Logo.png', file('image/png', 'PNGDATA')],
+  ['/caf%C3%A9.txt', file('text/plain', 'cafe', vary)],
+  // Traversal and malformed escapes are refused
+  ['/..%2F..%2Fsecret.txt', status(403, 'Forbidden')],
+  ['/..%2Fsecret.txt', status(403, 'Forbidden')],
+  ['/assets/%E0%A4%A', status(403, 'Forbidden')],
+];
+
+describe('dev server routing without compression', () => {
+  test('development server', async () => {
+    await withServer({ isProd: false, useGzip: false }, async (get) => {
+      for (const [path, expected] of routes({})) {
+        expect([path, await get(path)]).toEqual([path, expected]);
+      }
+      // The browser-event socket path refuses a plain request in development
+      expect(await get('/__thane-browser-events')).toEqual(status(400, 'WebSocket upgrade failed'));
+      // Compression is off: accept-encoding is ignored
+      expect(await get('/main.js', 'br, gzip')).toEqual(file('text/javascript', MAIN_JS));
+    });
+  });
+
+  test('production server: the socket path is an ordinary client route', async () => {
+    await withServer({ isProd: true, useGzip: false }, async (get) => {
+      for (const [path, expected] of routes({})) {
+        expect([path, await get(path)]).toEqual([path, expected]);
+      }
+      expect(await get('/__thane-browser-events')).toEqual(index());
+    });
+  });
+});
+
+describe('dev server routing with useGzip', () => {
+  for (const isProd of [false, true]) {
+    test(`${isProd ? 'production' : 'development'}: routes, Vary on compressible responses`, async () => {
+      await withServer({ isProd, useGzip: true }, async (get) => {
+        for (const [path, expected] of routes({ vary: 'Accept-Encoding' })) {
+          expect([path, await get(path)]).toEqual([path, expected]);
+        }
+      });
+    });
+
+    test(`${isProd ? 'production' : 'development'}: brotli is preferred, gzip next, identity otherwise`, async () => {
+      await withServer({ isProd, useGzip: true }, async (get) => {
+        const vary = { vary: 'Accept-Encoding' };
+        expect(await get('/main.js', 'br')).toEqual(
+          file('text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
+        );
+        expect(await get('/main.js', 'gzip')).toEqual(
+          file('text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'gzip' }),
+        );
+        expect(await get('/main.js', 'gzip, deflate, br')).toEqual(
+          file('text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
+        );
+        expect(await get('/main.js', 'deflate')).toEqual(file('text/javascript', MAIN_JS, vary));
+        // The index.html fallback is compressed too
+        expect(await get('/about', 'gzip')).toEqual(index({ ...vary, 'content-encoding': 'gzip' }));
+        // Images are never compressed and carry no Vary
+        expect(await get('/assets/My%20Logo.png', 'br')).toEqual(file('image/png', 'PNGDATA'));
+      });
+    });
+  }
+});

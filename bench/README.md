@@ -11,7 +11,9 @@ comparison and for a final check before a release.
 
 ## Requirements
 
-- Bun (the Thane compiler runs on it)
+- Bun (the Thane compiler runs on it). On Windows, Bun 1.3.4 cannot drive Chrome through
+  Playwright (the launch times out); use Bun 1.4 or later. The harness builds with the Bun that
+  runs it.
 - Google Chrome installed. The official runner measures on Chrome, so the harness uses the same
   binary. Without it the harness falls back to the Chromium that Playwright bundles and says so;
   only compare runs taken on the same browser.
@@ -39,12 +41,48 @@ and interleave the two later. An interleaved run re-measures both labels and ove
 result folders, which is what you want: a comparison is only fair when both sides were measured
 in the same session.
 
+`--interleave` takes any number of existing labels. Every iteration measures the current label
+first and then each interleaved label in the order given, so drift on the machine affects them
+all equally. The comparison printed at the end uses the first interleaved label as the baseline:
+
+```bash
+# Re-measure seven phases in one session (the current label is built or, with --no-build, reused)
+bun run bench --label p6-rw --no-build --interleave p0-next,p1-w1,p2-w2,p3-w3a,p4-a1,p5-a2
+bun run bench:compare p0-next p1-w1 p2-w2 p3-w3a p4-a1 p5-a2 p6-rw
+```
+
+### The nested app
+
+`--app nested` builds and measures `bench/app-nested/` instead of the standard app. It renders
+1,000 rows; each row has a text binding, a `when()` on a row property with a text binding inside,
+and an inner keyed `repeat()` of 3 items with text bindings only. It exists to measure what nested
+directives in rows cost, which the standard app cannot show. It is not part of the official
+benchmark, so its numbers only compare with other labels of the nested app.
+
+| Benchmark              | Operation                                         | Throttling |
+| :--------------------- | :------------------------------------------------ | :--------- |
+| `N1_create1k_nested`   | create 1,000 rows (after 5 create/clear warm-ups) | none       |
+| `N2_toggle10th_nested` | flip the `when()` of every 10th row               | 4x         |
+| `N3_inner10th_nested`  | replace the inner list of every 10th row          | 4x         |
+| `N4_swap_nested`       | swap rows 2 and 999                               | 4x         |
+| `N5_clear_nested`      | clear 1,000 rows                                  | 4x         |
+| `N6_run-memory_nested` | memory after creating 1,000 rows                  | —          |
+
+A label's build records which app it holds (`build-info.json`), so `--interleave` and
+`--no-build` refuse a label that holds the other app. Give nested labels their own names, for
+example with a `-n` suffix:
+
+```bash
+bun run bench --app nested --label p1-w1-n --interleave p0-next-n
+```
+
 ### Options
 
 | Option                | Effect                                                                           |
 | :-------------------- | :------------------------------------------------------------------------------- |
 | `--label <name>`      | Name for this build and its results (default `current`)                          |
-| `--interleave <name>` | Also re-measure an existing build, alternating iterations with this one          |
+| `--interleave <a,b>`  | Also re-measure existing builds, round-robin per iteration with this one         |
+| `--app <name>`        | `standard` (default, the js-framework-benchmark app) or `nested` (see above)     |
 | `--only <ids>`        | Comma-separated benchmark ids or substrings: `04`, `swap`, `memory`, `01,07`     |
 | `--iterations <n>`    | Iterations per CPU benchmark (default 15, the official count; select row adds 10) |
 | `--quick`             | 5 iterations and no extras, for a fast signal while iterating                    |

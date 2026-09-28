@@ -14,7 +14,14 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { benchmarkById, benchmarks, type Benchmark, type CpuBenchmark, type MemBenchmark } from './benchmarks.ts';
+import {
+  benchmarkById,
+  benchmarks,
+  nestedBenchmarks,
+  type Benchmark,
+  type CpuBenchmark,
+  type MemBenchmark,
+} from './benchmarks.ts';
 import { loadLabel, renderComparison, type ResultFile, type Summary } from './compare.ts';
 import { stats } from './stats.ts';
 import { analyseTrace, type CpuResult, type TraceEvent } from './trace.ts';
@@ -33,9 +40,19 @@ const TRACE_CATEGORIES = ['blink.user_timing', 'devtools.timeline', 'disabled-by
 const CHROME_ARGS = ['--window-size=1000,800', '--js-flags=--expose-gc', '--enable-benchmarking'];
 const LABEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
+/** The apps a label can hold: the js-framework-benchmark app, and the nested-directive scenario. */
+const APPS = {
+  standard: { dir: 'bench/app', benchmarks },
+  nested: { dir: 'bench/app-nested', benchmarks: nestedBenchmarks },
+} satisfies Record<string, { dir: string; benchmarks: Benchmark[] }>;
+type AppName = keyof typeof APPS;
+const isAppName = (s: string): s is AppName => Object.hasOwn(APPS, s);
+
 interface Options {
   label: string;
-  interleave: string | undefined;
+  /** Existing labels re-measured round-robin with this one, in the order given. */
+  interleave: string[];
+  app: AppName;
   only: string[];
   iterations: number;
   /** Whether benchmarks add their extra iterations (select row runs 25 times officially). */
@@ -52,12 +69,15 @@ interface BuildInfo {
   commit: string;
   dirty: boolean;
   builtAt: string;
+  /** Which app the build holds; builds from before `--app` existed hold the standard app. */
+  app?: AppName;
 }
 
 const USAGE = `Usage: bun bench/run.ts --label <name> [options]
 
   --label <name>        Name for this build and its results (default: current)
-  --interleave <name>   Also re-measure an existing build, alternating iterations with this one
+  --interleave <a,b,..> Also re-measure existing builds, round-robin per iteration with this one
+  --app <name>          standard (default: the js-framework-benchmark app) or nested
   --only <ids>          Comma-separated benchmark ids or substrings, e.g. 04,swap,memory
   --iterations <n>      Iterations per CPU benchmark (default ${DEFAULT_ITERATIONS}; select row adds 10)
   --quick               ${QUICK_ITERATIONS} iterations, for a fast signal while iterating
@@ -71,7 +91,8 @@ const USAGE = `Usage: bun bench/run.ts --label <name> [options]
 function parseArgs(argv: string[]): Options {
   const options: Options = {
     label: 'current',
-    interleave: undefined,
+    interleave: [],
+    app: 'standard',
     only: [],
     iterations: DEFAULT_ITERATIONS,
     extraIterations: true,
@@ -93,8 +114,17 @@ function parseArgs(argv: string[]): Options {
         options.label = value(++i, arg);
         break;
       case '--interleave':
-        options.interleave = value(++i, arg);
+        options.interleave = value(++i, arg)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
         break;
+      case '--app': {
+        const app = value(++i, arg);
+        if (!isAppName(app)) throw new Error(`--app must be one of: ${Object.keys(APPS).join(', ')}`);
+        options.app = app;
+        break;
+      }
       case '--only':
         options.only = value(++i, arg)
           .split(',')
@@ -130,12 +160,15 @@ function parseArgs(argv: string[]): Options {
         throw new Error(`Unknown option ${arg}\n\n${USAGE}`);
     }
   }
-  for (const label of [options.label, options.interleave]) {
-    if (label !== undefined && !LABEL_PATTERN.test(label)) {
+  for (const label of [options.label, ...options.interleave]) {
+    if (!LABEL_PATTERN.test(label)) {
       throw new Error(`Label "${label}" may only contain letters, digits, ".", "_" and "-"`);
     }
   }
-  if (options.interleave === options.label) throw new Error('--interleave must name a different label');
+  if (options.interleave.includes(options.label)) throw new Error('--interleave must name a different label');
+  if (new Set(options.interleave).size !== options.interleave.length) {
+    throw new Error('--interleave names a label twice');
+  }
   return options;
 }
 
@@ -143,9 +176,14 @@ function parseArgs(argv: string[]): Options {
 // Building
 // ---------------------------------------------------------------------------
 
-function exec(command: string, args: string[], cwd: string): void {
-  const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
-  if (result.status !== 0) throw new Error(`"${command} ${args.join(' ')}" failed with exit code ${result.status}`);
+/**
+ * Runs the Bun that runs this script, so the harness builds and measures with one Bun. The
+ * framework is compiled with tsc directly (`bun run build` is `tsc -p tsconfig.build.json`),
+ * which does not depend on the node_modules/.bin shims.
+ */
+function bun(args: string[], cwd: string): void {
+  const result = spawnSync(process.execPath, args, { cwd, stdio: 'inherit' });
+  if (result.status !== 0) throw new Error(`"bun ${args.join(' ')}" failed with exit code ${result.status}`);
 }
 
 function git(args: string[]): string {
@@ -157,33 +195,40 @@ function buildInfoPath(label: string): string {
   return join(buildRoot, label, 'build-info.json');
 }
 
-function readBuildInfo(label: string): BuildInfo {
+function readBuildInfo(label: string, app: AppName): BuildInfo {
   const path = buildInfoPath(label);
   if (!existsSync(path)) {
     throw new Error(
       `No build for label "${label}" at ${join(buildRoot, label)}. Run without --no-build, or build it first.`,
     );
   }
-  return JSON.parse(readFileSync(path, 'utf8')) as BuildInfo;
+  const info = JSON.parse(readFileSync(path, 'utf8')) as BuildInfo;
+  const held = info.app ?? 'standard';
+  if (held !== app) {
+    throw new Error(
+      `Label "${label}" holds the ${held} app, not the ${app} app. Pass --app ${held}, or pick another label.`,
+    );
+  }
+  return info;
 }
 
-function buildVariant(label: string): BuildInfo {
+function buildVariant(label: string, app: AppName): BuildInfo {
   console.log('\n▶ Compiling the framework (bun run build)');
-  exec('bun', ['run', 'build'], repoRoot);
+  bun(['./node_modules/typescript/bin/tsc', '-p', 'tsconfig.build.json'], repoRoot);
 
-  console.log(`\n▶ Building the benchmark app into bench/.build/${label}`);
-  exec(
-    'bun',
+  const appDir = APPS[app].dir;
+  console.log(`\n▶ Building the ${app} benchmark app (${appDir}) into bench/.build/${label}`);
+  bun(
     [
       './dist/compiler/cli/thane.js',
       'build',
       '--prod',
       '--entry',
-      './bench/app/main.ts',
+      `./${appDir}/main.ts`,
       '--out',
       `./bench/.build/${label}`,
       '--html',
-      './bench/app/index.html',
+      `./${appDir}/index.html`,
       '--base',
       `/${label}/`,
     ],
@@ -195,6 +240,7 @@ function buildVariant(label: string): BuildInfo {
     commit: git(['rev-parse', '--short', 'HEAD']) || 'unknown',
     dirty: git(['status', '--porcelain']).length > 0,
     builtAt: new Date().toISOString(),
+    app,
   };
   writeFileSync(buildInfoPath(label), JSON.stringify(info, null, 2));
   return info;
@@ -231,7 +277,19 @@ async function launchBrowser(options: Options): Promise<Browser> {
   const args = [...CHROME_ARGS];
   if (options.headless) args.push('--headless=new');
   // Same launch shape as the official runner: real Chrome with the new headless mode as a flag.
-  return chromium.launch({ args, headless: false, ...(executablePath ? { executablePath } : {}) });
+  try {
+    return await chromium.launch({ args, headless: false, ...(executablePath ? { executablePath } : {}) });
+  } catch (err) {
+    // Seen with Bun 1.3.4 on Windows: Chrome starts, but the DevTools pipe never answers.
+    const bunVersion = process.versions['bun'] ?? '';
+    if (process.platform === 'win32' && bunVersion.startsWith('1.3.')) {
+      throw new Error(
+        `${err instanceof Error ? err.message : String(err)}\n\nBun ${bunVersion} on Windows cannot drive Chrome through Playwright's pipe. ` +
+          'Run the harness with Bun 1.4 or later (put it first on PATH, e.g. ~/.bun/bin).',
+      );
+    }
+    throw err;
+  }
 }
 
 async function forceGc(page: Page): Promise<void> {
@@ -325,6 +383,7 @@ function writeResults(label: string, info: BuildInfo, browser: string, samples: 
     dirty: info.dirty,
     builtAt: info.builtAt,
     browser,
+    app: info.app ?? 'standard',
     updatedAt: now,
     benchmarks: previous?.commit === info.commit && previous.builtAt === info.builtAt ? previous.benchmarks : {},
   };
@@ -370,16 +429,21 @@ const round = (n: number) => Number(n.toFixed(3));
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
-  const selected = benchmarks.filter((b) => options.only.length === 0 || options.only.some((s) => b.id.includes(s)));
+  const appBenchmarks = APPS[options.app].benchmarks;
+  const selected = appBenchmarks.filter((b) => options.only.length === 0 || options.only.some((s) => b.id.includes(s)));
   if (selected.length === 0) {
     throw new Error(
-      `--only ${options.only.join(',')} matched no benchmarks. Available: ${benchmarks.map((b) => b.id).join(', ')}`,
+      `--only ${options.only.join(',')} matched no benchmarks. Available: ${appBenchmarks.map((b) => b.id).join(', ')}`,
     );
   }
 
   const builds = new Map<string, BuildInfo>();
-  builds.set(options.label, options.build ? buildVariant(options.label) : readBuildInfo(options.label));
-  if (options.interleave) builds.set(options.interleave, readBuildInfo(options.interleave));
+  for (const label of options.interleave) readBuildInfo(label, options.app); // fail before building
+  builds.set(
+    options.label,
+    options.build ? buildVariant(options.label, options.app) : readBuildInfo(options.label, options.app),
+  );
+  for (const label of options.interleave) builds.set(label, readBuildInfo(label, options.app));
   const labels = [...builds.keys()];
 
   const server = await startServer({ buildRoot, cssRoot, port: options.port });
@@ -393,7 +457,9 @@ async function main(): Promise<void> {
     void shutdown().then(() => process.exit(130));
   });
 
-  console.log(`\n▶ Measuring ${labels.join(' and ')} with ${browserName} on http://127.0.0.1:${server.port}/`);
+  const labelList = labels.length > 1 ? `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}` : labels[0];
+  const appNote = options.app === 'standard' ? '' : ` (${options.app} app)`;
+  console.log(`\n▶ Measuring ${labelList}${appNote} with ${browserName} on http://127.0.0.1:${server.port}/`);
   const extras = options.extraIterations ? ', select row +10' : '';
   console.log(
     `  ${selected.length} benchmarks, ${options.iterations} iterations each${extras}, memory ${options.memIterations}\n`,
@@ -441,9 +507,10 @@ async function main(): Promise<void> {
 
   for (const label of labels) writeResults(label, builds.get(label)!, browserName, samples.get(label)!);
 
-  if (options.interleave) {
+  if (options.interleave.length > 0) {
+    // The first interleaved label is the baseline, then the rest in the order given, this one last
     console.log('');
-    console.log(renderComparison([loadLabel(options.interleave), loadLabel(options.label)]));
+    console.log(renderComparison([...options.interleave, options.label].map(loadLabel)));
   } else {
     console.log(`Compare against another label with: bun run bench:compare <baseline> ${options.label}`);
   }

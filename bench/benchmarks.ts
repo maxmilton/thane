@@ -332,4 +332,123 @@ export const benchmarks: Benchmark[] = [
   },
 ];
 
-export const benchmarkById = new Map(benchmarks.map((b) => [b.id, b]));
+// ---------------------------------------------------------------------------
+// Nested app (bench/app-nested, `--app nested`): rows with a `when()` and an inner
+// `repeat()` of 3 items. Not part of the official benchmark; warm-ups and throttling
+// follow the closest standard operation.
+// ---------------------------------------------------------------------------
+
+const WHEN_TEXT = (n: number) => `${ROW(n)}>td:nth-of-type(2)>span`;
+const INNER_ITEM = (n: number, k: number) => `${ROW(n)}>td:nth-of-type(3)>div>span:nth-of-type(${k})`;
+/** Text of the first inner item after `g` "replace inner lists" clicks (see bench/app-nested/nested.ts). */
+const GENERATION = (g: number) => `[g${g}] c0`;
+
+export const nestedBenchmarks: Benchmark[] = [
+  {
+    type: 'cpu',
+    id: 'N1_create1k_nested',
+    label: 'create rows with nested directives',
+    throttle: undefined,
+    extraIterations: 0,
+    async init(page) {
+      await warmupCreateClear(page, WARMUP);
+    },
+    async run(page) {
+      await clickElement(page, '#run');
+      await checkElementContainsText(page, ID_CELL(1000), String((WARMUP + 1) * 1000));
+    },
+  },
+  {
+    type: 'cpu',
+    id: 'N2_toggle10th_nested',
+    label: "flip every 10th row's when()",
+    throttle: 4,
+    extraIterations: 0,
+    async init(page) {
+      await checkElementExists(page, '#run');
+      await clickElement(page, '#run');
+      await checkElementExists(page, ID_CELL(1000));
+      for (let i = 0; i < 3; i++) {
+        await clickElement(page, '#toggle');
+        if (i % 2 === 0) await checkElementNotExists(page, WHEN_TEXT(991));
+        else await checkElementExists(page, WHEN_TEXT(991));
+      }
+    },
+    async run(page) {
+      // Three flips in init leave every 10th row hidden; this one shows them again
+      await clickElement(page, '#toggle');
+      await checkElementExists(page, WHEN_TEXT(991));
+    },
+  },
+  {
+    type: 'cpu',
+    id: 'N3_inner10th_nested',
+    label: 'replace the inner list of every 10th row',
+    throttle: 4,
+    extraIterations: 0,
+    async init(page) {
+      await checkElementExists(page, '#run');
+      await clickElement(page, '#run');
+      await checkElementExists(page, ID_CELL(1000));
+      for (let i = 0; i < 3; i++) {
+        await clickElement(page, '#inner');
+        await checkElementContainsText(page, INNER_ITEM(991, 1), GENERATION(i + 1));
+      }
+    },
+    async run(page) {
+      await clickElement(page, '#inner');
+      await checkElementContainsText(page, INNER_ITEM(991, 1), GENERATION(4));
+    },
+  },
+  {
+    type: 'cpu',
+    id: 'N4_swap_nested',
+    label: 'swap rows 2 and 999',
+    throttle: 4,
+    extraIterations: 0,
+    async init(page) {
+      await checkElementExists(page, '#run');
+      await clickElement(page, '#run');
+      await checkElementExists(page, ID_CELL(1000));
+      for (let i = 0; i <= WARMUP; i++) {
+        await clickElement(page, '#swaprows');
+        await checkElementContainsText(page, ID_CELL(999), i % 2 === 0 ? '2' : '999');
+      }
+    },
+    async run(page) {
+      await clickElement(page, '#swaprows');
+      await checkElementContainsText(page, ID_CELL(999), WARMUP % 2 === 0 ? '999' : '2');
+      await checkElementContainsText(page, ID_CELL(2), WARMUP % 2 === 0 ? '2' : '999');
+    },
+  },
+  {
+    type: 'cpu',
+    id: 'N5_clear_nested',
+    label: 'clear rows with nested directives',
+    throttle: 4,
+    extraIterations: 0,
+    async init(page) {
+      await warmupCreateClear(page, WARMUP);
+      await clickElement(page, '#run');
+      await checkElementContainsText(page, ID_CELL(1), String(WARMUP * 1000 + 1));
+    },
+    async run(page) {
+      await clickElement(page, '#clear');
+      await checkElementNotExists(page, ID_CELL(1000));
+    },
+  },
+  {
+    type: 'memory',
+    id: 'N6_run-memory_nested',
+    label: 'memory after creating rows with nested directives',
+    async init(page) {
+      await checkElementExists(page, '#run');
+    },
+    async run(page) {
+      await clickElement(page, '#run');
+      await checkElementExists(page, INNER_ITEM(1, 1));
+    },
+  },
+];
+
+export const benchmarkById = new Map([...benchmarks, ...nestedBenchmarks].map((b) => [b.id, b]));

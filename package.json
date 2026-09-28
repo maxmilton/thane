@@ -82,7 +82,10 @@
     "test:benchmark": "bun pm pack --filename example-apps/benchmark/thane.tgz && cd example-apps/benchmark && rm -rf bun.lock node_modules/thane && bun install && bun run build",
     "bench": "bun bench/run.ts",
     "bench:compare": "bun bench/compare.ts",
-    "verify": "bun run format:check && bun run build && bun run test:apps && bun run test:benchmark && bun run test && bun run e2e:test"
+    "snapshot:output": "bun scripts/snapshot/output.ts",
+    "snapshot:compare": "bun scripts/snapshot/compare.ts",
+    "size": "bun scripts/size-report.ts",
+    "verify": "bun run format:check && bun run build && bun run test:benchmark && bun run test:apps && bun run test && bun run e2e:test"
   },
   "dependencies": {
     "esbuild": "^0.28.2",

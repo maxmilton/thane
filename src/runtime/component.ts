@@ -184,7 +184,7 @@ function findMatchingBrace(source: string, openIndex: number): number {
   return -1;
 }
 
-function scopeCssRules(cssText: string, hostSelector: string): string {
+export function scopeCssRules(cssText: string, hostSelector: string): string {
   let out = '';
   let cursor = 0;
 
