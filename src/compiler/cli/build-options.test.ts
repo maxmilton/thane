@@ -1,0 +1,105 @@
+/**
+ * Characterisation of the esbuild options runBuild derives from a BuildConfig (before CL-2).
+ *
+ * The output snapshot (§1.7) covers dev builds without drops and prod builds with both drops.
+ * This file pins the other combinations: drops requested in a dev build (ignored), prod builds
+ * that keep console / debugger, and entry and chunk file names with and without hashes.
+ * It calls runBuild directly (not buildAndReadJs), so the snapshot preload does not record it.
+ */
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { readdir } from 'node:fs/promises';
+import { runBuild } from './build.js';
+import type { BuildConfig } from './types.js';
+import {
+  PROD_BUILD,
+  createTempProject,
+  createTestBuildConfig,
+  readBuiltJs,
+  removeTempProject,
+  type TempProject,
+} from '../testing/build-project.js';
+
+const ENTRY = `
+export function report(value: number) {
+  console.log('kept-console', value);
+  debugger;
+  return value * 2;
+}
+report(1);
+import('./lazy').then((m) => m.lazy());
+`;
+
+const LAZY = `export const lazy = () => 'lazy-chunk';\n`;
+
+let project: TempProject;
+
+beforeAll(async () => {
+  project = await createTempProject(ENTRY, { 'src/lazy.ts': LAZY });
+});
+
+afterAll(async () => {
+  await removeTempProject(project);
+});
+
+const build = async (overrides: Partial<BuildConfig>) => {
+  await runBuild(createTestBuildConfig(project, { strictTypeCheck: false, ...overrides }));
+  const js = await readBuiltJs(project.outDir);
+  const files = (await readdir(project.outDir)).filter((f) => f.endsWith('.js')).sort();
+  return {
+    js,
+    files: files.map((f) => f.replace(/-[A-Z0-9]{8}\.js$/, '-HASH.js')),
+    hasConsole: js.includes('kept-console'),
+    hasDebugger: /\bdebugger\b/.test(js),
+  };
+};
+
+describe('runBuild esbuild options', () => {
+  test('dev: drops are not applied even when requested, output is not minified', async () => {
+    const out = await build({ dropConsole: true, dropDebugger: true });
+    expect(out.hasConsole).toBe(true);
+    expect(out.hasDebugger).toBe(true);
+    expect(out.js).toContain('function report(value) {\n');
+  });
+
+  test('dev: without drops', async () => {
+    const out = await build({});
+    expect(out.hasConsole).toBe(true);
+    expect(out.hasDebugger).toBe(true);
+  });
+
+  test('prod: both drops', async () => {
+    const out = await build(PROD_BUILD);
+    expect(out.hasConsole).toBe(false);
+    expect(out.hasDebugger).toBe(false);
+    expect(out.js).not.toContain('function report(value)');
+    expect(out.js).not.toContain('\n  ');
+  });
+
+  test('prod: console kept, debugger dropped', async () => {
+    const out = await build({ ...PROD_BUILD, dropConsole: false });
+    expect(out.hasConsole).toBe(true);
+    expect(out.hasDebugger).toBe(false);
+  });
+
+  test('prod: debugger kept, console dropped', async () => {
+    const out = await build({ ...PROD_BUILD, dropDebugger: false });
+    expect(out.hasConsole).toBe(false);
+    expect(out.hasDebugger).toBe(true);
+  });
+
+  test('prod: no drops', async () => {
+    const out = await build({ ...PROD_BUILD, dropConsole: false, dropDebugger: false });
+    expect(out.hasConsole).toBe(true);
+    expect(out.hasDebugger).toBe(true);
+  });
+
+  test('entry and chunk names carry a hash by default', async () => {
+    expect((await build({})).files).toEqual(['lazy-HASH.js', 'main-HASH.js']);
+    expect((await build(PROD_BUILD)).files).toEqual(['lazy-HASH.js', 'main-HASH.js']);
+  });
+
+  test('entry and chunk names without hashes', async () => {
+    expect((await build({ hashFileNames: false })).files).toEqual(['lazy.js', 'main.js']);
+    expect((await build({ ...PROD_BUILD, hashFileNames: false })).files).toEqual(['lazy.js', 'main.js']);
+  });
+});

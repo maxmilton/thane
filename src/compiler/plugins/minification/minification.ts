@@ -47,13 +47,12 @@ export const MinificationPlugin = (ctx: BuildContext, options: MinificationOptio
       const outPrefix = normalisePath(options.outDir) + path.sep;
       const isSource = (file: string): boolean => !normalisePath(file).startsWith(outPrefix);
 
-      const [tsPaths, cssPaths] = await Promise.all([
-        collectFilesRecursively(projectRoot, (name) => name.endsWith('.ts') && !name.endsWith('.d.ts')),
-        collectFilesRecursively(projectRoot, (name) => name.endsWith('.css')),
-      ]);
+      const isTs = (file: string): boolean => file.endsWith('.ts') && !file.endsWith('.d.ts');
+      const isCss = (file: string): boolean => file.endsWith('.css');
+      const paths = (await collectFilesRecursively(projectRoot, (name) => isTs(name) || isCss(name))).filter(isSource);
       const [tsFiles, cssFiles, html] = await Promise.all([
-        readAll(tsPaths.filter(isSource)),
-        readAll(cssPaths.filter(isSource)),
+        readAll(paths.filter(isTs)),
+        readAll(paths.filter(isCss)),
         fs.promises.readFile(options.htmlPath, 'utf8').catch(() => ''),
       ]);
 

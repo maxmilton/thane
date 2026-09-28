@@ -1,15 +1,8 @@
-export { FRAMEWORK_FN as FN, COMPILER_BIND_FN as BIND_FN } from '../../contracts/index.js';
-
-export const PROP = {
-  COMPONENT_MODULE: 'componentModule',
-  /** New-style route property: directly resolves to the component factory. */
-  COMPONENT: 'component',
-} as const;
+export { FRAMEWORK_FN as FN, RUNTIME_HELPER as BIND_FN } from '../../contracts/index.js';
 
 export const PLUGIN_NAME = {
   TYPE_CHECK: 'type-check',
   TYPES_SYNC: 'types-sync',
-  ROUTES: 'routes-ctfe',
   COMPONENT: 'component-ctfe',
   REACTIVE: 'reactive-binding',
   LINTER: 'thane-linter',

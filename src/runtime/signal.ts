@@ -28,14 +28,17 @@ type SignalInternal<T> = Signal<T> & {
   _nn: number; // number of null slots in _s
 };
 
+/** Subscriber slots, shared by signals and computeds. @internal */
+type Slots<T> = Pick<SignalInternal<T>, '_s' | '_nc' | '_nn'>;
+
 /** Drop the null slots left by unsubscribes. Only called while the signal is not notifying. */
-function _compact<T>(fn: SignalInternal<T>): void {
+function _compact<T>(fn: Slots<T>): void {
   const subs = fn._s;
   const len = subs.length;
   let w = 0;
   for (let r = 0; r < len; r++) {
     const cb = subs[r];
-    if (cb !== null && cb !== undefined) subs[w++] = cb;
+    if (cb != null) subs[w++] = cb;
   }
   subs.length = w;
   fn._nn = 0;
@@ -115,11 +118,6 @@ let _notificationDepth = 0;
  */
 let _computedFlushHook: (() => void) | null = null;
 
-/** @internal — called once by `computed()` to wire into the notification loop. */
-function _installComputedFlush(hook: () => void): void {
-  _computedFlushHook = hook;
-}
-
 function _notifySubscribers<T>(fn: SignalInternal<T>): void {
   const subs = fn._s;
   const len = subs.length;
@@ -142,29 +140,14 @@ function _notifySubscribers<T>(fn: SignalInternal<T>): void {
     // Compact the slots nulled by unsubscribes once the outermost notification is done
     if (--fn._nc === 0 && fn._nn > 0) _compact(fn);
     if (--_notificationDepth === 0) {
-      // Flush deferred cascade signals (cap iterations to catch circular deps)
-      let flushIterations = 0;
-      while (_pendingSignals.size > 0) {
-        if (++flushIterations > 100) {
-          _pendingSignals.clear();
-          throw new Error('Circular signal dependency');
-        }
-        const pending = Array.from(_pendingSignals);
-        _pendingSignals.clear();
-        for (let i = 0; i < pending.length; i++) {
-          _notifySubscribers(pending[i]!);
-        }
-      }
+      // Flush deferred cascade signals
+      if (_pendingSignals.size > 0) _flushPending();
       // Flush deferred computed notifications
       if (_computedFlushHook) _computedFlushHook();
     }
   }
 }
 
-/**
- * Notify computed subscribers with local depth tracking.
- * @internal
- */
 // ─────────────────────────────────────────────────────────────
 //  Batching
 // ─────────────────────────────────────────────────────────────
@@ -176,6 +159,15 @@ let _batchDepth = 0;
  * @internal
  */
 const _pendingSignals = new Set<SignalInternal<unknown>>();
+
+/** @internal — one pass: at depth 0 each pending signal drains its own cascades before the next. */
+function _flushPending(): void {
+  const pending = Array.from(_pendingSignals);
+  _pendingSignals.clear();
+  for (let i = 0; i < pending.length; i++) {
+    _notifySubscribers(pending[i]!);
+  }
+}
 
 /**
  * Batch multiple signal updates — notifications fire once after the batch completes.
@@ -193,13 +185,7 @@ export function batch(fn: () => void): void {
   try {
     fn();
   } finally {
-    if (--_batchDepth === 0) {
-      const pending = Array.from(_pendingSignals);
-      _pendingSignals.clear();
-      for (let i = 0; i < pending.length; i++) {
-        _notifySubscribers(pending[i]!);
-      }
-    }
+    if (--_batchDepth === 0) _flushPending();
   }
 }
 
@@ -210,12 +196,8 @@ export function batch(fn: () => void): void {
 /** @internal */
 let _activeTracker: { _track: (sig: Signal<unknown>) => void } | null = null;
 
-/**
- * Lazily initialised state for computed flush hook — lives inside
- * `computed()`'s tree-shakable scope.
- */
-let _computedFlushInstalled = false;
-let _computedPendingQueue: (() => void)[] = [];
+/** Deferred computed notifications; dropped by tree-shaking when `computed()` is never imported. */
+const _computedPendingQueue: (() => void)[] = [];
 
 /**
  * Create a derived signal that auto-tracks dependencies and re-evaluates lazily.
@@ -231,17 +213,12 @@ let _computedPendingQueue: (() => void)[] = [];
  */
 export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose: () => void } {
   // Install deferred-notification flush hook on first computed creation
-  if (!_computedFlushInstalled) {
-    _computedFlushInstalled = true;
-    const q: (() => void)[] = [];
-    _computedPendingQueue = q;
-    _installComputedFlush(() => {
-      while (q.length > 0) {
-        const cbs = q.splice(0);
-        for (let i = 0; i < cbs.length; i++) cbs[i]!();
-      }
-    });
-  }
+  _computedFlushHook ??= () => {
+    while (_computedPendingQueue.length > 0) {
+      const cbs = _computedPendingQueue.splice(0);
+      for (let i = 0; i < cbs.length; i++) cbs[i]!();
+    }
+  };
 
   let value: T = undefined as T;
   let dirty = true;
@@ -250,24 +227,12 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
   let hasError = false;
   // Dep map: signal → unsubscribe fn (supports O(1) differential updates)
   const depUnsubs = new Map<Signal<unknown>, () => void>();
-  // Subscriber slots. Unsubscribing nulls a slot in constant time (the slot index is
-  // remembered at subscribe time); dead slots are compacted after a notification, or before
-  // a subscribe when the signal is idle and they outnumber the live entries.
-  const subscribers: (((val: T) => void) | null)[] = [];
-  let notifyCount = 0;
-  let deadSlots = 0;
-  const compactSubs = () => {
-    let w = 0;
-    for (let r = 0; r < subscribers.length; r++) {
-      const cb = subscribers[r]!;
-      if (cb !== null) subscribers[w++] = cb;
-    }
-    subscribers.length = w;
-    deadSlots = 0;
-  };
+  // Subscriber slots, kept like a signal's (sharedSubscribe, _compact); notification stays separate
+  const slots: Slots<T> = { _s: [], _nc: 0, _nn: 0 };
   const notifySubs = () => {
+    const subscribers = slots._s;
     const len = subscribers.length;
-    notifyCount++;
+    slots._nc++;
     for (let i = 0; i < len; i++) {
       const cb = subscribers[i]!;
       if (cb !== null) {
@@ -280,7 +245,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
         }
       }
     }
-    if (--notifyCount === 0 && deadSlots > 0) compactSubs();
+    if (--slots._nc === 0 && slots._nn > 0) _compact(slots);
   };
 
   // Deps set populated during evaluation (null outside evaluate)
@@ -301,7 +266,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
   const markDirty = () => {
     if (disposed) return;
     dirty = true;
-    if (subscribers.length === deadSlots) return;
+    if (slots._s.length === slots._nn) return;
     // During a cascade, defer notification
     if (_notificationDepth > 0) {
       if (!pendingNotify) {
@@ -320,7 +285,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
     const oldVal = hasPendingOldValue ? pendingOldValue : value;
     pendingNotify = false;
     hasPendingOldValue = false;
-    if (disposed || subscribers.length === deadSlots) return;
+    if (disposed || slots._s.length === slots._nn) return;
     evaluate();
     if (hasError || !Object.is(oldVal, value)) notifySubs();
   };
@@ -359,6 +324,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
       _activeTracker = prev;
       _evalDeps = null;
     }
+    if (disposed) return;
 
     // Subscribe to newly-added deps
     for (const dep of newDeps) {
@@ -398,16 +364,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
 
   // Subscribe method — mimics signal.subscribe interface
   fn.subscribe = (cb: (val: T) => void, skipInitial?: boolean): (() => void) => {
-    if (deadSlots > 0 && notifyCount === 0 && deadSlots > subscribers.length >> 1) compactSubs();
-    const slot = subscribers.length;
-    subscribers.push(cb);
-    const unsubscribe = () => {
-      const idx = subscribers[slot] === cb ? slot : subscribers.indexOf(cb);
-      if (idx !== -1) {
-        subscribers[idx] = null;
-        deadSlots++;
-      }
-    };
+    const unsubscribe = (sharedSubscribe<T>).call(slots as SignalInternal<T>, cb, true);
     if (!skipInitial) {
       // Re-evaluate if dirty before calling subscriber
       if (dirty && !disposed) evaluate();
@@ -427,8 +384,8 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
   fn.dispose = () => {
     disposed = true;
     unsubscribeAll();
-    subscribers.length = 0;
-    deadSlots = 0;
+    slots._s.length = 0;
+    slots._nn = 0;
   };
 
   return fn;
@@ -482,6 +439,7 @@ export function effect(fn: () => void): () => void {
     } finally {
       _activeTracker = prev;
     }
+    if (disposed) return;
 
     // Subscribe to tracked deps (MUST run even after error)
     for (const dep of deps) {

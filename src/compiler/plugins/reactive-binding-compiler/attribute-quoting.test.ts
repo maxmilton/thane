@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { processHtmlTemplateWithConditionals, replaceExpressionsWithValues } from './template-processing.js';
+import { processHtmlTemplateWithConditionals } from './template-processing.js';
 
 /**
  * Regression tests for unquoted attribute value quoting.
@@ -182,29 +182,6 @@ describe('unquoted attribute value quoting', () => {
     // Text binding should have comment markers, not be wrapped in quotes
     expect(processedContent).toContain('42');
     expect(processedContent).not.toContain('"42"');
-  });
-});
-
-// ─── replaceExpressionsWithValues ────────────────────────────────────────
-
-describe('replaceExpressionsWithValues quoting', () => {
-  test('replaces unquoted attr expression with quoted value', () => {
-    const inits = new Map<string, string | number | boolean>([['name', 'hello']]);
-    const result = replaceExpressionsWithValues('<div title=${name()}></div>', inits);
-    expect(result).toContain('title="hello"');
-  });
-
-  test('does not double-quote already-positioned text content', () => {
-    const inits = new Map<string, string | number | boolean>([['name', 'hello']]);
-    const result = replaceExpressionsWithValues('<div>${name()}</div>', inits);
-    // In text content position (after >), should NOT be wrapped in quotes
-    expect(result).toContain('>hello<');
-  });
-
-  test('replaces unquoted attr with empty quoted value', () => {
-    const inits = new Map<string, string | number | boolean>();
-    const result = replaceExpressionsWithValues('<div title=${name()}></div>', inits);
-    expect(result).toContain('title=""');
   });
 });
 

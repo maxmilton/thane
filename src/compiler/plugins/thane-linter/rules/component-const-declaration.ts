@@ -15,40 +15,24 @@
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
-import { ErrorCode, createError } from '../../../errors.js';
-import { FN } from '../../../utils/constants.js';
-
-const isDefineComponentExpr = (node: ts.Expression): boolean => {
-  if (ts.isCallExpression(node)) {
-    const callee = node.expression;
-    return ts.isIdentifier(callee) && callee.text === FN.DEFINE_COMPONENT;
-  }
-  return false;
-};
+import { ErrorCode } from '../../../errors.js';
+import { createReporter, declarationKeyword, isDefineComponentExpr } from './lint-utils.js';
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
+  const { diagnostics, report } = createReporter(sourceFile, filePath, ErrorCode.COMPONENT_CONST_DECLARATION, 'error');
 
   const visit = (node: ts.Node) => {
     if (ts.isVariableStatement(node)) {
-      const flags = node.declarationList.flags;
-      const isConst = (flags & ts.NodeFlags.Const) !== 0;
+      const keyword = declarationKeyword(node.declarationList);
 
-      if (!isConst) {
-        const isLet = (flags & ts.NodeFlags.Let) !== 0;
-        const keyword = isLet ? 'let' : 'var';
-
+      if (keyword !== 'const') {
         for (const decl of node.declarationList.declarations) {
           if (decl.initializer && isDefineComponentExpr(decl.initializer)) {
-            const { line, character } = sourceFile.getLineAndCharacterOfPosition(decl.getStart());
-            diagnostics.push(
-              createError(
-                `Component declaration must use 'const', not '${keyword}'. ` +
-                  "Reassigning a component variable breaks the compiler's static analysis " +
-                  'and can cause selector collisions.',
-                { file: filePath, line: line + 1, column: character + 1 },
-                ErrorCode.COMPONENT_CONST_DECLARATION,
-              ),
+            report(
+              decl,
+              `Component declaration must use 'const', not '${keyword}'. ` +
+                "Reassigning a component variable breaks the compiler's static analysis " +
+                'and can cause selector collisions.',
             );
           }
         }

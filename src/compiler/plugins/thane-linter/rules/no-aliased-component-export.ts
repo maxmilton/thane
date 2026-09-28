@@ -18,11 +18,11 @@
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
-import { ErrorCode, createError } from '../../../errors.js';
-import { FN } from '../../../utils/constants.js';
+import { ErrorCode } from '../../../errors.js';
+import { createReporter, isDefineComponentExpr } from './lint-utils.js';
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
+  const { diagnostics, report } = createReporter(sourceFile, filePath, ErrorCode.NO_ALIASED_COMPONENT_EXPORT, 'error');
 
   // Collect all local variable names that are assigned defineComponent()
   const componentVarNames = new Set<string>();
@@ -30,13 +30,7 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
   const collectComponentVars = (node: ts.Node) => {
     if (ts.isVariableStatement(node)) {
       for (const decl of node.declarationList.declarations) {
-        if (
-          ts.isIdentifier(decl.name) &&
-          decl.initializer &&
-          ts.isCallExpression(decl.initializer) &&
-          ts.isIdentifier(decl.initializer.expression) &&
-          decl.initializer.expression.text === FN.DEFINE_COMPONENT
-        ) {
+        if (ts.isIdentifier(decl.name) && decl.initializer && isDefineComponentExpr(decl.initializer)) {
           componentVarNames.add(decl.name.text);
         }
       }
@@ -64,14 +58,10 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
         if (stmt.moduleSpecifier) {
           // Only warn if the name looks like a PascalCase component name
           if (/^[A-Z]/.test(exportedName)) {
-            const { line, character } = sourceFile.getLineAndCharacterOfPosition(spec.getStart());
-            diagnostics.push(
-              createError(
-                `Component re-exports are not supported. Define the component in this file instead: ` +
-                  `export const ${exportedName} = defineComponent(...)`,
-                { file: filePath, line: line + 1, column: character + 1 },
-                ErrorCode.NO_ALIASED_COMPONENT_EXPORT,
-              ),
+            report(
+              spec,
+              `Component re-exports are not supported. Define the component in this file instead: ` +
+                `export const ${exportedName} = defineComponent(...)`,
             );
           }
           continue;
@@ -79,15 +69,11 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
 
         // Aliased export of a local component variable
         if (componentVarNames.has(localName) && localName !== exportedName) {
-          const { line, character } = sourceFile.getLineAndCharacterOfPosition(spec.getStart());
-          diagnostics.push(
-            createError(
-              `Aliased component export is not supported: '${localName}' exported as '${exportedName}'. ` +
-                'The compiler derives the selector from the declaration name, not the exported name. ' +
-                `Use 'export const ${exportedName} = defineComponent(...)' instead.`,
-              { file: filePath, line: line + 1, column: character + 1 },
-              ErrorCode.NO_ALIASED_COMPONENT_EXPORT,
-            ),
+          report(
+            spec,
+            `Aliased component export is not supported: '${localName}' exported as '${exportedName}'. ` +
+              'The compiler derives the selector from the declaration name, not the exported name. ' +
+              `Use 'export const ${exportedName} = defineComponent(...)' instead.`,
           );
         }
 
@@ -96,14 +82,10 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
         // extractComponentDefinitions only finds `export const X = defineComponent(...)`.
         // A separate `export { X }` won't be detected. Block it for safety.
         if (componentVarNames.has(localName) && localName === exportedName) {
-          const { line, character } = sourceFile.getLineAndCharacterOfPosition(spec.getStart());
-          diagnostics.push(
-            createError(
-              `Deferred component export is not supported. The compiler requires the export keyword ` +
-                `on the declaration: export const ${exportedName} = defineComponent(...)`,
-              { file: filePath, line: line + 1, column: character + 1 },
-              ErrorCode.NO_ALIASED_COMPONENT_EXPORT,
-            ),
+          report(
+            spec,
+            `Deferred component export is not supported. The compiler requires the export keyword ` +
+              `on the declaration: export const ${exportedName} = defineComponent(...)`,
           );
         }
       }

@@ -298,9 +298,7 @@ export function defineRoutes<const T extends RoutesConfig>(
     startRouter({ routes: routeMap, notFound }, target, routerConfig);
     return {
       root: target as any,
-      destroy: () => {
-        stopRouter();
-      },
+      destroy: stopRouter,
     };
   });
 
@@ -353,26 +351,23 @@ interface NormalizedScrollRestorationConfig {
   restoreOnBackForward: boolean;
 }
 
-const DEFAULT_SCROLL_RESTORATION: NormalizedScrollRestorationConfig = {
-  enabled: true,
-  behavior: 'auto',
-  left: 0,
-  top: 0,
-  resetOnNavigate: true,
-  restoreOnBackForward: true,
+const normalizeScrollRestoration = (config?: boolean | ScrollRestorationConfig): NormalizedScrollRestorationConfig => {
+  const c: ScrollRestorationConfig = typeof config === 'object' ? config : {};
+  return {
+    enabled: config !== false,
+    behavior: c.behavior ?? 'auto',
+    left: c.left ?? 0,
+    top: c.top ?? 0,
+    resetOnNavigate: c.resetOnNavigate ?? true,
+    restoreOnBackForward: c.restoreOnBackForward ?? true,
+  };
 };
 
-let _scrollConfig: NormalizedScrollRestorationConfig = DEFAULT_SCROLL_RESTORATION;
+let _scrollConfig: NormalizedScrollRestorationConfig = normalizeScrollRestoration();
 
 const SCROLL_STATE_KEY = '__thaneScroll';
 
-const currentPathSignal = _currentPath as ReadonlySignal<string>;
-
-const installCurrentPathGlobal = (): void => {
-  (globalThis as { currentPath?: ReadonlySignal<string> }).currentPath = currentPathSignal;
-};
-
-installCurrentPathGlobal();
+(globalThis as { currentPath?: ReadonlySignal<string> }).currentPath = _currentPath;
 
 const createCurrentRouteContext = (): UntypedRouteContext => ({
   params: { ..._routeParams },
@@ -384,41 +379,15 @@ const createCurrentRouteContext = (): UntypedRouteContext => ({
   state: typeof window !== 'undefined' ? window.history.state : undefined,
 });
 
-__setRouteContextProvider(() => createCurrentRouteContext());
-
-const normalizeScrollRestoration = (config?: boolean | ScrollRestorationConfig): NormalizedScrollRestorationConfig => {
-  if (config === false) {
-    return { ...DEFAULT_SCROLL_RESTORATION, enabled: false };
-  }
-  if (config === true || config === undefined) {
-    return { ...DEFAULT_SCROLL_RESTORATION };
-  }
-
-  return {
-    enabled: true,
-    behavior: config.behavior ?? DEFAULT_SCROLL_RESTORATION.behavior,
-    left: config.left ?? DEFAULT_SCROLL_RESTORATION.left,
-    top: config.top ?? DEFAULT_SCROLL_RESTORATION.top,
-    resetOnNavigate: config.resetOnNavigate ?? DEFAULT_SCROLL_RESTORATION.resetOnNavigate,
-    restoreOnBackForward: config.restoreOnBackForward ?? DEFAULT_SCROLL_RESTORATION.restoreOnBackForward,
-  };
-};
+__setRouteContextProvider(createCurrentRouteContext);
 
 const readScrollPositionFromHistoryState = (state: unknown): { left: number; top: number } | null => {
-  if (!state || typeof state !== 'object' || !(SCROLL_STATE_KEY in state)) return null;
-
-  const candidate = (state as Record<string, unknown>)[SCROLL_STATE_KEY];
-  if (!candidate || typeof candidate !== 'object') return null;
-
-  const left = (candidate as Record<string, unknown>)['left'];
-  const top = (candidate as Record<string, unknown>)['top'];
-  if (typeof left !== 'number' || typeof top !== 'number') return null;
-
-  return { left, top };
+  const s = (state as any)?.[SCROLL_STATE_KEY];
+  return s && typeof s.left === 'number' && typeof s.top === 'number' ? s : null;
 };
 
 const persistCurrentScrollPosition = (): void => {
-  if (!_scrollConfig.enabled || typeof window === 'undefined') return;
+  if (!_scrollConfig.enabled) return;
   // While the next route loads, the scroll offset belongs to the page still on screen and the
   // URL to the entry being loaded: writing one into the other would restore a wrong position later.
   if (_routePending) return;
@@ -439,7 +408,7 @@ const persistCurrentScrollPosition = (): void => {
 };
 
 const schedulePersistCurrentScrollPosition = (): void => {
-  if (_scrollPersistScheduled || typeof window === 'undefined') return;
+  if (_scrollPersistScheduled) return;
 
   _scrollPersistScheduled = true;
   requestAnimationFrame(() => {
@@ -453,7 +422,7 @@ const applyScrollPosition = (
   action: 'init' | 'navigate' | 'pop',
   popScrollPosition: { left: number; top: number } | null,
 ): void => {
-  if (!_scrollConfig.enabled || typeof window === 'undefined') return;
+  if (!_scrollConfig.enabled) return;
 
   const saved =
     action === 'pop' && _scrollConfig.restoreOnBackForward
@@ -621,7 +590,7 @@ const loadRoute = async (): Promise<void> => {
 
   if (!match) {
     _currentRoutePattern = pathname;
-    _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
+    _currentRouteTitle = document.title;
     _routeParams = {};
     return;
   }
@@ -633,7 +602,7 @@ const loadRoute = async (): Promise<void> => {
   if (match.route.title) {
     document.title = match.route.title;
   }
-  _currentRouteTitle = match.route.title ?? (typeof document !== 'undefined' ? document.title : '');
+  _currentRouteTitle = match.route.title ?? document.title;
 
   // The component failed to load (reported above): the outlet stays empty
   if (!component) return;
@@ -677,7 +646,6 @@ export function navigateBack(): void {
   window.history.back();
 }
 
-/**
 // ─────────────────────────────────────────────────────────────
 //  Router lifecycle — called internally by mount()
 // ─────────────────────────────────────────────────────────────
@@ -704,22 +672,21 @@ export function startRouter(
   _config = config;
   _target = target;
   _scrollConfig = normalizeScrollRestoration(routerConfig?.scrollRestoration);
-  _pendingPopScrollPosition =
-    typeof window !== 'undefined' ? readScrollPositionFromHistoryState(window.history.state) : null;
+  _pendingPopScrollPosition = readScrollPositionFromHistoryState(window.history.state);
   _pendingScrollAction = _pendingPopScrollPosition ? 'pop' : 'init';
 
   // Expose navigation helpers globally (like when, whenElse, repeat)
   const g = globalThis as any;
-  g.currentPath = currentPathSignal;
+  g.currentPath = _currentPath;
   g.navigate = navigate;
   g.navigateBack = navigateBack;
 
-  if (_scrollConfig.enabled && typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+  if (_scrollConfig.enabled && 'scrollRestoration' in window.history) {
     _previousHistoryScrollRestoration = window.history.scrollRestoration;
     window.history.scrollRestoration = 'manual';
   }
 
-  if (_scrollConfig.enabled && typeof window !== 'undefined') {
+  if (_scrollConfig.enabled) {
     persistCurrentScrollPosition();
     _scrollHandler = () => {
       if (_scrollRestorationTimers.length > 0) {
@@ -781,24 +748,20 @@ export function stopRouter(): void {
   _config = null;
   _target = null;
   _loadedUrl = null;
-  _currentPath(typeof window !== 'undefined' ? window.location.pathname : '');
-  _currentRoutePattern = typeof window !== 'undefined' ? window.location.pathname : '';
-  _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
+  _currentPath(window.location.pathname);
+  _currentRoutePattern = window.location.pathname;
+  _currentRouteTitle = document.title;
   _routeParams = {};
   _started = false;
   _pendingPopScrollPosition = null;
   for (const id of _scrollRestorationTimers) clearTimeout(id);
   _scrollRestorationTimers = [];
   _scrollPositions = new Map<string, { left: number; top: number }>();
-  _scrollConfig = DEFAULT_SCROLL_RESTORATION;
+  _scrollConfig = normalizeScrollRestoration();
   _pendingScrollAction = 'init';
   _scrollPersistScheduled = false;
 
-  if (
-    _previousHistoryScrollRestoration !== null &&
-    typeof window !== 'undefined' &&
-    'scrollRestoration' in window.history
-  ) {
+  if (_previousHistoryScrollRestoration !== null && 'scrollRestoration' in window.history) {
     window.history.scrollRestoration = _previousHistoryScrollRestoration;
     _previousHistoryScrollRestoration = null;
   }

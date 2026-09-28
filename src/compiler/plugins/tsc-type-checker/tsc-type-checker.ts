@@ -49,13 +49,11 @@ export async function runProjectTypeCheck(options?: {
   );
   const rootNames = Array.from(new Set([...parsedConfig.fileNames, ...generatedTypeFiles]));
 
-  const diagnostics = await new Promise<readonly ts.Diagnostic[]>((resolve) => {
-    const program = ts.createProgram({
-      rootNames,
-      options: { ...parsedConfig.options, noEmit: true },
-    });
-    resolve(ts.getPreEmitDiagnostics(program));
+  const program = ts.createProgram({
+    rootNames,
+    options: { ...parsedConfig.options, noEmit: true },
   });
+  const diagnostics = ts.getPreEmitDiagnostics(program);
 
   if (diagnostics.length === 0) {
     return;
@@ -83,20 +81,14 @@ export async function runProjectTypeCheck(options?: {
 }
 
 export const TSCTypeCheckerPlugin = (options?: { strict?: boolean; projectRoot?: string | undefined }): Plugin => {
-  let isRunning = false;
   const strict = options?.strict ?? true;
   const projectRoot = options?.projectRoot;
 
-  /** Run TypeScript type-checking asynchronously so esbuild is not blocked. */
+  /** Runs in onStart: esbuild waits for it, and never overlaps two builds of one context. */
   const runTypeCheck = async (): Promise<void> => {
-    if (isRunning) return;
-    isRunning = true;
-
     try {
       await runProjectTypeCheck({ strict, projectRoot });
-      isRunning = false;
     } catch (error) {
-      isRunning = false;
       if (strict && error instanceof Error && error.message.includes('type check failed')) {
         throw error;
       }

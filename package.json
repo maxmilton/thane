@@ -84,6 +84,7 @@
     "bench:compare": "bun bench/compare.ts",
     "snapshot:output": "bun scripts/snapshot/output.ts",
     "snapshot:compare": "bun scripts/snapshot/compare.ts",
+    "snapshot:statements": "bun scripts/snapshot/statements.ts",
     "size": "bun scripts/size-report.ts",
     "verify": "bun run format:check && bun run build && bun run test:benchmark && bun run test:apps && bun run test && bun run e2e:test"
   },

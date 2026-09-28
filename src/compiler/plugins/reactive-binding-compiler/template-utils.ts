@@ -15,8 +15,10 @@ import {
   firstElementId,
   type HtmlElement,
   type ParsedTemplate,
+  type BindingInfo as ParsedBindingInfo,
 } from '../../utils/html-parser/index.js';
 import { safeEvaluateCondition } from './template-processing.js';
+import type { processItemTemplate } from './repeat-analysis.js';
 
 // ============================================================================
 // Shared types
@@ -47,7 +49,7 @@ export interface SubTemplateResult {
   conditionals: ConditionalBlock[];
   whenElseBlocks: WhenElseBlock[];
   repeatBlocks: RepeatBlock[];
-  eventBindings?: EventBinding[];
+  eventBindings: EventBinding[];
   nextId: number;
 }
 
@@ -182,7 +184,7 @@ export const collectConditionalBlocks = (
       nestedConditionals: processed.conditionals,
       nestedWhenElse: processed.whenElseBlocks,
       nestedRepeats: processed.repeatBlocks,
-      nestedEventBindings: processed.eventBindings ?? [],
+      nestedEventBindings: processed.eventBindings,
     });
     bindings.push(...processed.bindings);
   }
@@ -241,8 +243,8 @@ export const collectWhenElseBlocks = (
       elseBindings: elseProcessed.bindings,
       thenRepeats: thenProcessed.repeatBlocks,
       elseRepeats: elseProcessed.repeatBlocks,
-      thenEventBindings: thenProcessed.eventBindings ?? [],
-      elseEventBindings: elseProcessed.eventBindings ?? [],
+      thenEventBindings: thenProcessed.eventBindings,
+      elseEventBindings: elseProcessed.eventBindings,
       thenConditionals: thenProcessed.conditionals,
       elseConditionals: elseProcessed.conditionals,
       thenWhenElse: thenProcessed.whenElseBlocks,
@@ -254,18 +256,55 @@ export const collectWhenElseBlocks = (
 };
 
 // ============================================================================
-// buildRangeOverlapChecker
+// toRepeatBlock
 // ============================================================================
 
-// Re-export Range from shared compiler types for backward compatibility
-export type { Range } from '../../types.js';
+/** A repeat()'s empty template with its whitespace collapsed. */
+export const collapseEmptyTemplate = (template: string): string =>
+  template.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim();
+
+/**
+ * The RepeatBlock for a parsed repeat() binding whose row template has been processed. The
+ * caller allocates the id, processes the row template and passes the (possibly rewritten) items
+ * expression and its signal names.
+ */
+export const toRepeatBlock = (
+  binding: ParsedBindingInfo,
+  id: string,
+  processed: ReturnType<typeof processItemTemplate>,
+  itemsExpression: string,
+  signalNames: string[],
+): RepeatBlock => ({
+  id,
+  signalName: signalNames[0] || '',
+  signalNames,
+  itemsExpression,
+  itemVar: binding.itemVar!,
+  indexVar: binding.indexVar,
+  itemTemplate: processed.processedContent,
+  emptyTemplate: binding.emptyTemplate ? collapseEmptyTemplate(binding.emptyTemplate) : undefined,
+  trackByFn: binding.trackByFn,
+  startIndex: binding.expressionStart,
+  endIndex: binding.expressionEnd,
+  itemBindings: processed.bindings,
+  itemEvents: processed.events,
+  signalBindings: processed.signalBindings,
+  nestedConditionals: processed.nestedConditionals,
+  nestedWhenElse: processed.nestedWhenElse,
+  nestedRepeats: processed.nestedRepeats,
+  rowSignalVars: processed.rowSignalVars,
+});
+
+// ============================================================================
+// buildRangeOverlapChecker
+// ============================================================================
 
 /**
  * Build a fast predicate for checking whether a position falls inside any of
  * the given structural ranges (conditionals, whenElse, repeats).
  */
-export const buildRangeOverlapChecker = (ranges: Range[]): ((start: number, end?: number) => boolean) => {
-  return (start: number, _end?: number) => {
+export const buildRangeOverlapChecker = (ranges: Range[]): ((start: number) => boolean) => {
+  return (start: number) => {
     for (const r of ranges) {
       if (start >= r.start && start < r.end) return true;
     }
@@ -310,29 +349,21 @@ export const buildConditionalEdits = (conditionals: ConditionalBlock[]): Templat
 };
 
 /**
- * Build standard edits from whenElse blocks.
- * @param injectIds If true, injects IDs into the first element of then/else templates (used by generateProcessedHtml and sub-template)
+ * Build standard edits from whenElse blocks. A pre-rendered branch carries its branch id on its
+ * first element, so the runtime can find it and toggle it.
  */
-export const buildWhenElseEdits = (
-  whenElseBlocks: WhenElseBlock[],
-  injectIds: boolean,
-  injectIdFn?: (html: string, id: string) => string,
-): TemplateEdit[] => {
+export const buildWhenElseEdits = (whenElseBlocks: WhenElseBlock[]): TemplateEdit[] => {
   return whenElseBlocks.map((we) => {
     // initialValue === true  → pre-render then, defer else
     // initialValue === false → pre-render else, defer then
     // initialValue === undefined (not statically resolvable) → defer both; runtime evaluates at mount
     const thenReplacement =
       we.initialValue === true
-        ? injectIds && injectIdFn
-          ? injectIdFn(we.thenTemplate, we.thenId)
-          : we.thenTemplate
+        ? injectIdIntoFirstElement(we.thenTemplate, we.thenId)
         : `<template id="${we.thenId}"></template>`;
     const elseReplacement =
       we.initialValue === false
-        ? injectIds && injectIdFn
-          ? injectIdFn(we.elseTemplate, we.elseId)
-          : we.elseTemplate
+        ? injectIdIntoFirstElement(we.elseTemplate, we.elseId)
         : `<template id="${we.elseId}"></template>`;
     return {
       start: we.startIndex,
@@ -370,14 +401,7 @@ export const stripPropertyBoundAttributes = (
  * Build edits to inject element IDs into non-conditional elements that have bindings.
  * Elements whose user-supplied id was reused as the binding id are left untouched.
  */
-export const buildElementIdEdits = (
-  elementIdMap: Map<HtmlElement, string>,
-  allRanges: Range[],
-  _opts?: {
-    eventBindings?: EventBinding[];
-    itemEvents?: Array<{ eventId: string; eventName: string; modifiers: string[] }>;
-  },
-): TemplateEdit[] => {
+export const buildElementIdEdits = (elementIdMap: Map<HtmlElement, string>, allRanges: Range[]): TemplateEdit[] => {
   const isInsideRange = buildRangeOverlapChecker(allRanges);
   const edits: TemplateEdit[] = [];
 
@@ -400,7 +424,6 @@ export const buildElementIdEdits = (
  * Also handles expression text bindings like ${count() + 1}.
  */
 export const buildSignalReplacementEdits = (
-  _templateContent: string,
   signalInitializers: Map<string, string | number | boolean>,
   allRanges: Range[],
   textBindingSpans?: Map<number, { spanId: string; exprEnd: number; signalName: string }>,

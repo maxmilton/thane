@@ -43,14 +43,6 @@ export const pascalToKebab = (name: string): string => {
 // Signal Detection
 // ============================================================================
 
-/** Get signal name from a bare getter call like `count()`. Returns null if not a bare call. */
-export const getBareSignalGetterName = (node: ts.CallExpression): string | null => {
-  if (ts.isIdentifier(node.expression) && node.arguments.length === 0) {
-    return node.expression.text;
-  }
-  return null;
-};
-
 /**
  * Extract static value from an expression if possible
  * Used for signal initializers and compile-time evaluation
@@ -128,33 +120,6 @@ export const findSignalInitializers = (sourceFile: ts.SourceFile): Map<string, s
 // Class Detection
 // ============================================================================
 
-export const findClassExtending = (
-  sourceFile: ts.SourceFile,
-  baseClassName: string,
-): ts.ClassExpression | ts.ClassDeclaration | null => {
-  let foundClass: ts.ClassExpression | ts.ClassDeclaration | null = null;
-
-  const visit = (node: ts.Node) => {
-    if ((ts.isClassDeclaration(node) || ts.isClassExpression(node)) && node.heritageClauses) {
-      for (const clause of node.heritageClauses) {
-        if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-          for (const type of clause.types) {
-            if (ts.isIdentifier(type.expression) && type.expression.text === baseClassName) {
-              foundClass = node;
-            }
-          }
-        }
-      }
-    }
-    if (!foundClass) {
-      ts.forEachChild(node, visit);
-    }
-  };
-
-  visit(sourceFile);
-  return foundClass;
-};
-
 export const findEnclosingClass = (node: ts.Node): ts.ClassExpression | ts.ClassDeclaration | null => {
   let current: ts.Node | undefined = node;
   while (current) {
@@ -174,42 +139,8 @@ export const isHtmlTemplate = (node: ts.TaggedTemplateExpression): boolean => {
   return ts.isIdentifier(node.tag) && node.tag.text === FN.HTML;
 };
 
-export const isCssTemplate = (node: ts.TaggedTemplateExpression): boolean => {
-  return ts.isIdentifier(node.tag) && node.tag.text === FN.CSS;
-};
-
 export const hasHtmlTemplates = (source: string): boolean => {
   return source.includes('html`');
-};
-
-/**
- * Extract template content from a template literal
- * Supports both TaggedTemplateExpression and TemplateLiteral
- */
-export const extractTemplateContent = (
-  template: ts.TaggedTemplateExpression | ts.TemplateLiteral,
-  sourceFile?: ts.SourceFile,
-): string => {
-  // Handle TaggedTemplateExpression - get the template property
-  const templateLiteral = ts.isTaggedTemplateExpression(template) ? template.template : template;
-
-  if (ts.isNoSubstitutionTemplateLiteral(templateLiteral)) {
-    return templateLiteral.text;
-  }
-
-  // For template expressions with substitutions, we need to reconstruct
-  if (ts.isTemplateExpression(templateLiteral)) {
-    let content = templateLiteral.head.text;
-    for (const span of templateLiteral.templateSpans) {
-      // Use sourceFile.getText if available for more accurate representation
-      const exprText = sourceFile ? span.expression.getText(sourceFile) : span.expression.getText();
-      content += '${' + exprText + '}';
-      content += span.literal.text;
-    }
-    return content;
-  }
-
-  return '';
 };
 
 // ============================================================================
@@ -311,10 +242,6 @@ export const extractPageSelector = (sourceFile: ts.SourceFile): string | null =>
 
 export const toCamelCase = (str: string): string => {
   return str.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-};
-
-export const toKebabCase = (str: string): string => {
-  return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 };
 
 // ============================================================================
@@ -429,45 +356,6 @@ export const expressionReferencesIdentifier = (expression: string, identifierNam
 };
 
 /**
- * Detect signal call expressions in a JS expression.
- * Class mode: `this._signal()`, closure mode: `_signal()`.
- */
-export const findComponentSignalCalls = (expression: string, classStyle: boolean): Set<string> => {
-  const wrapped = `(${expression})`;
-  const sf = ts.createSourceFile('__expr.ts', wrapped, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-
-  const signals = new Set<string>();
-  const visit = (node: ts.Node) => {
-    if (ts.isCallExpression(node) && node.arguments.length === 0) {
-      if (classStyle) {
-        // Class mode: this._signalName()
-        if (
-          ts.isPropertyAccessExpression(node.expression) &&
-          node.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
-          ts.isIdentifier(node.expression.name) &&
-          node.expression.name.text.startsWith('_')
-        ) {
-          signals.add(node.expression.name.text);
-        }
-      } else {
-        // Closure mode: _signalName() — bare identifier call, not a method call
-        if (ts.isIdentifier(node.expression) && node.expression.text.startsWith('_')) {
-          // Ensure it's not a method call like obj._signal()
-          const parent = node.parent;
-          const isBareCall = !(parent && ts.isPropertyAccessExpression(parent));
-          if (isBareCall) {
-            signals.add(node.expression.text);
-          }
-        }
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
-  return signals;
-};
-
-/**
  * Parse an arrow function expression and return its parameter list and body.
  * Uses TS AST to correctly handle destructuring, defaults, and nested parens.
  * Returns null if the expression is not an arrow function.
@@ -497,40 +385,6 @@ export const parseArrowFunction = (
   };
   visit(sf);
   return result;
-};
-
-/**
- * Check if an expression is a simple `this.methodName` or `this._methodName` reference
- * (not a call — just the reference itself).
- */
-export const isThisMethodReference = (expression: string): boolean => {
-  const trimmed = expression.trim();
-  const wrapped = `(${trimmed})`;
-  const sf = ts.createSourceFile('__expr.ts', wrapped, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-
-  let found = false;
-  const visit = (node: ts.Node) => {
-    if (found) return;
-    if (
-      ts.isPropertyAccessExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ThisKeyword &&
-      ts.isIdentifier(node.name)
-    ) {
-      // Ensure this is the top-level expression (not nested inside another expr)
-      // The structure is: ExpressionStatement > ParenthesizedExpression > PropertyAccessExpression
-      if (
-        node.parent &&
-        ts.isParenthesizedExpression(node.parent) &&
-        node.parent.parent &&
-        ts.isExpressionStatement(node.parent.parent)
-      ) {
-        found = true;
-      }
-    }
-    if (!found) ts.forEachChild(node, visit);
-  };
-  visit(sf);
-  return found;
 };
 
 // ============================================================================

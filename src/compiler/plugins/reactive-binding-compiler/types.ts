@@ -95,13 +95,12 @@ export interface RepeatBlock {
   indexVar?: string | undefined; // e.g., "index" (optional)
   itemTemplate: string; // HTML template for each item (processed)
   emptyTemplate?: string | undefined; // HTML template shown when list is empty
-  trackByFn?: string | undefined; // Custom trackBy function source (deprecated - no longer used)
+  trackByFn?: string | undefined; // Custom trackBy function source: the reconciler's row key (its property name for `(x) => x.prop`)
   startIndex: number; // Position in HTML where ${repeat starts
   endIndex: number; // Position after }
   itemBindings: ItemBinding[]; // Bindings inside item template that reference item/index
   itemEvents: ItemEventBinding[]; // Event handlers inside item template
   signalBindings: SimpleBinding[]; // Component-level signal bindings inside repeat items (always simple)
-  eventBindings: EventBinding[]; // Event bindings not involving item
   nestedConditionals: ConditionalBlock[];
   nestedWhenElse: WhenElseBlock[];
   nestedRepeats: RepeatBlock[];

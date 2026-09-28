@@ -18,6 +18,7 @@ import {
   PLUGIN_NAME,
   BIND_FN,
 } from '../../utils/index.js';
+import { getSetupFunction, unwrapParens } from '../../utils/component-ast.js';
 import type { BindingInfo, ConditionalBlock, WhenElseBlock, RepeatBlock, EventBinding } from './types.js';
 import { CLOSURE_ACCESS } from './types.js';
 import type { AccessPattern } from './types.js';
@@ -25,6 +26,7 @@ import { minifyHTML } from '../minification/template-minifier.js';
 import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
 import type { SelectorMap } from '../minification/selector-minifier.js';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
+import { walkDirectives } from './directive-tree.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
 
 // ============================================================================
@@ -49,28 +51,16 @@ const isEmptyArrowFunction = (node: ts.Node): boolean => {
   return false;
 };
 
-/**
- * Strip empty lifecycle hooks and redundant `template` property from the
- * defineComponent return object. Also detects styles/lifecycle feature flags.
- */
-const stripDeadPropertiesAndDetectFeatures = (
-  source: string,
-  hasCompiledTemplate: boolean,
-): { source: string; hasStyles: boolean; hasLifecycle: boolean } => {
-  const sf = ts.createSourceFile('__strip.ts', source, ts.ScriptTarget.Latest, true);
-
-  // Find the defineComponent return object
+/** Find the defineComponent return object */
+const findReturnObject = (sf: ts.SourceFile): ts.ObjectLiteralExpression | null => {
   let returnObj: ts.ObjectLiteralExpression | null = null;
   const find = (node: ts.Node) => {
     if (returnObj) return;
     if (ts.isCallExpression(node) && isDefineComponentCall(node)) {
-      const setupArg = node.arguments.length >= 2 ? node.arguments[1] : node.arguments[0];
-      if (setupArg && (ts.isArrowFunction(setupArg) || ts.isFunctionExpression(setupArg))) {
+      const setupArg = getSetupFunction(node);
+      if (setupArg) {
         if (ts.isArrowFunction(setupArg) && !ts.isBlock(setupArg.body)) {
-          let bodyExpr: ts.Expression = setupArg.body;
-          while (ts.isParenthesizedExpression(bodyExpr)) {
-            bodyExpr = bodyExpr.expression;
-          }
+          const bodyExpr = unwrapParens(setupArg.body);
           if (ts.isObjectLiteralExpression(bodyExpr)) {
             returnObj = bodyExpr;
             return;
@@ -92,22 +82,23 @@ const stripDeadPropertiesAndDetectFeatures = (
     ts.forEachChild(node, find);
   };
   find(sf);
+  return returnObj;
+};
 
-  if (!returnObj) return { source, hasStyles: false, hasLifecycle: false };
-
-  // Collect ranges to remove (in reverse order for safe splicing)
-  const removals: Array<{ start: number; end: number }> = [];
-  const properties = (returnObj as ts.ObjectLiteralExpression).properties;
+/** Detect the styles/lifecycle feature flags of the defineComponent return object. */
+const detectFeatures = (
+  returnObj: ts.ObjectLiteralExpression | null,
+): { hasStyles: boolean; hasLifecycle: boolean } => {
   let hasStyles = false;
   let hasLifecycle = false;
 
-  for (const prop of properties) {
+  for (const prop of returnObj?.properties ?? []) {
     // Handle shorthand property assignment: return { styles }
     if (ts.isShorthandPropertyAssignment(prop)) {
       if (prop.name.text === 'styles') {
         hasStyles = true;
       }
-      continue; // shorthand props are never strippable
+      continue;
     }
 
     if (!ts.isPropertyAssignment(prop)) continue;
@@ -118,14 +109,34 @@ const stripDeadPropertiesAndDetectFeatures = (
     // Supports both inline css`` and imported CSS file strings
     if (name === 'styles') {
       hasStyles = true;
-      continue; // keep in return — runtime handles it via _onStyles callback
     }
 
     // ── Feature detection (lifecycle) — non-empty hooks that survive stripping ──
     if (STRIPPABLE_LIFECYCLE.has(name) && !isEmptyArrowFunction(prop.initializer)) {
       hasLifecycle = true;
-      continue; // keep — runtime needs these
     }
+  }
+
+  return { hasStyles, hasLifecycle };
+};
+
+/**
+ * Strip empty lifecycle hooks and redundant `template` property from the
+ * defineComponent return object. Styles and non-empty hooks are kept: the runtime needs them.
+ */
+const stripDeadProperties = (source: string, hasCompiledTemplate: boolean): string => {
+  const sf = ts.createSourceFile('__strip.ts', source, ts.ScriptTarget.Latest, true);
+  const returnObj = findReturnObject(sf);
+  if (!returnObj) return source;
+
+  // Collect ranges to remove (in reverse order for safe splicing)
+  const removals: Array<{ start: number; end: number }> = [];
+
+  for (const prop of returnObj.properties) {
+    // shorthand props are never strippable
+    if (!ts.isPropertyAssignment(prop)) continue;
+    const name = prop.name && ts.isIdentifier(prop.name) ? prop.name.text : null;
+    if (!name) continue;
 
     // ── Strippable properties ──
     const shouldStripLifecycle = STRIPPABLE_LIFECYCLE.has(name) && isEmptyArrowFunction(prop.initializer);
@@ -159,7 +170,7 @@ const stripDeadPropertiesAndDetectFeatures = (
     removals.push({ start, end });
   }
 
-  if (removals.length === 0) return { source, hasStyles, hasLifecycle };
+  if (removals.length === 0) return source;
 
   // Apply removals in reverse order
   let modified = source;
@@ -167,7 +178,7 @@ const stripDeadPropertiesAndDetectFeatures = (
     modified = modified.substring(0, start) + modified.substring(end);
   }
 
-  return { source: modified, hasStyles, hasLifecycle };
+  return modified;
 };
 import { generateInitBindingsFunction, generateStaticTemplate, generateUpdatedImport } from './codegen.js';
 import { ErrorCode, createError } from '../../errors.js';
@@ -296,19 +307,6 @@ const extractAndInlineFragment = (
   return content;
 };
 
-/**
- * Inline fragment template variables into the main template content.
- * For each ${identifier} in the template where the identifier resolves to
- * a const html`` variable, replaces it with the fragment's content (recursively).
- */
-const inlineFragmentTemplates = (
-  templateNode: ts.TaggedTemplateExpression,
-  sourceFile: ts.SourceFile,
-  scopeRoot: ts.Node,
-): string => {
-  return extractAndInlineFragment(templateNode, sourceFile, scopeRoot, new Set());
-};
-
 const resolveTemplateIdentifier = (
   sourceFile: ts.SourceFile,
   scopeRoot: ts.Node,
@@ -351,15 +349,12 @@ const resolveTemplateIdentifier = (
  * Find html`` templates in the defineComponent return object only.
  * Fragment templates (const piece = html`...`) are intentionally skipped.
  */
-const findHtmlTemplates = (sourceFile: ts.SourceFile, defineComponentCall: ts.CallExpression): TemplateInfo[] => {
+const findHtmlTemplates = (
+  sourceFile: ts.SourceFile,
+  setupArg: ts.ArrowFunction | ts.FunctionExpression,
+): TemplateInfo[] => {
   const templates: TemplateInfo[] = [];
   const seen = new Set<number>();
-
-  const setupArg =
-    defineComponentCall.arguments.length >= 2 ? defineComponentCall.arguments[1] : defineComponentCall.arguments[0];
-  if (!setupArg || (!ts.isArrowFunction(setupArg) && !ts.isFunctionExpression(setupArg))) {
-    return templates;
-  }
 
   const collectFromReturnObject = (obj: ts.ObjectLiteralExpression) => {
     for (const prop of obj.properties) {
@@ -389,11 +384,8 @@ const findHtmlTemplates = (sourceFile: ts.SourceFile, defineComponentCall: ts.Ca
   // The body is a ParenthesizedExpression wrapping an ObjectLiteralExpression,
   // not a Block with a ReturnStatement, so we unwrap it directly.
   if (ts.isArrowFunction(setupArg) && !ts.isBlock(setupArg.body)) {
-    let expr: ts.Expression = setupArg.body;
     // Unwrap parenthesized expression: () => ({...}) parses as Paren(ObjLiteral)
-    while (ts.isParenthesizedExpression(expr)) {
-      expr = expr.expression;
-    }
+    const expr = unwrapParens(setupArg.body);
     if (ts.isObjectLiteralExpression(expr)) {
       collectFromReturnObject(expr);
     }
@@ -438,7 +430,6 @@ export const transformDefineComponentSource = (
   source: string,
   filePath: string,
   childMounts?: ChildMountInfo[],
-  _childMountCount?: number,
   options: CompileOptions = {},
 ): string | null => {
   const sourceFile = sourceCache.parse(filePath, source);
@@ -493,8 +484,8 @@ export const transformDefineComponentSource = (
   // Find html templates directly — no normalization needed.
   // The regex pipeline natively matches bare signal() calls.
   const servicesImport = findServicesImport(sourceFile);
-  const htmlTemplates = findHtmlTemplates(sourceFile, dcCall);
-  const setupArg = dcCall.arguments.length >= 2 ? dcCall.arguments[1]! : dcCall.arguments[0]!;
+  const setupArg = getSetupFunction(dcCall);
+  const htmlTemplates = setupArg ? findHtmlTemplates(sourceFile, setupArg) : [];
 
   const edits: Array<{ start: number; end: number; replacement: string }> = [];
   let allBindings: BindingInfo[] = [];
@@ -504,10 +495,10 @@ export const transformDefineComponentSource = (
   let allEventBindings: EventBinding[] = [];
   let idCounter = computeInitialIdSeed(filePath, source);
   let lastProcessedTemplateContent = '';
-  let hasConditionals = false;
 
   for (const templateInfo of htmlTemplates) {
-    let templateContent = inlineFragmentTemplates(templateInfo.node, sourceFile, setupArg);
+    // htmlTemplates is empty without a setup function
+    let templateContent = extractAndInlineFragment(templateInfo.node, sourceFile, setupArg!, new Set());
 
     const result = processHtmlTemplateWithConditionals(templateContent, signalInitializers, idCounter);
     templateContent = result.processedContent;
@@ -517,7 +508,6 @@ export const transformDefineComponentSource = (
     allRepeatBlocks = [...allRepeatBlocks, ...result.repeatBlocks];
     allEventBindings = [...allEventBindings, ...result.eventBindings];
     idCounter = result.nextId;
-    hasConditionals = hasConditionals || result.hasConditionals;
 
     lastProcessedTemplateContent = templateContent;
 
@@ -554,52 +544,12 @@ export const transformDefineComponentSource = (
   };
   visitCss(sourceFile);
 
-  // Early detection: check if the component has a `styles` property.
-  // This is needed before edits are applied so we can add __enableComponentStyles to imports.
-  let componentHasStyles = false;
-  {
-    const setupArg = dcCall.arguments.length >= 2 ? dcCall.arguments[1] : dcCall.arguments[0];
-    if (setupArg && (ts.isArrowFunction(setupArg) || ts.isFunctionExpression(setupArg))) {
-      const checkForStyles = (n: ts.Node): void => {
-        if (componentHasStyles) return;
-        if (ts.isArrowFunction(n) && n !== setupArg) return;
-        if (ts.isFunctionExpression(n) && n !== setupArg) return;
-
-        // Check object literals in return statements and arrow expression bodies
-        const checkObjectForStyles = (obj: ts.ObjectLiteralExpression) => {
-          for (const prop of obj.properties) {
-            if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name) && prop.name.text === 'styles') {
-              componentHasStyles = true;
-            }
-            // Support shorthand: return { styles } (e.g. from CSS file import)
-            if (ts.isShorthandPropertyAssignment(prop) && prop.name.text === 'styles') {
-              componentHasStyles = true;
-            }
-          }
-        };
-
-        if (ts.isReturnStatement(n) && n.expression && ts.isObjectLiteralExpression(n.expression)) {
-          checkObjectForStyles(n.expression);
-        }
-
-        // Handle arrow expression body: () => ({ styles })
-        if (ts.isParenthesizedExpression(n) && ts.isObjectLiteralExpression(n.expression) && n.parent === setupArg) {
-          checkObjectForStyles(n.expression);
-        }
-        if (
-          ts.isObjectLiteralExpression(n) &&
-          n.parent &&
-          ts.isParenthesizedExpression(n.parent) &&
-          n.parent.parent === setupArg
-        ) {
-          checkObjectForStyles(n);
-        }
-
-        ts.forEachChild(n, checkForStyles);
-      };
-      checkForStyles(setupArg);
-    }
-  }
+  // Styles and non-empty lifecycle hooks, read once from the return object the strip pass edits.
+  // They decide the styles import and call, and the registration function: the lean variant when
+  // the component has no styles and no lifecycle hooks, so esbuild can tree-shake the styles
+  // subsystem entirely for style-free apps.
+  const { hasStyles, hasLifecycle } = detectFeatures(findReturnObject(sourceFile));
+  const registerFnName = hasStyles || hasLifecycle ? BIND_FN.REGISTER_COMPONENT : BIND_FN.REGISTER_COMPONENT_LEAN;
 
   // ── Partition child mounts by directive containment ──
   const directiveChildMounts = new Map<string, { cm: ChildMountInfo; globalIndex: number }[]>();
@@ -724,11 +674,7 @@ export const transformDefineComponentSource = (
       ...servicesImport,
       namedImports: servicesImport.namedImports.filter((n) => n !== 'defineComponent'),
     };
-    // Determine which registration function to import — lean or full.
-    // At this point we don't yet know if the component has lifecycle hooks
-    // (that's detected later in stripDeadPropertiesAndDetectFeatures).
-    // We add a placeholder and fix it up after stripping.
-    const requiredFunctions: string[] = ['__REGISTER_PLACEHOLDER__'];
+    const requiredFunctions: string[] = [registerFnName];
 
     // ── Binding function imports ──
     if (hasAnyBindings) {
@@ -737,30 +683,14 @@ export const transformDefineComponentSource = (
       const everyConditional: ConditionalBlock[] = [];
       const everyWhenElse: WhenElseBlock[] = [];
       const everyRepeat: RepeatBlock[] = [];
-      const visitCond = (c: ConditionalBlock): void => {
-        everyConditional.push(c);
-        c.nestedConditionals.forEach(visitCond);
-        c.nestedWhenElse.forEach(visitWE);
-        c.nestedRepeats.forEach(visitRep);
-      };
-      const visitWE = (we: WhenElseBlock): void => {
-        everyWhenElse.push(we);
-        we.thenConditionals.forEach(visitCond);
-        we.elseConditionals.forEach(visitCond);
-        we.thenWhenElse.forEach(visitWE);
-        we.elseWhenElse.forEach(visitWE);
-        we.thenRepeats.forEach(visitRep);
-        we.elseRepeats.forEach(visitRep);
-      };
-      const visitRep = (rep: RepeatBlock): void => {
-        everyRepeat.push(rep);
-        rep.nestedConditionals.forEach(visitCond);
-        rep.nestedWhenElse.forEach(visitWE);
-        rep.nestedRepeats.forEach(visitRep);
-      };
-      allConditionals.forEach(visitCond);
-      allWhenElseBlocks.forEach(visitWE);
-      allRepeatBlocks.forEach(visitRep);
+      walkDirectives(
+        { conditionals: allConditionals, whenElse: allWhenElseBlocks, repeats: allRepeatBlocks },
+        {
+          cond: (c) => void everyConditional.push(c),
+          whenElse: (we) => void everyWhenElse.push(we),
+          repeat: (rep) => void everyRepeat.push(rep),
+        },
+      );
 
       const isSimpleConditional = (c: ConditionalBlock): boolean =>
         c.signalNames.length === 1 && c.jsExpression === `${c.signalName}()`;
@@ -774,7 +704,7 @@ export const transformDefineComponentSource = (
     }
 
     // ── Styles enablement import ──
-    if (componentHasStyles) {
+    if (hasStyles) {
       requiredFunctions.push(BIND_FN.ENABLE_STYLES);
     }
 
@@ -832,14 +762,6 @@ export const transformDefineComponentSource = (
     }
   }
 
-  // Collect repeat static template names
-  const repeatTemplateNames: string[] = [];
-  const repeatTplRegex = /const (__tpl_\w+) =/g;
-  let tplMatch: RegExpExecArray | null;
-  while ((tplMatch = repeatTplRegex.exec(staticTemplateCode)) !== null) {
-    if (tplMatch[1]) repeatTemplateNames.push(tplMatch[1]);
-  }
-
   // Inject selector if auto-derived (before the setup function argument)
   if (!hasExplicitSelector && selector) {
     result = result.replace(/defineComponent\s*((?:<[^(]*>)?)\s*\(/, `defineComponent$1('${emittedSelector}', `);
@@ -872,17 +794,11 @@ export const transformDefineComponentSource = (
 
   // Find the return statement inside the setup function
   if (dcCallNode) {
-    const setupArg =
-      (dcCallNode as ts.CallExpression).arguments.length >= 2
-        ? (dcCallNode as ts.CallExpression).arguments[1]
-        : (dcCallNode as ts.CallExpression).arguments[0];
-    if (setupArg && (ts.isArrowFunction(setupArg) || ts.isFunctionExpression(setupArg))) {
+    const setupArg = getSetupFunction(dcCallNode as ts.CallExpression);
+    if (setupArg) {
       // Handle concise arrow: () => ({...}) — no ReturnStatement in AST
       if (ts.isArrowFunction(setupArg) && !ts.isBlock(setupArg.body)) {
-        let bodyExpr: ts.Expression = setupArg.body;
-        while (ts.isParenthesizedExpression(bodyExpr)) {
-          bodyExpr = bodyExpr.expression;
-        }
+        const bodyExpr = unwrapParens(setupArg.body);
         if (ts.isObjectLiteralExpression(bodyExpr)) {
           returnObjectBracePos = bodyExpr.getStart(injectionSf) + 1; // after {
         }
@@ -902,13 +818,6 @@ export const transformDefineComponentSource = (
       }
     }
   }
-
-  // Track strip result for lean/full registration decision
-  let stripResult: { source: string; hasStyles: boolean; hasLifecycle: boolean } = {
-    source: result,
-    hasStyles: false,
-    hasLifecycle: false,
-  };
 
   if (exportStart !== null) {
     // ── Insert static template declarations before the export ──
@@ -933,46 +842,29 @@ export const transformDefineComponentSource = (
       if (dcCallCloseParen !== null) dcCallCloseParen = dcCallCloseParen + bindingsFnBody.length;
     }
 
-    // Strip dead properties, then pass __tpl + repeat templates as extra args to defineComponent()
+    // Strip dead properties, then pass __tpl as an extra arg to defineComponent()
     if (dcCallCloseParen !== null) {
       // Strip dead properties before inserting extra args (positions would shift)
       const hasCompiledTemplate = !!lastProcessedTemplateContent;
-      stripResult = stripDeadPropertiesAndDetectFeatures(result, hasCompiledTemplate);
+      const stripped = stripDeadProperties(result, hasCompiledTemplate);
 
       // Adjust dcCallCloseParen for any characters removed by stripping
-      const charDelta = stripResult.source.length - result.length;
-      result = stripResult.source;
+      const charDelta = stripped.length - result.length;
+      result = stripped;
       dcCallCloseParen = dcCallCloseParen + charDelta;
 
-      let extraArgs = '';
-
       if (lastProcessedTemplateContent) {
-        extraArgs += ', __tpl';
+        result = result.substring(0, dcCallCloseParen) + ', __tpl' + result.substring(dcCallCloseParen);
       }
 
-      for (const name of repeatTemplateNames) {
-        extraArgs += `, '${name}', ${name}`;
-      }
-
-      if (extraArgs) {
-        result = result.substring(0, dcCallCloseParen) + extraArgs + result.substring(dcCallCloseParen);
-      }
-
-      if (stripResult.hasStyles) {
+      if (hasStyles) {
         result += '\n__enableComponentStyles();\n';
       }
     }
   }
 
   // Rename defineComponent → __registerComponent or __registerComponentLean
-  // Use the lean variant when the component has no styles and no lifecycle hooks,
-  // so esbuild can tree-shake the styles subsystem entirely for style-free apps.
-  const useLean = stripResult && !stripResult.hasStyles && !stripResult.hasLifecycle;
-  const registerFnName = useLean ? BIND_FN.REGISTER_COMPONENT_LEAN : BIND_FN.REGISTER_COMPONENT;
   result = result.replace(/\bdefineComponent\s*(?:<[^(]*>)?\s*\(/, `${registerFnName}(`);
-
-  // Fix up the placeholder import to the actual registration function
-  result = result.replace('__REGISTER_PLACEHOLDER__', registerFnName);
 
   return result;
 };
@@ -1000,7 +892,7 @@ export const createReactiveBindingPlugin = (getOptions: () => CompileOptions = (
       }
 
       try {
-        const transformed = transformDefineComponentSource(source, args.path, undefined, undefined, getOptions());
+        const transformed = transformDefineComponentSource(source, args.path, undefined, getOptions());
 
         if (transformed === null) {
           return undefined;

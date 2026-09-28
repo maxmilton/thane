@@ -1,18 +1,16 @@
 {
   "no config file": {
-    "baseline": {
-      "app": "client",
-      "command": "build",
-      "gzip": false,
-      "logLevel": "normal",
-      "prod": false,
-      "serve": false
-    },
+    "baseline": { "command": "build", "gzip": false, "logLevel": "normal", "prod": false, "serve": false },
     "rows": {
-      "--app cli-app": { "app": "cli-app" },
-      "--app": {},
-      "--app --prod": { "app": "--prod" },
-      "--app ''": {},
+      "--app cli-app": {
+        "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."]
+      },
+      "--app": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--app --prod": {
+        "prod": true,
+        "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."]
+      },
+      "--app ''": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
       "--entry ./cli/main.ts": { "entry": "./cli/main.ts" },
       "--entry": {},
       "--entry --prod": { "entry": "--prod" },
@@ -167,9 +165,17 @@
       },
       "-xyz": {},
       "---x": { "(warnings)": ["Warning: Unknown flag '---x'. Run 'thane --help' to see available options."] },
-      "--app --nope": { "app": "--nope" },
+      "--app --nope": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."
+        ]
+      },
       "--port --port --nope": { "port": "<NaN>" },
-      "--entry --app --zzz": { "entry": "--app" },
+      "--entry --app --zzz": {
+        "entry": "--app",
+        "(warnings)": ["Warning: Unknown flag '--zzz'. Run 'thane --help' to see available options."]
+      },
       "--prod --nope --gzip": {
         "gzip": true,
         "prod": true,
@@ -180,7 +186,6 @@
   "thane.config.json": {
     "baseline": {
       "analyze": true,
-      "app": "cfg-app",
       "assetsDir": "<cwd>/cfg-assets",
       "base": "/cfg-build/",
       "command": "build",
@@ -208,10 +213,12 @@
       "target": ["es2021"]
     },
     "rows": {
-      "--app cli-app": { "app": "cli-app" },
-      "--app": {},
-      "--app --prod": {},
-      "--app ''": { "app": "client" },
+      "--app cli-app": {
+        "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."]
+      },
+      "--app": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--app --prod": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--app ''": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
       "--entry ./cli/main.ts": { "entry": "./cli/main.ts" },
       "--entry": {},
       "--entry --prod": {},
@@ -230,7 +237,6 @@
       "--html ''": {},
       "--config ./alt.config.json": {
         "analyze": "<absent>",
-        "app": "client",
         "assetsDir": "<absent>",
         "base": "<absent>",
         "configPath": "<cwd>/alt.config.json",
@@ -256,7 +262,6 @@
       "--config": {},
       "--config --prod": {
         "analyze": "<absent>",
-        "app": "client",
         "assetsDir": "<absent>",
         "base": "<absent>",
         "configPath": "--prod",
@@ -310,7 +315,6 @@
       "--target es2020 --target es2022": { "target": ["es2022"] },
       "--config ./missing.json": {
         "analyze": "<absent>",
-        "app": "client",
         "assetsDir": "<absent>",
         "base": "<absent>",
         "configPath": "./missing.json",
@@ -455,9 +459,16 @@
       },
       "-xyz": {},
       "---x": { "(warnings)": ["Warning: Unknown flag '---x'. Run 'thane --help' to see available options."] },
-      "--app --nope": {},
+      "--app --nope": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."
+        ]
+      },
       "--port --port --nope": {},
-      "--entry --app --zzz": {},
+      "--entry --app --zzz": {
+        "(warnings)": ["Warning: Unknown flag '--zzz'. Run 'thane --help' to see available options."]
+      },
       "--prod --nope --gzip": {
         "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."]
       }
@@ -466,7 +477,6 @@
   "thane.config.jsonc": {
     "baseline": {
       "analyze": false,
-      "app": "cfg2-app",
       "assetsDir": "<cwd>/cfg2-assets",
       "base": "/cfg2/",
       "command": "build",
@@ -494,10 +504,15 @@
       "target": ["es2019", "firefox100"]
     },
     "rows": {
-      "--app cli-app": { "app": "cli-app" },
-      "--app": {},
-      "--app --prod": { "prod": true },
-      "--app ''": { "app": "client" },
+      "--app cli-app": {
+        "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."]
+      },
+      "--app": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--app --prod": {
+        "prod": true,
+        "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."]
+      },
+      "--app ''": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
       "--entry ./cli/main.ts": { "entry": "./cli/main.ts" },
       "--entry": {},
       "--entry --prod": { "prod": true },
@@ -516,7 +531,6 @@
       "--html ''": {},
       "--config ./alt.config.json": {
         "analyze": "<absent>",
-        "app": "client",
         "assetsDir": "<absent>",
         "base": "<absent>",
         "configPath": "<cwd>/alt.config.json",
@@ -542,7 +556,6 @@
       "--config": {},
       "--config --prod": {
         "analyze": "<absent>",
-        "app": "client",
         "assetsDir": "<absent>",
         "base": "<absent>",
         "configPath": "--prod",
@@ -594,7 +607,6 @@
       "--target es2020 --target es2022": { "target": ["es2022"] },
       "--config ./missing.json": {
         "analyze": "<absent>",
-        "app": "client",
         "assetsDir": "<absent>",
         "base": "<absent>",
         "configPath": "./missing.json",
@@ -716,9 +728,16 @@
       },
       "-xyz": {},
       "---x": { "(warnings)": ["Warning: Unknown flag '---x'. Run 'thane --help' to see available options."] },
-      "--app --nope": {},
+      "--app --nope": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."
+        ]
+      },
       "--port --port --nope": {},
-      "--entry --app --zzz": {},
+      "--entry --app --zzz": {
+        "(warnings)": ["Warning: Unknown flag '--zzz'. Run 'thane --help' to see available options."]
+      },
       "--prod --nope --gzip": {
         "gzip": true,
         "prod": true,

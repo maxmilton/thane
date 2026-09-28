@@ -3,12 +3,9 @@
  */
 
 import { basename, join, extname, relative, resolve, sep } from 'node:path';
-import { brotliCompress, constants as zlibConstants } from 'node:zlib';
-import { promisify } from 'node:util';
 import type { Server } from 'bun';
 import { consoleColors, ansi, getContentType, logger } from '../../utils/index.js';
-
-const brotliCompressAsync = promisify(brotliCompress);
+import { compress } from './compression.js';
 
 const promptForPort = async (): Promise<number> => {
   process.stdout.write(`${ansi.yellow}Enter a different port number: ${ansi.reset}`);
@@ -374,24 +371,13 @@ export class DevServer {
       };
 
       if (canCompress) {
-        const brotliQuality = isProd ? 11 : 4;
         headers['Vary'] = 'Accept-Encoding';
         const raw = await Bun.file(filePath).bytes();
+        const encoding = acceptEncoding.includes('br') ? 'br' : acceptEncoding.includes('gzip') ? 'gzip' : null;
 
-        if (acceptEncoding.includes('br')) {
-          headers['Content-Encoding'] = 'br';
-          const compressed = await brotliCompressAsync(raw, {
-            params: {
-              [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
-              [zlibConstants.BROTLI_PARAM_QUALITY]: brotliQuality,
-              [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
-            },
-          });
-          return new Response(compressed, { headers });
-        } else if (acceptEncoding.includes('gzip')) {
-          headers['Content-Encoding'] = 'gzip';
-          const compressed = Bun.gzipSync(raw, { level: 9 });
-          return new Response(compressed, { headers });
+        if (encoding) {
+          headers['Content-Encoding'] = encoding;
+          return new Response(await compress(raw, encoding, isProd), { headers });
         }
       }
 
@@ -438,21 +424,16 @@ export class DevServer {
                 getContentType(requestedUrl),
                 'public, max-age=31536000, immutable',
               );
-            } else if (!hasFileExtension) {
-              return compressAndRespond(indexPath, req, 'text/html', 'no-cache');
             }
-            return new Response('Not Found', { status: 404 });
           }
-          if (!hasFileExtension) {
-            return compressAndRespond(indexPath, req, 'text/html', 'no-cache');
-          }
-          return new Response('Not Found', { status: 404 });
         } catch {
-          if (!hasFileExtension) {
-            return compressAndRespond(indexPath, req, 'text/html', 'no-cache');
-          }
-          return new Response('Not Found', { status: 404 });
+          // Not a readable file: answered below like a missing one
         }
+
+        // Anything that is not a file: a missing asset, or a client route served by index.html
+        return hasFileExtension
+          ? new Response('Not Found', { status: 404 })
+          : compressAndRespond(indexPath, req, 'text/html', 'no-cache');
       },
       websocket: {
         message: (_ws, rawMessage) => {

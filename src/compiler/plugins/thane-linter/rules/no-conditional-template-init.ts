@@ -23,20 +23,14 @@
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
-import { ErrorCode, createWarning } from '../../../errors.js';
-import { FN } from '../../../utils/constants.js';
-
-/** Tag names that cannot appear in conditional initializers */
-const TEMPLATE_TAGS: ReadonlySet<string> = new Set([FN.HTML, FN.CSS]);
+import { ErrorCode } from '../../../errors.js';
+import { TEMPLATE_TAGS, createReporter, isTaggedWith } from './lint-utils.js';
 
 /**
  * Recursively check whether a node contains an html`` or css`` tagged template.
  */
 const containsTemplateTag = (node: ts.Node): boolean => {
-  if (ts.isTaggedTemplateExpression(node)) {
-    const tag = node.tag;
-    if (ts.isIdentifier(tag) && TEMPLATE_TAGS.has(tag.text)) return true;
-  }
+  if (isTaggedWith(node, TEMPLATE_TAGS)) return true;
   let found = false;
   node.forEachChild((child) => {
     if (!found) found = containsTemplateTag(child);
@@ -45,7 +39,12 @@ const containsTemplateTag = (node: ts.Node): boolean => {
 };
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
+  const { diagnostics, report } = createReporter(
+    sourceFile,
+    filePath,
+    ErrorCode.NO_CONDITIONAL_TEMPLATE_INIT,
+    'warning',
+  );
 
   const visit = (node: ts.Node) => {
     if (ts.isVariableDeclaration(node) && node.initializer) {
@@ -54,14 +53,10 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
       // Ternary: const tpl = cond ? html`a` : html`b`
       if (ts.isConditionalExpression(init)) {
         if (containsTemplateTag(init.whenTrue) || containsTemplateTag(init.whenFalse)) {
-          const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-          diagnostics.push(
-            createWarning(
-              'Conditional assignment of tagged templates is not supported. ' +
-                "The compiler cannot determine which template to use at compile time. Use 'whenElse()' instead.",
-              { file: filePath, line: line + 1, column: character + 1 },
-              ErrorCode.NO_CONDITIONAL_TEMPLATE_INIT,
-            ),
+          report(
+            node,
+            'Conditional assignment of tagged templates is not supported. ' +
+              "The compiler cannot determine which template to use at compile time. Use 'whenElse()' instead.",
           );
         }
       }
@@ -74,14 +69,10 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
           init.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
       ) {
         if (containsTemplateTag(init.left) || containsTemplateTag(init.right)) {
-          const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-          diagnostics.push(
-            createWarning(
-              'Logical expression assignment of tagged templates is not supported. ' +
-                "The compiler cannot resolve the template value at compile time. Use 'whenElse()' instead.",
-              { file: filePath, line: line + 1, column: character + 1 },
-              ErrorCode.NO_CONDITIONAL_TEMPLATE_INIT,
-            ),
+          report(
+            node,
+            'Logical expression assignment of tagged templates is not supported. ' +
+              "The compiler cannot resolve the template value at compile time. Use 'whenElse()' instead.",
           );
         }
       }

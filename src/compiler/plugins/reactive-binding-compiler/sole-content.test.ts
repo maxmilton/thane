@@ -3,11 +3,12 @@
  *
  * A row text binding that is the only content of its element is rendered through that
  * element's text node (`textNode`, the element gets the id); otherwise a comment marker is
- * placed before it (`commentMarker`). The decision is made by `analyzeTextBindingContext`
- * (repeat-analysis.ts), which scans the raw row template. The table pins, for each row
+ * placed before it (`commentMarker`). Until TA-7 the decision was made by
+ * `analyzeTextBindingContext`, which scanned the raw row template; since TA-7 it is read from
+ * the parse tree (`soleContentParent`, repeat-analysis.ts). The table pins, for each row
  * template, the processed row template (where the id or marker goes) and each item binding's
- * mode. Rows marked "defect" show today's behaviour where it is wrong; TA-7's parse-tree version
- * changes some of them (see the hand-off note).
+ * mode. Rows marked "defect" show today's behaviour where it is wrong; rows marked "TA-7"
+ * changed with the parse-tree rule (see the TA-7 commits).
  */
 import { describe, expect, test } from 'bun:test';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
@@ -173,25 +174,26 @@ describe('sole content: comment marker', () => {
 describe('sole content: defects pinned as they are', () => {
   table([
     [
-      // The backward scan takes `<img …>` as the parent: the id goes on the void element
-      'defect: a void sibling before is taken as the parent',
+      // Before TA-7 the scan took `<img …>` as the parent and put the text into the void element (H-32)
+      'TA-7: a void sibling before gets a comment marker',
       '<li><img src="x">${item.name}</li>',
-      '<li><img id="i1" src="x">${item$().name}</li>',
-      [['i1', 'text', 'item.name', 'textNode']],
+      '<li><img src="x"><!--i1-->${item$().name}</li>',
+      [['i1', 'text', 'item.name', 'commentMarker']],
     ],
     [
-      // The backward scan takes the comment as the parent tag: text-node mode, but no element gets the id
-      'defect: a comment before is taken as the parent',
+      // Before TA-7 the scan took the comment as the parent tag: text-node mode with no element id (H-32)
+      'TA-7: a comment before gets a comment marker',
       '<li><!-- c -->${item.name}</li>',
-      '<li><!-- c -->${item$().name}</li>',
-      [['i1', 'text', 'item.name', 'textNode']],
+      '<li><!-- c --><!--i1-->${item$().name}</li>',
+      [['i1', 'text', 'item.name', 'commentMarker']],
     ],
     [
-      // Any closing tag ends the forward scan, so the unclosed <p> counts as closed by </li>
-      'an unclosed element closed by its parent counts as closed',
+      // The parser leaves a <p> closed by its parent unclosed, so the parent is <li>, which has a
+      // child element. Before TA-7 the scan accepted </li> as the <p>'s close: a text node on <p>
+      'TA-7: an element closed by its parent holds nothing',
       '<li><p>${item.a}</li>',
-      '<li><p id="i1">${item$().a}</li>',
-      [['i1', 'text', 'item.a', 'textNode']],
+      '<li><p><!--i1-->${item$().a}</li>',
+      [['i1', 'text', 'item.a', 'commentMarker']],
     ],
     [
       // The row-expression regex stops at the first `}`: the expression is cut and `)}` is left as row text
@@ -205,6 +207,48 @@ describe('sole content: defects pinned as they are', () => {
       '<li>${`x${item.a}`}</li>',
       '<li><!--i1-->${`x${item$().a}`}</li>',
       [['i1', 'text', '`x${item.a', 'commentMarker']],
+    ],
+  ]);
+});
+
+// Shapes outside the F0-2 table where the scanner's text heuristics misread the parent's tag,
+// added before TA-7. The parse tree reads the tag correctly: each binding is the sole content.
+describe('sole content: the parent tag as the parser reads it', () => {
+  table([
+    [
+      // Before TA-7 the scan for the end of the open tag stopped at the `>` in the value: comment marker
+      'TA-7: a > in a quoted attribute value of the parent',
+      '<li title="a>b">${item.name}</li>',
+      '<li id="i1" title="a>b">${item$().name}</li>',
+      [['i1', 'text', 'item.name', 'textNode']],
+    ],
+    [
+      'TA-7: a /> in a quoted attribute value of the parent',
+      '<li title="a/>">${item.name}</li>',
+      '<li id="i1" title="a/>">${item$().name}</li>',
+      [['i1', 'text', 'item.name', 'textNode']],
+    ],
+    [
+      // Before TA-7 the backward scan took `<b">` as the parent: no element got the id, and the
+      // build failed in generateStaticRepeatTemplate (THANE202, element path)
+      'TA-7: a < in a quoted attribute value of the parent',
+      '<li title="a<b">${item.name}</li>',
+      '<li id="i1" title="a<b">${item$().name}</li>',
+      [['i1', 'text', 'item.name', 'textNode']],
+    ],
+    [
+      // The same with the < inside an attribute expression; the li's id comes from that binding
+      'TA-7: a < in an attribute expression of the parent',
+      '<li title="${a() < 1}">${item.name}</li>',
+      '<li id="b1" title="${a() < 1}">${item$().name}</li>',
+      [['b1', 'text', 'item.name', 'textNode']],
+    ],
+    [
+      // Before TA-7 the forward scan only accepted `</name>`: comment marker
+      'TA-7: whitespace in the closing tag',
+      '<li>${item.name}</li >',
+      '<li id="i1">${item$().name}</li>',
+      [['i1', 'text', 'item.name', 'textNode']],
     ],
   ]);
 });

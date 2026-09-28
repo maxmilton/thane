@@ -76,9 +76,9 @@ mount(App);
     const js = await buildAndReadJs(source);
     // The fill writes textContent (through the guard variable) and keeps the Text node it
     // created; the guarded update writes the node's nodeValue
-    expect(js).toMatch(/\.textContent\s*=\s*\(?(\w+\s*=\s*)?\w+\.label/);
+    expect(js).toMatch(/\.textContent\s*=\s*\(?([\w$]+\s*=\s*)?[\w$]+\.label/);
     expect(js).toMatch(/\.firstChild/);
-    expect(js).toMatch(/\.nodeValue\s*=\s*\w+/);
+    expect(js).toMatch(/\.nodeValue\s*=\s*[\w$]+/);
   });
 
   test('sole-content leaves the element empty in the template', async () => {
@@ -240,13 +240,13 @@ mount(App);
     // Update path: `if (_m.p !== (_m.p = expr)) write(_m.p)` — the guard (a field on the row's
     // record for lean rows, a closure variable otherwise) is compared with its own
     // reassignment, so an unchanged value never reaches textContent/setAttribute
-    expect(js).toMatch(/([\w.]+)\s*!==\s*\(\1\s*=\s*\w+\.label\)/);
+    expect(js).toMatch(/([\w$.]+)\s*!==\s*\(\1\s*=\s*[\w$]+\.label\)/);
     // (the selection class binding is owned by the list-level subscription, so the row update
     // path no longer recomputes it; its guarded fill is asserted below)
     // Create path: the template already ships class="", so an empty result skips the write
     // (esbuild shortens the strict comparison against a string literal to `!=`; the class
     // write itself goes through className on HTML elements)
-    expect(js).toMatch(/\)\s*!==?\s*""\s*&&\s*\(?\w+\.className\s*=/);
+    expect(js).toMatch(/\)\s*!==?\s*""\s*&&\s*\(?[\w$]+\.className\s*=/);
   });
 });
 
@@ -372,7 +372,7 @@ mount(App);
     // With prefix reuse, the second var should chain off the first via .nextElementSibling
     // not re-navigate from the clone root. Check that the pattern varName.nextElementSibling
     // appears where varName was previously assigned to .firstElementChild
-    const firstElemAssign = rowCode.match(/(\w+)=\w+\.firstElementChild/);
+    const firstElemAssign = rowCode.match(/([\w$]+)=[\w$]+\.firstElementChild/);
     expect(firstElemAssign).toBeTruthy();
     const firstVar = firstElemAssign![1];
     // The second binding should reuse firstVar (e.g., g.nextElementSibling)

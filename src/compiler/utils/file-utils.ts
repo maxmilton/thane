@@ -77,27 +77,21 @@ export const getContentType = (url: string): string => {
  */
 export const createBuildContext = async (): Promise<BuildContext> => {
   const workspaceRoot = process.cwd();
-  const searchDirs = [workspaceRoot];
   const tsFilter = (name: string) => name.endsWith('.ts') && !name.endsWith('.d.ts');
 
-  const tsFiles: string[] = [];
   const componentsByName = new Map<string, ComponentDefinition>();
   const componentsBySelector = new Map<string, ComponentDefinition>();
 
   sourceCache.clear();
 
-  for (const dir of searchDirs) {
-    const files = await collectFilesRecursively(dir, tsFilter);
-    tsFiles.push(...files);
-
-    for (const filePath of files) {
-      const cached = await sourceCache.get(filePath);
-      if (cached) {
-        const definitions = extractComponentDefinitions(cached.sourceFile, filePath);
-        for (const def of definitions) {
-          componentsByName.set(def.name, def);
-          componentsBySelector.set(def.selector, def);
-        }
+  const tsFiles = await collectFilesRecursively(workspaceRoot, tsFilter);
+  for (const filePath of tsFiles) {
+    const cached = await sourceCache.get(filePath);
+    if (cached) {
+      const definitions = extractComponentDefinitions(cached.sourceFile, filePath);
+      for (const def of definitions) {
+        componentsByName.set(def.name, def);
+        componentsBySelector.set(def.selector, def);
       }
     }
   }

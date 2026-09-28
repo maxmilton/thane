@@ -16,7 +16,7 @@ import {
 } from './file-copy.js';
 import { gzipDistFiles } from './compression.js';
 import { DevServer } from './dev-server.js';
-import { printAllFileSizes, printTotalSizes } from './console-reporting.js';
+import { collectFileSizes, printAllFileSizes, printTotalSizes } from './console-reporting.js';
 import { minifySelectorsInHTML } from '../minification/minification.js';
 import { minifyHTML } from '../minification/template-minifier.js';
 
@@ -120,8 +120,9 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     if (useGzip) {
       await gzipDistFiles(distDir, isProd);
     }
-    await printAllFileSizes(fileSizeLog, distDir, useGzip);
-    await printTotalSizes(totalBundleSizeInBytes, fileSizeLog, distDir, useGzip);
+    const sizes = await collectFileSizes(fileSizeLog, distDir, useGzip);
+    printAllFileSizes(sizes);
+    printTotalSizes(totalBundleSizeInBytes, sizes, useGzip);
 
     fileSizeLog.length = 0;
 

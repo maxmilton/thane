@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { __bindIfExpr } from './internal.js';
 import { signal } from './signal.js';
 
@@ -167,5 +169,56 @@ describe('dom-binding remount semantics', () => {
     } finally {
       (globalThis as any).document = originalDocument;
     }
+  });
+});
+
+describe('a branch template with no element', () => {
+  // A whenElse() branch that is only text and starts hidden: its template has no element, so showing
+  // it replaces the placeholder with `null` (the text "null" in a real DOM) and the binding goes
+  // inert. Later toggles must neither throw nor touch the DOM (checked in Chromium on simplify-w0).
+  // Runs in a child process because dom-binding.ts caches its parsing <template> in module state,
+  // which bun shares between test files.
+  test('showing it once leaves the binding inert: later toggles only run the cleanups, without errors', () => {
+    const internalUrl = pathToFileURL(join(dirname(import.meta.path), 'internal.ts')).href;
+    const signalUrl = pathToFileURL(join(dirname(import.meta.path), 'signal.ts')).href;
+    const script = `
+      const replaced = [];
+      const placeholder = { tagName: 'TEMPLATE', replaceWith: (n) => replaced.push(n) };
+      globalThis.document = {
+        createElement: (tag) =>
+          tag === 'template' ? { innerHTML: '', content: { cloneNode: () => ({ firstElementChild: null }) } } : { tagName: tag.toUpperCase() },
+      };
+      const errors = [];
+      globalThis.queueMicrotask = (cb) => { try { cb(); } catch (e) { errors.push(e.message); } };
+      const { __bindIfExpr } = await import(${JSON.stringify(internalUrl)});
+      const { signal } = await import(${JSON.stringify(signalUrl)});
+      const show = signal(false);
+      const inits = [];
+      let cleanups = 0;
+      const root = { querySelector: () => placeholder };
+      const dispose = __bindIfExpr(root, [show], () => show(), 'b1', 'text only', (el) => {
+        inits.push(el);
+        return [() => cleanups++];
+      });
+      show(true);
+      const afterShow = { replaced: replaced.length, inits: inits.length, cleanups };
+      show(false);
+      const afterHide = { cleanups };
+      show(true);
+      show(false);
+      show(true);
+      dispose();
+      console.log(JSON.stringify({ afterShow, afterHide, replaced, inits, cleanups, errors }));
+    `;
+    const run = Bun.spawnSync([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' });
+    const out = run.stdout.toString().trim().split('\n').at(-1) ?? '';
+    expect(JSON.parse(out)).toEqual({
+      afterShow: { replaced: 1, inits: 1, cleanups: 0 },
+      afterHide: { cleanups: 1 },
+      replaced: [null],
+      inits: [null],
+      cleanups: 1,
+      errors: [],
+    });
   });
 });

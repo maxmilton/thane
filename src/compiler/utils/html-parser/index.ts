@@ -14,11 +14,9 @@ export type {
   BindingInfo,
   ParseDiagnostic,
   ParsedTemplate,
-  HtmlEdit,
-  EventBindingDescriptor,
 } from './types.js';
 
-export { VOID_ELEMENTS, decodeHtmlEntities } from './types.js';
+export { VOID_ELEMENTS } from './types.js';
 
 // Parser core
 export { parseHtmlTemplate } from './parser-core.js';
@@ -38,26 +36,10 @@ export {
 export {
   walkElements,
   findElements,
-  findElementsWithAttribute,
   findElementsWithWhenDirective,
   getElementHtml,
-  getElementInnerHtml,
-  getBindingsForElement,
   isInsideSvg,
   attributeDomProperty,
-  isElementInside,
-  applyHtmlEdits,
-  createIdInjectionEdit,
-  createDataAttrEdit,
-  createWhenDirectiveRemovalEdit,
-  createEventBindingRemovalEdit,
-  createSignalReplacementEdits,
-  extractEventBindings,
-  groupBindingsByElement,
-  isPositionInRanges,
-  findElementsNeedingIds,
-  createIdGenerator,
-  normalizeHtmlWhitespace,
   injectIdIntoFirstElement,
   firstElementId,
   escapeTemplateLiteral,

@@ -9,27 +9,12 @@ import type { Diagnostic, DiagnosticSeverity, SourceLocation } from './types.js'
  */
 export enum ErrorCode {
   // Parse errors
-  UNCLOSED_TAG = 'THANE001',
-  INVALID_NESTING = 'THANE002',
-  MALFORMED_ATTRIBUTE = 'THANE003',
-  UNCLOSED_EXPRESSION = 'THANE004',
-  INVALID_DIRECTIVE = 'THANE005',
   PREFIXED_ATTRIBUTE = 'THANE006',
   REPEAT_ROW_ROOT = 'THANE007',
 
-  // Type errors
-  TYPE_ERROR = 'THANE100',
-  MISSING_SIGNAL = 'THANE101',
-  INVALID_COMPONENT = 'THANE102',
-
   // Build errors
   FILE_NOT_FOUND = 'THANE200',
-  BUILD_FAILED = 'THANE201',
   PLUGIN_ERROR = 'THANE202',
-
-  // Runtime errors
-  INVALID_SELECTOR = 'THANE300',
-  DUPLICATE_COMPONENT = 'THANE301',
 
   // Lint rules
   NO_DEFAULT_EXPORT_COMPONENT = 'THANE400',

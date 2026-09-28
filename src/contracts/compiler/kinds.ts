@@ -13,31 +13,12 @@ export const PARSER_STATE = {
 
 export type ParserStateKind = (typeof PARSER_STATE)[keyof typeof PARSER_STATE];
 
-export const PARSER_BINDING_KIND = {
-  TEXT: 'text',
-  STYLE: 'style',
-  ATTR: 'attr',
-  WHEN: 'when',
-  WHEN_ELSE: 'whenElse',
-  REPEAT: 'repeat',
-  EVENT: 'event',
-} as const;
+export type ParserBindingKind = 'text' | 'style' | 'attr' | 'when' | 'whenElse' | 'repeat' | 'event';
 
-export type ParserBindingKind = (typeof PARSER_BINDING_KIND)[keyof typeof PARSER_BINDING_KIND];
+export type ReactiveBindingKind = 'text' | 'style' | 'attr';
 
-export const REACTIVE_BINDING_KIND = {
-  TEXT: 'text',
-  STYLE: 'style',
-  ATTR: 'attr',
-} as const;
-
-export type ReactiveBindingKind = (typeof REACTIVE_BINDING_KIND)[keyof typeof REACTIVE_BINDING_KIND];
-
-export const TEXT_BINDING_MODE = {
+export type TextBindingMode =
   /** Sole content of its element: the row creates the Text node on fill and writes its nodeValue after */
-  TEXT_NODE: 'textNode',
+  | 'textNode'
   /** Mixed content: located through a `<!--id-->` comment marker, writes the following Text node */
-  COMMENT_MARKER: 'commentMarker',
-} as const;
-
-export type TextBindingMode = (typeof TEXT_BINDING_MODE)[keyof typeof TEXT_BINDING_MODE];
+  | 'commentMarker';

@@ -19,84 +19,50 @@ const bindConditional = (
   id: string,
   template: string,
   initNested: (contentEl?: Element) => (() => void)[],
-  subscribe: (update: () => void) => (() => void)[],
-  evalCondition: () => boolean,
+  signals: Signal<any>[],
+  evalCondition: () => unknown,
   anchorEl?: Element | null,
 ): (() => void) => {
-  let cleanups: (() => void)[] = [];
-  let bindingsInitialized = false;
-
   // Use provided anchor element (for repeat-nested conditionals) or scoped lookup within component root
   let currentNode: Element | null = anchorEl || (root as Element).querySelector('#' + id);
   if (!currentNode) return () => {};
-  const initiallyShowing = currentNode.tagName !== 'TEMPLATE';
-
-  const cloneTemplateContent = (): HTMLElement => {
-    const tpl = getTempEl();
-    tpl.innerHTML = template;
-    return (tpl.content.cloneNode(true) as DocumentFragment).firstElementChild as HTMLElement;
-  };
-
-  let contentEl: HTMLElement | null;
-  if (initiallyShowing) {
-    contentEl = currentNode as HTMLElement;
-  } else {
-    contentEl = null;
-  }
-
-  let currentlyShowing = initiallyShowing;
-
-  if (initiallyShowing && contentEl) {
-    bindingsInitialized = true;
-    cleanups = initNested(contentEl);
-  }
-
-  const show = () => {
-    if (currentlyShowing) return;
-    currentlyShowing = true;
-    if (currentNode) {
-      const nextContentEl = cloneTemplateContent();
-      currentNode.replaceWith(nextContentEl);
-      currentNode = nextContentEl;
-      contentEl = nextContentEl;
-      bindingsInitialized = true;
-      cleanups = initNested(nextContentEl);
-    }
-  };
-
-  const hide = () => {
-    if (!currentlyShowing) return;
-    currentlyShowing = false;
-    if (currentNode) {
-      const p = document.createElement('template');
-      p.id = id;
-      currentNode.replaceWith(p);
-      currentNode = p;
-    }
-    // Dispose nested subscriptions so hidden effects don't
-    // fire against detached DOM. Re-initialized on next show().
-    if (bindingsInitialized) {
-      for (let i = 0; i < cleanups.length; i++) cleanups[i]?.();
-      cleanups = [];
-      bindingsInitialized = false;
-    }
-    contentEl = null;
-  };
+  let showing = currentNode.tagName !== 'TEMPLATE';
+  let cleanups: (() => void)[] = showing ? initNested(currentNode) : [];
 
   const update = () => {
     if (evalCondition()) {
-      show();
-    } else {
-      hide();
+      if (showing) return;
+      showing = true;
+      // A branch template with no element (text only) leaves currentNode null; the binding then goes inert
+      if (currentNode) {
+        const tpl = getTempEl();
+        tpl.innerHTML = template;
+        const next = (tpl.content.cloneNode(true) as DocumentFragment).firstElementChild!;
+        currentNode.replaceWith(next);
+        currentNode = next;
+        cleanups = initNested(next);
+      }
+    } else if (showing) {
+      showing = false;
+      if (currentNode) {
+        const p = document.createElement('template');
+        p.id = id;
+        currentNode.replaceWith(p);
+        currentNode = p;
+      }
+      // Dispose nested subscriptions so hidden effects don't
+      // fire against detached DOM. Re-initialized on next show().
+      for (let i = 0; i < cleanups.length; i++) cleanups[i]!();
+      cleanups = [];
     }
   };
 
-  const unsubscribes = subscribe(update);
+  const unsubscribes = signals.map((s) => s.subscribe(update, true));
   update();
 
   return () => {
-    for (let i = 0; i < unsubscribes.length; i++) unsubscribes[i]?.();
-    for (let i = 0; i < cleanups.length; i++) cleanups[i]?.();
+    for (let i = 0; i < unsubscribes.length; i++) unsubscribes[i]!();
+    for (let i = 0; i < cleanups.length; i++) cleanups[i]!();
     cleanups = [];
   };
 };
@@ -108,16 +74,7 @@ export const __bindIf = (
   template: string,
   initNested: (contentEl?: Element) => (() => void)[],
   anchorEl?: Element | null,
-): (() => void) =>
-  bindConditional(
-    root,
-    id,
-    template,
-    initNested,
-    (update) => [signal.subscribe(update, true)],
-    () => Boolean(signal()),
-    anchorEl,
-  );
+): (() => void) => bindConditional(root, id, template, initNested, [signal], signal, anchorEl);
 
 export const __bindIfExpr = (
   root: ComponentRoot,
@@ -127,16 +84,7 @@ export const __bindIfExpr = (
   template: string,
   initNested: (contentEl?: Element) => (() => void)[],
   anchorEl?: Element | null,
-): (() => void) =>
-  bindConditional(
-    root,
-    id,
-    template,
-    initNested,
-    (update) => signals.map((s) => s.subscribe(update, true)),
-    evalExpr,
-    anchorEl,
-  );
+): (() => void) => bindConditional(root, id, template, initNested, signals, evalExpr, anchorEl);
 
 // ─────────────────────────────────────────────────────────────
 //  Keyed Reconciler
@@ -227,6 +175,7 @@ export function createKeyedReconciler<T>(
     return keyMap;
   };
   let scans = 0;
+  /** The row for a key; exposed as `get` so compiled code can update the rows it knows changed. */
   const find = (key: string | number): ManagedItem<T> | undefined => {
     if (keyMap !== null) return keyMap.get(key);
     if (++scans > 4) return keys().get(key);
@@ -236,9 +185,20 @@ export function createKeyedReconciler<T>(
     return undefined;
   };
 
-  const removeItem = (managed: ManagedItem<T>) => {
+  const adopt = (managed: ManagedItem<T>, key: string | number, i: number): ManagedItem<T> => {
+    managed.key = key;
+    if (trackIndex) managed.i = i;
+    if (keyMap !== null) keyMap.set(key, managed);
+    return managed;
+  };
+
+  const runCleanups = (managed: ManagedItem<T>) => {
     const cleanups = managed.cleanups;
     for (let i = 0, len = cleanups.length; i < len; i++) cleanups[i]!();
+  };
+
+  const removeItem = (managed: ManagedItem<T>) => {
+    runCleanups(managed);
     managed.el.remove();
   };
 
@@ -246,10 +206,7 @@ export function createKeyedReconciler<T>(
     const len = managedItems.length;
     if (len === 0) return;
     // Run cleanups (subscriptions, nested reconcilers) before clearing DOM
-    for (let i = 0; i < len; i++) {
-      const cleanups = managedItems[i]!.cleanups;
-      for (let j = 0, clen = cleanups.length; j < clen; j++) cleanups[j]!();
-    }
+    for (let i = 0; i < len; i++) runCleanups(managedItems[i]!);
     const anchorParent = anchor.parentNode;
     if (anchorParent) {
       anchor.remove();
@@ -294,12 +251,7 @@ export function createKeyedReconciler<T>(
         let el = rows.firstElementChild!;
         for (let k = 0; k < size; k++, i++) {
           const item = items[i]!;
-          const managed = bind(el, item, i);
-          const key = keyFn(item, i);
-          managed.key = key;
-          if (trackIndex) managed.i = i;
-          managedItems[write++] = managed;
-          if (keyMap !== null) keyMap.set(key, managed);
+          managedItems[write++] = adopt(bind(el, item, i), keyFn(item, i), i);
           el = el.nextElementSibling!;
         }
         container.insertBefore(rows, anchor);
@@ -308,15 +260,22 @@ export function createKeyedReconciler<T>(
 
     for (; i < end; i++) {
       const item = items[i]!;
-      const managed = createItemFn(item, i, anchor);
-      const key = keyFn(item, i);
-      managed.key = key;
-      if (trackIndex) managed.i = i;
-      managedItems[write++] = managed;
-      if (keyMap !== null) keyMap.set(key, managed);
+      managedItems[write++] = adopt(createItemFn(item, i, anchor), keyFn(item, i), i);
     }
 
     if (parent) parent.insertBefore(container, containerNextSibling);
+  };
+
+  const applyOrder = (next: ManagedItem<T>[], currentEl: Element | null) => {
+    const len = next.length;
+    for (let i = 0; i < len; i++) {
+      const wanted = next[i]!.el;
+      if (wanted === currentEl) currentEl = currentEl.nextElementSibling || null;
+      else container.insertBefore(wanted, currentEl);
+    }
+    managedItems.length = len;
+    for (let i = 0; i < len; i++) managedItems[i] = next[i]!;
+    if (trackIndex) syncIndexes();
   };
 
   const reconcile = (newItems: T[]) => {
@@ -402,10 +361,8 @@ export function createKeyedReconciler<T>(
         updateRow(managed, newItem, inPlace);
       }
       if (inPlace === newLength) return;
-    }
 
-    // Fast path: reorder with same keys (fused allKeysExist + update in single pass)
-    if (oldLength === newLength) {
+      // Fast path: reorder with same keys (fused allKeysExist + update in single pass)
       let allKeysExist = true;
       let mismatchCount = 0,
         mismatch1 = -1,
@@ -422,12 +379,12 @@ export function createKeyedReconciler<T>(
           allKeysExist = false;
           break;
         }
+        if (mismatchCount > 2) continue;
         if (existing.value !== newItem) updateRow(existing, newItem, i);
         if (managed !== existing) {
           mismatchCount++;
           if (mismatchCount === 1) mismatch1 = i;
           else if (mismatchCount === 2) mismatch2 = i;
-          if (mismatchCount > 2) break;
         }
       }
 
@@ -460,22 +417,11 @@ export function createKeyedReconciler<T>(
         const newManagedItems: ManagedItem<T>[] = new Array(newLength);
         const byKey = keys();
         for (let i = 0; i < newLength; i++) newManagedItems[i] = byKey.get(keyFn(newItems[i]!, i))!;
-
-        let currentEl: Element | null = managedItems[0]?.el || null;
-        for (let i = 0; i < newLength; i++) {
-          const wanted = newManagedItems[i]!.el;
-          if (wanted === currentEl) currentEl = currentEl?.nextElementSibling || null;
-          else container.insertBefore(wanted, currentEl);
-        }
-        managedItems.length = newLength;
-        for (let i = 0; i < newLength; i++) managedItems[i] = newManagedItems[i]!;
-        if (trackIndex) syncIndexes();
+        applyOrder(newManagedItems, managedItems[0]?.el || null);
         return;
       }
-    }
 
-    // Fast path: complete replacement (first and last keys both new)
-    if (oldLength > 0 && oldLength === newLength) {
+      // Fast path: complete replacement (first and last keys both new)
       const firstNewKey = keyFn(newItems[0]!, 0);
       if (find(firstNewKey) === undefined) {
         const lastNewKey = keyFn(newItems[newLength - 1]!, newLength - 1);
@@ -513,32 +459,16 @@ export function createKeyedReconciler<T>(
         newManagedItems.push(existing);
       } else {
         const refNode = i < managedItems.length ? managedItems[i]!.el : anchor;
-        const managed = createItemFn(newItem, i, refNode);
-        managed.key = key;
-        if (trackIndex) managed.i = i;
-        if (keyMap !== null) keyMap.set(key, managed);
-        newManagedItems.push(managed);
+        newManagedItems.push(adopt(createItemFn(newItem, i, refNode), key, i));
       }
     }
 
-    let currentEl: Element | null =
-      newManagedItems[0]?.el.previousElementSibling?.nextElementSibling || container.firstElementChild;
-    for (let i = 0; i < newLength; i++) {
-      const wanted = newManagedItems[i]!.el;
-      if (wanted === currentEl) currentEl = currentEl?.nextElementSibling || null;
-      else container.insertBefore(wanted, currentEl);
-    }
-    managedItems.length = newLength;
-    for (let i = 0; i < newLength; i++) managedItems[i] = newManagedItems[i]!;
-    if (trackIndex) syncIndexes();
+    // Not newManagedItems[0].el: a row whose root a when() replaced is outside the container
+    applyOrder(
+      newManagedItems,
+      newManagedItems[0]?.el.previousElementSibling?.nextElementSibling || container.firstElementChild,
+    );
   };
 
-  /**
-   * The managed row for a key, or undefined when no row has that key. Lets compiled code
-   * that knows which keys changed (for example a selection driven by one signal) update
-   * those rows directly instead of fanning a subscription out to every row.
-   */
-  const get = (key: string | number): ManagedItem<T> | undefined => find(key);
-
-  return { reconcile, clearAll, get };
+  return { reconcile, clearAll, get: find };
 }

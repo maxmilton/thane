@@ -9,8 +9,6 @@ export interface CLIOptions {
   prod: boolean;
   /** Enable gzip/brotli compression */
   gzip: boolean;
-  /** Application name */
-  app: string;
   /** Entry point file */
   entry?: string | undefined;
   /** Output directory */
@@ -69,8 +67,6 @@ export interface ThaneBuildOptions {
   prod?: boolean | undefined;
   /** Enable gzip compression */
   gzip?: boolean | undefined;
-  /** Application name */
-  app?: string | undefined;
   /** Entry point file */
   entry?: string | undefined;
   /** Output directory */

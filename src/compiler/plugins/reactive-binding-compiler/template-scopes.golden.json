@@ -1,0 +1,674 @@
+{
+  "component: events come before other bindings in the markup": {
+    "processedContent": "<div><button id=\"b3\">Go</button><span id=\"b0\" title=\"\"><!--b1--> <!----></span><input id=\"b2\"></div>",
+    "bindings": [
+      {
+        "id": "b0",
+        "signalName": "t",
+        "type": "attr",
+        "property": "title",
+        "isInsideConditional": false
+      },
+      {
+        "id": "b1",
+        "signalName": "n",
+        "type": "text",
+        "isInsideConditional": false
+      },
+      {
+        "id": "b2",
+        "signalName": "c",
+        "type": "attr",
+        "property": "checked",
+        "domProperty": "checked",
+        "isInsideConditional": false
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [
+      {
+        "id": "e0",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "go",
+        "elementId": "b3",
+        "startIndex": 13,
+        "endIndex": 25
+      },
+      {
+        "id": "e1",
+        "eventName": "change",
+        "modifiers": [],
+        "handlerExpression": "ch",
+        "elementId": "b2",
+        "startIndex": 91,
+        "endIndex": 104
+      }
+    ],
+    "nextId": 4,
+    "hasConditionals": false
+  },
+  "component: event on an element with its own id, and with an empty id": {
+    "processedContent": "<button id=\"save\">S</button><button id=\"\">D</button><p><!--b0--> <!----></p>",
+    "bindings": [
+      {
+        "id": "b0",
+        "signalName": "n",
+        "type": "text",
+        "isInsideConditional": false
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [
+      {
+        "id": "e0",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "s",
+        "elementId": "save",
+        "startIndex": 18,
+        "endIndex": 29
+      },
+      {
+        "id": "e1",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "d",
+        "elementId": "",
+        "startIndex": 54,
+        "endIndex": 65
+      }
+    ],
+    "nextId": 1,
+    "hasConditionals": false
+  },
+  "component: an event attribute without a name": {
+    "processedContent": "<button @=${f}>x</button><i><!--b0--> <!----></i>",
+    "bindings": [
+      {
+        "id": "b0",
+        "signalName": "n",
+        "type": "text",
+        "isInsideConditional": false
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [],
+    "nextId": 1,
+    "hasConditionals": false
+  },
+  "component: pre-rendered when() with property-bound attributes, on a void element and inside": {
+    "processedContent": "<div><input id=\"b0\" checked=${c()} checked><p id=\"b1\"><input id=\"b2\"></p></div>",
+    "bindings": [
+      {
+        "id": "b2",
+        "signalName": "v",
+        "type": "attr",
+        "property": "value",
+        "domProperty": "value",
+        "isInsideConditional": true,
+        "conditionalId": "b1"
+      }
+    ],
+    "conditionals": [
+      {
+        "id": "b0",
+        "signalName": "s",
+        "signalNames": ["s"],
+        "jsExpression": "s()",
+        "initialValue": true,
+        "startIndex": 5,
+        "endIndex": 48,
+        "templateContent": "<input id=\"b0\" checked=${c()} checked>",
+        "nestedBindings": [],
+        "nestedConditionals": [],
+        "nestedWhenElse": [],
+        "nestedRepeats": [],
+        "nestedEventBindings": []
+      },
+      {
+        "id": "b1",
+        "signalName": "s",
+        "signalNames": ["s"],
+        "jsExpression": "s()",
+        "initialValue": true,
+        "startIndex": 48,
+        "endIndex": 88,
+        "templateContent": "<p id=\"b1\"><input id=\"b2\"></p>",
+        "nestedBindings": [
+          {
+            "id": "b2",
+            "signalName": "v",
+            "type": "attr",
+            "property": "value",
+            "domProperty": "value",
+            "isInsideConditional": true,
+            "conditionalId": "b1"
+          }
+        ],
+        "nestedConditionals": [],
+        "nestedWhenElse": [],
+        "nestedRepeats": [],
+        "nestedEventBindings": []
+      }
+    ],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [],
+    "nextId": 3,
+    "hasConditionals": true
+  },
+  "component: pre-rendered when() on a non-void element with a duplicated property-bound attribute": {
+    "processedContent": "<div><button id=\"b0\">B</button><b><!--b1--> <!----></b></div>",
+    "bindings": [
+      {
+        "id": "b0",
+        "signalName": "d",
+        "type": "attr",
+        "property": "disabled",
+        "domProperty": "disabled",
+        "isInsideConditional": true,
+        "conditionalId": "b0"
+      },
+      {
+        "id": "b1",
+        "signalName": "n",
+        "type": "text",
+        "isInsideConditional": false
+      }
+    ],
+    "conditionals": [
+      {
+        "id": "b0",
+        "signalName": "s",
+        "signalNames": ["s"],
+        "jsExpression": "s()",
+        "initialValue": true,
+        "startIndex": 5,
+        "endIndex": 61,
+        "templateContent": "<button id=\"b0\" disabled=\"false\">B</button>",
+        "nestedBindings": [
+          {
+            "id": "b0",
+            "signalName": "d",
+            "type": "attr",
+            "property": "disabled",
+            "domProperty": "disabled",
+            "isInsideConditional": true,
+            "conditionalId": "b0"
+          }
+        ],
+        "nestedConditionals": [],
+        "nestedWhenElse": [],
+        "nestedRepeats": [],
+        "nestedEventBindings": []
+      }
+    ],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [],
+    "nextId": 2,
+    "hasConditionals": true
+  },
+  "component: whenElse with events, a repeat with row events, then more bindings": {
+    "processedContent": "<section><p id=\"b0\"><!--b2--> <!----></p><template id=\"b1\"></template><ul><template id=\"b3\"></template></ul><em id=\"b7\"><!--b6--> <!----></em></section>",
+    "bindings": [
+      {
+        "id": "b6",
+        "signalName": "m",
+        "type": "text",
+        "isInsideConditional": false
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [
+      {
+        "thenId": "b0",
+        "elseId": "b1",
+        "signalName": "f",
+        "signalNames": ["f"],
+        "jsExpression": "f()",
+        "initialValue": true,
+        "thenTemplate": "<p id=\"b0\"><!--b2--> <!----></p>",
+        "elseTemplate": "<p>else</p>",
+        "startIndex": 9,
+        "endIndex": 77,
+        "thenBindings": [
+          {
+            "id": "b2",
+            "signalName": "n",
+            "type": "text",
+            "isInsideConditional": true,
+            "conditionalId": "b0"
+          }
+        ],
+        "elseBindings": [],
+        "thenRepeats": [],
+        "elseRepeats": [],
+        "thenEventBindings": [
+          {
+            "id": "e0",
+            "eventName": "click",
+            "modifiers": [],
+            "handlerExpression": "a",
+            "elementId": "b0",
+            "startIndex": 3,
+            "endIndex": 14
+          }
+        ],
+        "elseEventBindings": [],
+        "thenConditionals": [],
+        "elseConditionals": [],
+        "thenWhenElse": [],
+        "elseWhenElse": []
+      }
+    ],
+    "repeatBlocks": [
+      {
+        "id": "b3",
+        "signalName": "items",
+        "signalNames": ["items"],
+        "itemsExpression": "items()",
+        "itemVar": "it",
+        "itemTemplate": "<li id=\"b4\">${it$().name}</li>",
+        "startIndex": 81,
+        "endIndex": 159,
+        "itemBindings": [
+          {
+            "elementId": "b4",
+            "type": "text",
+            "expression": "it.name",
+            "textBindingMode": "textNode"
+          }
+        ],
+        "itemEvents": [
+          {
+            "eventId": "ie0",
+            "elementId": "b4",
+            "eventName": "click",
+            "modifiers": [],
+            "handlerExpression": "() => pick(it)"
+          }
+        ],
+        "signalBindings": [],
+        "nestedConditionals": [],
+        "nestedWhenElse": [],
+        "nestedRepeats": [],
+        "rowSignalVars": []
+      }
+    ],
+    "eventBindings": [
+      {
+        "id": "e1",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "z",
+        "elementId": "b7",
+        "startIndex": 168,
+        "endIndex": 179
+      }
+    ],
+    "nextId": 8,
+    "hasConditionals": true
+  },
+  "component: nested when() with events and attributes": {
+    "processedContent": "<div id=\"b0\"><template id=\"b1\"></template><i id=\"b3\" title=\"\">x</i></div><b><!--b4--> <!----></b>",
+    "bindings": [
+      {
+        "id": "b3",
+        "signalName": "t",
+        "type": "attr",
+        "property": "title",
+        "isInsideConditional": true,
+        "conditionalId": "b0"
+      },
+      {
+        "id": "b4",
+        "signalName": "n",
+        "type": "text",
+        "isInsideConditional": false
+      }
+    ],
+    "conditionals": [
+      {
+        "id": "b0",
+        "signalName": "a",
+        "signalNames": ["a"],
+        "jsExpression": "a()",
+        "initialValue": true,
+        "startIndex": 0,
+        "endIndex": 101,
+        "templateContent": "<div id=\"b0\"><template id=\"b1\"></template><i id=\"b3\" title=\"\">x</i></div>",
+        "nestedBindings": [
+          {
+            "id": "b3",
+            "signalName": "t",
+            "type": "attr",
+            "property": "title",
+            "isInsideConditional": true,
+            "conditionalId": "b0"
+          }
+        ],
+        "nestedConditionals": [
+          {
+            "id": "b1",
+            "signalName": "b",
+            "signalNames": ["b"],
+            "jsExpression": "b()",
+            "initialValue": false,
+            "startIndex": 6,
+            "endIndex": 50,
+            "templateContent": "<span id=\"b1\"><!--b2--> <!----></span>",
+            "nestedBindings": [
+              {
+                "id": "b2",
+                "signalName": "n",
+                "type": "text",
+                "isInsideConditional": true,
+                "conditionalId": "b1"
+              }
+            ],
+            "nestedConditionals": [],
+            "nestedWhenElse": [],
+            "nestedRepeats": [],
+            "nestedEventBindings": [
+              {
+                "id": "e0",
+                "eventName": "click",
+                "modifiers": [],
+                "handlerExpression": "h",
+                "elementId": "b1",
+                "startIndex": 7,
+                "endIndex": 18
+              }
+            ]
+          }
+        ],
+        "nestedWhenElse": [],
+        "nestedRepeats": [],
+        "nestedEventBindings": [
+          {
+            "id": "e1",
+            "eventName": "click",
+            "modifiers": [],
+            "handlerExpression": "k",
+            "elementId": "b3",
+            "startIndex": 66,
+            "endIndex": 77
+          }
+        ]
+      }
+    ],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [],
+    "nextId": 5,
+    "hasConditionals": true
+  },
+  "component: expression bindings and unquoted attribute values": {
+    "processedContent": "<a id=\"b0\" href=\"\" class=\"\" style=\"width: \"><!--b1--> <!----></a><img id=\"b2\" src=\"\" alt=\"\">",
+    "bindings": [
+      {
+        "id": "b0",
+        "signalName": "url",
+        "type": "attr",
+        "property": "href",
+        "isInsideConditional": false
+      },
+      {
+        "id": "b0",
+        "signalNames": ["k"],
+        "expression": "`x ${k()}`",
+        "type": "attr",
+        "property": "class",
+        "domProperty": "className",
+        "isInsideConditional": false
+      },
+      {
+        "id": "b0",
+        "signalNames": ["w"],
+        "expression": "`${w()}px`",
+        "type": "style",
+        "property": "width",
+        "isInsideConditional": false
+      },
+      {
+        "id": "b1",
+        "signalNames": ["n"],
+        "expression": "n() + 1",
+        "type": "text",
+        "isInsideConditional": false
+      },
+      {
+        "id": "b2",
+        "signalNames": [],
+        "expression": "p.src",
+        "type": "attr",
+        "property": "src",
+        "isInsideConditional": false
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [
+      {
+        "id": "e0",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "go",
+        "elementId": "b0",
+        "startIndex": 58,
+        "endIndex": 70
+      }
+    ],
+    "nextId": 3,
+    "hasConditionals": false
+  },
+  "sub: the first root element takes the parent id": {
+    "processedContent": "<div id=\"parent\"><span><!--b0--> <!----></span><b id=\"b1\" title=\"\">x</b></div>",
+    "bindings": [
+      {
+        "id": "b0",
+        "signalName": "n",
+        "type": "text",
+        "isInsideConditional": true,
+        "conditionalId": "parent"
+      },
+      {
+        "id": "b1",
+        "signalName": "t",
+        "type": "attr",
+        "property": "title",
+        "isInsideConditional": true,
+        "conditionalId": "parent"
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [
+      {
+        "id": "e0",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "a",
+        "elementId": "parent",
+        "startIndex": 5,
+        "endIndex": 16
+      },
+      {
+        "id": "e1",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "b",
+        "elementId": "b1",
+        "startIndex": 52,
+        "endIndex": 63
+      }
+    ],
+    "nextId": 2
+  },
+  "sub: first root with its own id, events in document order": {
+    "processedContent": "<div id=\"parent\" id=\"own\" title=\"\"><button id=\"b0\">A</button><button id=\"b1\" id=\"\">B</button></div>",
+    "bindings": [
+      {
+        "id": "parent",
+        "signalName": "t",
+        "type": "attr",
+        "property": "title",
+        "isInsideConditional": true,
+        "conditionalId": "parent"
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [
+      {
+        "id": "e0",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "a",
+        "elementId": "b0",
+        "startIndex": 35,
+        "endIndex": 46
+      },
+      {
+        "id": "e1",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "b",
+        "elementId": "b1",
+        "startIndex": 71,
+        "endIndex": 82
+      }
+    ],
+    "nextId": 2
+  },
+  "sub: an event attribute without a name": {
+    "processedContent": "<div><i id=\"b0\" @=${f}>x</i><!--b1--> <!----></div>",
+    "bindings": [
+      {
+        "id": "b1",
+        "signalName": "n",
+        "type": "text",
+        "isInsideConditional": true,
+        "conditionalId": "parent"
+      }
+    ],
+    "conditionals": [],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [],
+    "nextId": 2
+  },
+  "sub: nested whenElse and when() with events": {
+    "processedContent": "<div><template id=\"b2\"></template><p id=\"b3\"><!--b5--> <!----></p><em id=\"b0\"><!--b1--> <!----></em><u id=\"b6\">u</u></div>",
+    "bindings": [],
+    "conditionals": [
+      {
+        "id": "b0",
+        "signalName": "g",
+        "signalNames": ["g"],
+        "jsExpression": "g()",
+        "initialValue": true,
+        "startIndex": 75,
+        "endIndex": 115,
+        "templateContent": "<em id=\"b0\"><!--b1--> <!----></em>",
+        "nestedBindings": [
+          {
+            "id": "b1",
+            "signalName": "m",
+            "type": "text",
+            "isInsideConditional": true,
+            "conditionalId": "b0"
+          }
+        ],
+        "nestedConditionals": [],
+        "nestedWhenElse": [],
+        "nestedRepeats": [],
+        "nestedEventBindings": [
+          {
+            "id": "e0",
+            "eventName": "click",
+            "modifiers": [],
+            "handlerExpression": "z",
+            "elementId": "b0",
+            "startIndex": 5,
+            "endIndex": 16
+          }
+        ]
+      }
+    ],
+    "whenElseBlocks": [
+      {
+        "thenId": "b2",
+        "elseId": "b3",
+        "signalName": "f",
+        "signalNames": ["f"],
+        "jsExpression": "f()",
+        "initialValue": false,
+        "thenTemplate": "<p id=\"b2\"><!--b4--> <!----></p>",
+        "elseTemplate": "<p><!--b5--> <!----></p>",
+        "startIndex": 5,
+        "endIndex": 75,
+        "thenBindings": [
+          {
+            "id": "b4",
+            "signalName": "n",
+            "type": "text",
+            "isInsideConditional": true,
+            "conditionalId": "b2"
+          }
+        ],
+        "elseBindings": [
+          {
+            "id": "b5",
+            "signalName": "m",
+            "type": "text",
+            "isInsideConditional": true,
+            "conditionalId": "b3"
+          }
+        ],
+        "thenRepeats": [],
+        "elseRepeats": [],
+        "thenEventBindings": [
+          {
+            "id": "e1",
+            "eventName": "click",
+            "modifiers": [],
+            "handlerExpression": "a",
+            "elementId": "b2",
+            "startIndex": 3,
+            "endIndex": 14
+          }
+        ],
+        "elseEventBindings": [],
+        "thenConditionals": [],
+        "elseConditionals": [],
+        "thenWhenElse": [],
+        "elseWhenElse": []
+      }
+    ],
+    "repeatBlocks": [],
+    "eventBindings": [
+      {
+        "id": "e2",
+        "eventName": "click",
+        "modifiers": [],
+        "handlerExpression": "y",
+        "elementId": "b6",
+        "startIndex": 118,
+        "endIndex": 129
+      }
+    ],
+    "nextId": 7
+  }
+}

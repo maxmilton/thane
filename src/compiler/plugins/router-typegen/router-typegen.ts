@@ -133,43 +133,21 @@ const resolveImportedSourceFile = async (specifier: string, importerPath: string
   return null;
 };
 
-const resolveSelectorFromSource = async (
-  sourcePath: string,
-  exportName?: string | undefined,
+/** The selector of the component `exportName` names in the imported file, or of its last component. */
+const resolveSelector = async (
+  specifier: string,
+  exportName: string | undefined,
+  routesFilePath: string,
 ): Promise<string | null> => {
-  const cached = await sourceCache.get(sourcePath);
-  if (!cached) {
+  const sourcePath = await resolveImportedSourceFile(specifier, routesFilePath);
+  const cached = sourcePath ? await sourceCache.get(sourcePath) : null;
+  if (!sourcePath || !cached) {
     return null;
   }
 
   const definitions = extractComponentDefinitions(cached.sourceFile, sourcePath);
-  if (exportName) {
-    return definitions.find((definition) => definition.name === exportName)?.selector ?? null;
-  }
-
-  if (definitions.length === 1) {
-    return definitions[0]?.selector ?? null;
-  }
-
-  return definitions[definitions.length - 1]?.selector ?? null;
-};
-
-const resolveSelectorFromImport = async (binding: ImportBinding, routesFilePath: string): Promise<string | null> => {
-  const sourcePath = await resolveImportedSourceFile(binding.moduleSpecifier, routesFilePath);
-  if (!sourcePath) {
-    return null;
-  }
-
-  return resolveSelectorFromSource(sourcePath, binding.importedName);
-};
-
-const resolveSelectorFromLazyImport = async (info: LazyImportInfo, routesFilePath: string): Promise<string | null> => {
-  const sourcePath = await resolveImportedSourceFile(info.importPath, routesFilePath);
-  if (!sourcePath) {
-    return null;
-  }
-
-  return resolveSelectorFromSource(sourcePath, info.exportName);
+  const definition = exportName ? definitions.find((d) => d.name === exportName) : definitions.at(-1);
+  return definition?.selector ?? null;
 };
 
 const getRouteComponentSelector = async (
@@ -181,12 +159,12 @@ const getRouteComponentSelector = async (
 
   if (ts.isIdentifier(initializer)) {
     const binding = importBindings.get(initializer.text);
-    return binding ? resolveSelectorFromImport(binding, routesFilePath) : null;
+    return binding ? resolveSelector(binding.moduleSpecifier, binding.importedName, routesFilePath) : null;
   }
 
   if (ts.isArrowFunction(initializer)) {
     const importInfo = extractImportPathFromArrow(initializer);
-    return importInfo ? resolveSelectorFromLazyImport(importInfo, routesFilePath) : null;
+    return importInfo ? resolveSelector(importInfo.importPath, importInfo.exportName, routesFilePath) : null;
   }
 
   return null;
@@ -300,10 +278,10 @@ const collectRouteTyping = async (
 
   const importBindings = collectImportBindings(cached.sourceFile);
   const routePaths = new Set<string>();
-  const selectorMap = new Map<string, string>();
+  const routeComponents: Array<[routeKey: string, routeProp: ts.PropertyAssignment]> = [];
   let foundRoutes = false;
 
-  const visit = async (node: ts.Node): Promise<void> => {
+  const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'defineRoutes') {
       const [firstArg] = node.arguments;
       if (firstArg && ts.isObjectLiteralExpression(firstArg)) {
@@ -327,25 +305,25 @@ const collectRouteTyping = async (
             const routePropName = getPropertyNameText(routeProp.name);
             if (!routePropName || !ROUTE_COMPONENT_PROPS.has(routePropName)) continue;
 
-            const selector = await getRouteComponentSelector(routeProp, importBindings, routesFilePath);
-            if (selector) {
-              selectorMap.set(selector, routeKey);
-            }
+            routeComponents.push([routeKey, routeProp]);
           }
         }
       }
     }
 
-    const childVisits: Promise<void>[] = [];
-    ts.forEachChild(node, (child) => {
-      childVisits.push(visit(child));
-    });
-    if (childVisits.length > 0) {
-      await Promise.all(childVisits);
-    }
+    ts.forEachChild(node, visit);
   };
 
-  await visit(cached.sourceFile);
+  visit(cached.sourceFile);
+
+  // Resolved in source order: a selector that several routes use maps to the last of them
+  const selectorMap = new Map<string, string>();
+  for (const [routeKey, routeProp] of routeComponents) {
+    const selector = await getRouteComponentSelector(routeProp, importBindings, routesFilePath);
+    if (selector) {
+      selectorMap.set(selector, routeKey);
+    }
+  }
   return foundRoutes ? { routePaths, selectorMap } : null;
 };
 
@@ -355,10 +333,11 @@ const collectRouteTyping = async (
  * generated types into another.
  */
 export const syncProjectTypes = async (projectRoot: string = process.cwd()): Promise<number> => {
-  const tsFiles = await collectFilesRecursively(
-    projectRoot,
-    (fileName) => fileName.endsWith('.ts') && !fileName.endsWith('.d.ts'),
-  );
+  const isTsSource = (fileName: string): boolean => fileName.endsWith('.ts') && !fileName.endsWith('.d.ts');
+  const isLegacy = (filePath: string): boolean => path.basename(filePath) === '__thane-router.generated.d.ts';
+  const projectFiles = await collectFilesRecursively(projectRoot, (name) => isTsSource(name) || isLegacy(name));
+  const tsFiles = projectFiles.filter(isTsSource);
+  const legacyGeneratedFiles = projectFiles.filter(isLegacy);
   const generatedRoot = path.join(projectRoot, GENERATED_ROOT_DIR);
   const generatedFiles = (await fs
     .stat(generatedRoot)
@@ -366,10 +345,6 @@ export const syncProjectTypes = async (projectRoot: string = process.cwd()): Pro
     .catch(() => false))
     ? await collectFilesRecursively(generatedRoot, (fileName) => fileName.endsWith('.d.ts'))
     : [];
-  const legacyGeneratedFiles = await collectFilesRecursively(
-    projectRoot,
-    (fileName) => fileName === '__thane-router.generated.d.ts',
-  );
   const nextGeneratedFiles = new Set<string>();
   const projectConfigPaths = new Set<string>();
   const clientTypesContent = await readClientTypesTemplate();
@@ -434,5 +409,3 @@ export const ProjectTypesSyncPlugin = (projectRoot?: string): Plugin => ({
     });
   },
 });
-
-export const RouterTypegenPlugin = ProjectTypesSyncPlugin;

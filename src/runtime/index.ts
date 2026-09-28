@@ -100,7 +100,6 @@ export type {
 /** Escape HTML-significant chars in interpolated values. */
 const _esc = (val: unknown): string => {
   const s = String(val);
-  if (s.length === 0) return s;
   if (!/[&<>"']/.test(s)) return s;
   return s
     .replace(/&/g, '&amp;')

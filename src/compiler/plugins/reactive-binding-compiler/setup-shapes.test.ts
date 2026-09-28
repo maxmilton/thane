@@ -122,10 +122,10 @@ describe('setup shapes: parenthesised bodies', () => {
     );
   });
 
-  test('parenthesised twice with styles: full and styles called, but never imported (defect)', async () => {
-    // The early styles walk (index.ts L557-602) only looks through one level of parentheses; the
-    // strip pass unwraps any number. The result calls a function the module does not import:
-    // `ReferenceError: __enableComponentStyles is not defined` at runtime.
+  test('parenthesised twice with styles: full, styles called and imported (H-33)', async () => {
+    // Before CE-3 the import came from an early styles walk that looked through one level of
+    // parentheses only, while the call followed the strip pass, which unwraps any number: the
+    // module called `__enableComponentStyles` without importing it (ReferenceError at mount).
     const r = await compile(`export const App = defineComponent(() => (({
   template: html\`<p>a</p>\`,
   styles: css\`p { color: red; }\`,
@@ -133,7 +133,7 @@ describe('setup shapes: parenthesised bodies', () => {
     expect(r.registration).toBe(
       ['var App = __registerComponent("app", () => ({', '  styles: `p { color: red; }`', '}), __tpl);'].join('\n'),
     );
-    expect([r.stylesCall, r.stylesImported]).toEqual([true, false]);
+    expect([r.stylesCall, r.stylesImported]).toEqual([true, true]);
   });
 
   test('parenthesised once with styles: full, styles called and imported', async () => {
@@ -230,7 +230,8 @@ describe('setup shapes: several return statements and nested functions', () => {
 });`);
     expect(r.registration.startsWith('var App = __registerComponentLean("app", () => {')).toBe(true);
     expect(r.registration).toContain('return { template: ``, styles: `p { color: red; }` };');
-    // The early walk imported __enableComponentStyles; with no call, esbuild drops it
+    // Detection reads the first return only (before CE-3 an early walk imported
+    // __enableComponentStyles anyway, and esbuild dropped the unused import)
     expect([r.stylesCall, r.stylesImported]).toEqual([false, false]);
   });
 

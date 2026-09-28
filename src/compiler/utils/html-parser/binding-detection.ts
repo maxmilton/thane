@@ -9,6 +9,7 @@ import ts from 'typescript';
 import { WHEN_ELSE_REGEX, REPEAT_REGEX, SIGNAL_EXPR_REGEX } from './types.js';
 import { logger } from '../logger.js';
 import { parseArrowFunction } from '../ast-utils.js';
+import { ErrorCode } from '../../errors.js';
 
 /**
  * Shared argument parser for both whenElse and repeat expressions.
@@ -226,58 +227,52 @@ export function stripTemplateExpressions(value: string): string {
   return out + value.slice(last);
 }
 
+/**
+ * End (exclusive) of the `${…}` that starts at `start`, or -1 when it is not closed. Nested braces
+ * and template literals (with their own `${…}`) are skipped; quotes are not.
+ */
+function templateExpressionEnd(value: string, start: number): number {
+  let braceDepth = 1;
+  let inBacktick = false;
+  let templateBraceDepth = 0;
+  for (let i = start + 2; i < value.length; i++) {
+    const ch = value[i];
+    if (inBacktick) {
+      if (ch === '`' && templateBraceDepth === 0) {
+        inBacktick = false;
+      } else if (ch === '$' && value[i + 1] === '{') {
+        templateBraceDepth++;
+        i++;
+      } else if (ch === '}' && templateBraceDepth > 0) {
+        templateBraceDepth--;
+      }
+    } else if (ch === '`') {
+      inBacktick = true;
+    } else if (ch === '{') {
+      braceDepth++;
+    } else if (ch === '}' && --braceDepth === 0) {
+      return i + 1;
+    }
+  }
+  return -1;
+}
+
 export function findTemplateExpressions(
   value: string,
 ): Array<{ start: number; end: number; expression: string; full: string }> {
   const results: Array<{ start: number; end: number; expression: string; full: string }> = [];
   let searchPos = 0;
+  let start: number;
 
-  while (searchPos < value.length) {
-    const dollarIdx = value.indexOf('${', searchPos);
-    if (dollarIdx === -1) break;
-
-    let braceDepth = 1;
-    let i = dollarIdx + 2;
-    let inBacktick = false;
-    let templateBraceDepth = 0;
-
-    while (i < value.length && braceDepth > 0) {
-      const ch = value[i];
-
-      if (inBacktick) {
-        if (ch === '`' && templateBraceDepth === 0) {
-          inBacktick = false;
-        } else if (ch === '$' && value[i + 1] === '{') {
-          templateBraceDepth++;
-          i++;
-        } else if (ch === '}' && templateBraceDepth > 0) {
-          templateBraceDepth--;
-        }
-        i++;
-        continue;
-      }
-
-      if (ch === '`') {
-        inBacktick = true;
-        templateBraceDepth = 0;
-      } else if (ch === '{') {
-        braceDepth++;
-      } else if (ch === '}') {
-        braceDepth--;
-      }
-
-      if (braceDepth > 0) i++;
-    }
-
-    if (braceDepth !== 0) {
-      searchPos = dollarIdx + 2;
+  while ((start = value.indexOf('${', searchPos)) !== -1) {
+    const end = templateExpressionEnd(value, start);
+    if (end === -1) {
+      searchPos = start + 2;
       continue;
     }
-
-    const full = value.substring(dollarIdx, i + 1);
-    const expression = value.substring(dollarIdx + 2, i).trim();
-    results.push({ start: dollarIdx, end: i + 1, expression, full });
-    searchPos = i + 1;
+    const expression = value.substring(start + 2, end - 1).trim();
+    results.push({ start, end, expression, full: value.substring(start, end) });
+    searchPos = end;
   }
 
   return results;
@@ -560,88 +555,36 @@ export function findBindingsInText(
   // ── Complex expression text bindings ──
   // Detect ${expr} interpolations that contain signal calls but aren't bare ${sig()}.
   // Examples: ${count() + 1}, ${isActive() ? 'Yes' : 'No'}, ${a() + b()}
+  // A `${` inside a whenElse/repeat/bare-signal range is stepped over, not the whole `${…}` it
+  // opens: a directive's range ends at its `)`, and an expression after that is still reached.
   const allSkipRanges = [...complexExprPositions, ...bareSignalPositions];
   let searchPos = 0;
-  while (searchPos < text.length) {
-    const dollarIdx = text.indexOf('${', searchPos);
-    if (dollarIdx === -1) break;
-
-    // Skip if inside a whenElse/repeat/bare-signal range
-    const isInsideSkipRange = allSkipRanges.some((r) => dollarIdx >= r.start && dollarIdx < r.end);
-    if (isInsideSkipRange) {
+  let dollarIdx: number;
+  while ((dollarIdx = text.indexOf('${', searchPos)) !== -1) {
+    const insideSkipRange = allSkipRanges.some((r) => dollarIdx >= r.start && dollarIdx < r.end);
+    const end = insideSkipRange ? -1 : templateExpressionEnd(text, dollarIdx);
+    if (end === -1) {
       searchPos = dollarIdx + 2;
       continue;
     }
 
-    // Find the matching closing brace (handle nested braces and template literals)
-    let braceDepth = 1;
-    let i = dollarIdx + 2;
-    let inBacktick = false;
-    let templateBraceDepth = 0;
-
-    while (i < text.length && braceDepth > 0) {
-      const ch = text[i];
-
-      if (inBacktick) {
-        if (ch === '`' && templateBraceDepth === 0) {
-          inBacktick = false;
-        } else if (ch === '$' && text[i + 1] === '{') {
-          templateBraceDepth++;
-          i++;
-        } else if (ch === '}' && templateBraceDepth > 0) {
-          templateBraceDepth--;
-        }
-        i++;
-        continue;
-      }
-
-      if (ch === '`') {
-        inBacktick = true;
-        templateBraceDepth = 0;
-      } else if (ch === '{') {
-        braceDepth++;
-      } else if (ch === '}') {
-        braceDepth--;
-      }
-      if (braceDepth > 0) i++;
-    }
-
-    if (braceDepth !== 0) {
-      searchPos = dollarIdx + 2;
-      continue;
-    }
-
-    const exprContent = text.substring(dollarIdx + 2, i); // inner expression (without ${ and })
-    const fullExpr = text.substring(dollarIdx, i + 1); // ${expr}
-
-    // Check if expression contains signal calls
+    const exprContent = text.substring(dollarIdx + 2, end - 1); // inner expression (without ${ and })
     const signals = extractSignalsFromExpression(exprContent);
-    if (signals.length > 0) {
+    // A non-signal expression (e.g. prop access like product.title) is a static expression binding
+    if (signals.length > 0 || (options?.detectNonSignalBindings && exprContent.trim())) {
       bindings.push({
         element: parent,
         type: 'text',
-        signalName: signals[0]!,
+        signalName: signals[0] ?? '',
         signalNames: signals,
         expressionStart: textStart + dollarIdx,
-        expressionEnd: textStart + i + 1,
-        fullExpression: fullExpr,
-        jsExpression: exprContent,
-      });
-    } else if (options?.detectNonSignalBindings && exprContent.trim()) {
-      // Non-signal expression (e.g. prop access like product.title) — treat as static expression binding
-      bindings.push({
-        element: parent,
-        type: 'text',
-        signalName: '',
-        signalNames: [],
-        expressionStart: textStart + dollarIdx,
-        expressionEnd: textStart + i + 1,
-        fullExpression: fullExpr,
+        expressionEnd: textStart + end,
+        fullExpression: text.substring(dollarIdx, end),
         jsExpression: exprContent,
       });
     }
 
-    searchPos = i + 1;
+    searchPos = end;
   }
 }
 
@@ -650,6 +593,51 @@ export function findBindingsInAttributes(
   bindings: BindingInfo[],
   options?: BindingDetectionOptions,
 ): void {
+  /** A value that is one `${…}`: a bare `${sig()}` binds the signal by name, anything else as an expression. */
+  const pushExpressionBinding = (
+    type: 'attr' | 'style',
+    property: string,
+    expr: TemplateExpressionSpan,
+    offset: number,
+  ): void => {
+    const signals = extractSignalsFromExpression(expr.expression);
+    if (signals.length === 0 && !options?.detectNonSignalBindings) return;
+    const bareSignal = signals.length > 0 ? expr.expression.match(/^\s*(\w+)\(\)\s*$/) : null;
+    bindings.push({
+      element,
+      type,
+      signalName: bareSignal?.[1] ?? signals[0] ?? '',
+      ...(bareSignal ? {} : { signalNames: signals, jsExpression: expr.expression }),
+      property,
+      expressionStart: offset + expr.start,
+      expressionEnd: offset + expr.end,
+      fullExpression: expr.full,
+    });
+  };
+
+  /** A value with static text or several expressions: one binding, written as a template literal. */
+  const pushTemplateLiteralBinding = (
+    type: 'attr' | 'style',
+    property: string,
+    valueText: string,
+    start: number,
+    expressions: TemplateExpressionSpan[],
+  ): void => {
+    const signals = [...new Set(expressions.flatMap((e) => extractSignalsFromExpression(e.expression)))];
+    if (signals.length === 0 && !options?.detectNonSignalBindings) return;
+    bindings.push({
+      element,
+      type,
+      signalName: signals[0] ?? '',
+      signalNames: signals,
+      jsExpression: '`' + valueText + '`',
+      property,
+      expressionStart: start,
+      expressionEnd: start + valueText.length,
+      fullExpression: valueText,
+    });
+  };
+
   if (element.whenDirective) {
     const whenMatch = element.whenDirective.match(/^\$\{when\((.+)\)\}$/);
     if (whenMatch) {
@@ -674,7 +662,7 @@ export function findBindingsInAttributes(
   for (const [name, attr] of element.attributes) {
     if (name.startsWith(':')) {
       throw new Error(
-        `THANE006: attribute "${name}" — the ":" prefix is not a binding syntax. Write ${name.slice(1)}=\${…} instead.`,
+        `${ErrorCode.PREFIXED_ATTRIBUTE}: attribute "${name}" — the ":" prefix is not a binding syntax. Write ${name.slice(1)}=\${…} instead.`,
       );
     }
     if (name.startsWith('@')) {
@@ -708,7 +696,6 @@ export function findBindingsInAttributes(
       const styleExprs = findTemplateExpressions(attr.value);
       for (const declaration of splitStyleDeclarations(attr.value, styleExprs)) {
         if (declaration.expressions.length === 0) continue;
-        const propertyName = declaration.property;
         const expr = declaration.expressions[0]!;
         const valueIsOneExpression =
           declaration.expressions.length === 1 &&
@@ -717,56 +704,16 @@ export function findBindingsInAttributes(
 
         // `width: ${w()}px` or `margin: ${a()}px ${b()}em` — the static text belongs to the
         // value, so the whole declaration value is one binding written as a template literal.
-        if (!valueIsOneExpression) {
-          const signals = [
-            ...new Set(declaration.expressions.flatMap((e) => extractSignalsFromExpression(e.expression))),
-          ];
-          if (signals.length > 0 || options?.detectNonSignalBindings) {
-            const valueText = attr.value.substring(declaration.valueStart, declaration.valueEnd);
-            bindings.push({
-              element,
-              type: 'style',
-              signalName: signals[0] ?? '',
-              signalNames: signals,
-              jsExpression: '`' + valueText + '`',
-              property: propertyName,
-              expressionStart: attr.valueStart + declaration.valueStart,
-              expressionEnd: attr.valueStart + declaration.valueEnd,
-              fullExpression: valueText,
-            });
-          }
-          continue;
-        }
-
-        const signals = extractSignalsFromExpression(expr.expression);
-
-        if (signals.length > 0) {
-          const bareSignal = expr.expression.match(/^\s*(\w+)\(\)\s*$/);
-          const primarySignal = bareSignal?.[1] || signals[0]!;
-
-          bindings.push({
-            element,
-            type: 'style',
-            signalName: primarySignal,
-            ...(bareSignal ? {} : { signalNames: signals, jsExpression: expr.expression }),
-            property: propertyName,
-            expressionStart: attr.valueStart + expr.start,
-            expressionEnd: attr.valueStart + expr.end,
-            fullExpression: expr.full,
-          });
-        } else if (options?.detectNonSignalBindings) {
-          // Non-signal style expression (e.g. prop-derived value)
-          bindings.push({
-            element,
-            type: 'style',
-            signalName: '',
-            signalNames: [],
-            jsExpression: expr.expression,
-            property: propertyName,
-            expressionStart: attr.valueStart + expr.start,
-            expressionEnd: attr.valueStart + expr.end,
-            fullExpression: expr.full,
-          });
+        if (valueIsOneExpression) {
+          pushExpressionBinding('style', declaration.property, expr, attr.valueStart);
+        } else {
+          pushTemplateLiteralBinding(
+            'style',
+            declaration.property,
+            attr.value.substring(declaration.valueStart, declaration.valueEnd),
+            attr.valueStart + declaration.valueStart,
+            declaration.expressions,
+          );
         }
       }
       continue;
@@ -777,53 +724,11 @@ export function findBindingsInAttributes(
     // the whole attribute as a template literal: `class="btn ${kind()}"` writes `btn primary`.
     const staticText = attrExprs.reduce((rest, e) => rest.replace(e.full, ''), attr.value);
     if (attrExprs.length > 1 || (attrExprs.length === 1 && staticText.trim() !== '')) {
-      const signals = [...new Set(attrExprs.flatMap((e) => extractSignalsFromExpression(e.expression)))];
-      if (signals.length > 0 || options?.detectNonSignalBindings) {
-        bindings.push({
-          element,
-          type: 'attr',
-          signalName: signals[0] ?? '',
-          signalNames: signals,
-          jsExpression: '`' + attr.value + '`',
-          property: name,
-          expressionStart: attr.valueStart,
-          expressionEnd: attr.valueStart + attr.value.length,
-          fullExpression: attr.value,
-        });
-      }
+      pushTemplateLiteralBinding('attr', name, attr.value, attr.valueStart, attrExprs);
       continue;
     }
     for (const expr of attrExprs) {
-      const signals = extractSignalsFromExpression(expr.expression);
-
-      if (signals.length > 0) {
-        const bareSignal = expr.expression.match(/^\s*(\w+)\(\)\s*$/);
-        const signalName = bareSignal?.[1] || signals[0]!;
-
-        bindings.push({
-          element,
-          type: 'attr',
-          signalName,
-          ...(bareSignal ? {} : { signalNames: signals, jsExpression: expr.expression }),
-          property: name,
-          expressionStart: attr.valueStart + expr.start,
-          expressionEnd: attr.valueStart + expr.end,
-          fullExpression: expr.full,
-        });
-      } else if (options?.detectNonSignalBindings) {
-        // Non-signal attribute expression (e.g. prop-derived value like product.image)
-        bindings.push({
-          element,
-          type: 'attr',
-          signalName: '',
-          signalNames: [],
-          jsExpression: expr.expression,
-          property: name,
-          expressionStart: attr.valueStart + expr.start,
-          expressionEnd: attr.valueStart + expr.end,
-          fullExpression: expr.full,
-        });
-      }
+      pushExpressionBinding('attr', name, expr, attr.valueStart);
     }
   }
 }

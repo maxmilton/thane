@@ -1,0 +1,56 @@
+
+Thane CLI - Component Framework Build Tool
+
+Usage:
+  thane <command> [options]
+
+Commands:
+  build       Build the application
+  dev         Start development server with watch mode
+  serve       Build and serve the application
+  types       Generate hidden .thane types without building
+  typecheck   Run Thane-aware TypeScript checking without building
+
+Options:
+  --prod, -p          Production build (default: development)
+  --gzip              Enable gzip compression (production only)
+  --entry <path>      Custom entry point (default: ./src/main.ts)
+  --out <dir>         Output directory (default: ./dist)
+  --assets <dir>      Assets directory (default: ./src/assets)
+  --html <path>       Root HTML file (default: ./index.html)
+  --config <path>     Path to thane config file (default: ./thane.config.json or .jsonc)
+  --drop-console      Strip console.* calls from the bundle (default: on in prod)
+  --no-drop-console   Keep console.* calls in the bundle (even in prod)
+  --drop-debugger     Strip debugger statements (default: on in prod)
+  --no-drop-debugger  Keep debugger statements (even in prod)
+  --sourcemap         Generate source maps (default: on in dev)
+  --no-sourcemap      Disable source maps (even in dev)
+  --strict-type-check Fail build on TypeScript type errors (default: warn only)
+  --port <number>     Dev server port (default: 4200)
+  --open              Auto-open browser on dev server start
+  --no-open           Do not auto-open browser
+  --host <addr>       Dev server host address (default: localhost; use 0.0.0.0 for LAN)
+  --base <path>       Public base path for deployed assets (default: /)
+  --target <targets>  Comma-separated esbuild targets (e.g. es2022,chrome120)
+  --hash-file-names   Include content hashes in output filenames (default: on)
+  --no-hash-file-names  Disable content hashes in output filenames
+  --env-prefix <pre>  Only env vars with this prefix are injected as defines (default: THANE_)
+  --empty-out-dir     Clear output directory before building (default: on)
+  --no-empty-out-dir  Keep existing output directory contents
+  --splitting         Enable code splitting (default: on)
+  --no-splitting      Disable code splitting (single bundle)
+  --legal-comments <mode>  Handle license comments: none, eof, linked, external (default: none)
+  --analyze           Write esbuild metafile to dist for bundle analysis
+  --no-analyze        Do not write metafile (default)
+  --verbose, -V       Verbose output (show debug info)
+  --quiet, -q         Suppress all non-error output
+  --help, -h          Show this help message
+  --version, -v       Show version number
+
+Examples:
+  thane dev                    Start dev server
+  thane build --prod           Production build
+  thane serve --prod --gzip    Production build with gzip and server
+  thane types                  Generate hidden project types only
+  thane typecheck              Run typecheck with generated .thane types included
+  thane build --verbose        Build with detailed logging

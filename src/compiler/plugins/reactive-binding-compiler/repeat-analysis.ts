@@ -11,7 +11,6 @@ import type {
   RepeatBlock,
   ItemBinding,
   ItemEventBinding,
-  EventBinding,
   StaticTemplateInfo,
   SimpleBinding,
 } from './types.js';
@@ -22,7 +21,6 @@ import {
   parseHtmlTemplate,
   walkElements,
   findElementsWithWhenDirective,
-  injectIdIntoFirstElement,
   attributeDomProperty,
   findTemplateExpressions,
   stripTemplateExpressions,
@@ -37,10 +35,11 @@ import {
   buildElementIdEdits,
   applyTemplateEdits,
   stripPropertyBoundAttributes,
+  toRepeatBlock,
   type IdState,
   type TemplateEdit,
-  type Range,
 } from './template-utils.js';
+import type { Range } from '../../types.js';
 
 /**
  * Inside a row, nested directives (when/whenElse/repeat) cannot close over the row factory's
@@ -173,29 +172,19 @@ export const generateStaticRepeatTemplate = (
 
     return null;
   };
-
-  // Find path for each element with bindings
-  for (const elementId of bindingsByElement.keys()) {
-    // Check if root element matches
-    const rootId = rootEl.attributes.get('id')?.value;
-    if (rootId === elementId) {
-      elementPaths.set(elementId, []);
-    } else {
-      const path = findElementPath(rootEl, elementId, []);
-      if (path) {
-        elementPaths.set(elementId, path);
-      }
-    }
-  }
+  // The root's own id resolves to [] (findElementPath checks the element before its children)
+  const pathOf = (id: string): number[] | null => findElementPath(rootEl, id, []);
+  const pathError = (): Error =>
+    new Error(
+      `${ErrorCode.PLUGIN_ERROR}: internal compiler error — the element path for a bound element in a repeat() row could not be computed. Please report this with the row template.`,
+    );
 
   // Every bound element has a path; since ids are injected before analysis this can only be
   // a compiler bug, and an error surfaces it instead of hiding it behind another renderer.
   for (const elementId of bindingsByElement.keys()) {
-    if (!elementPaths.has(elementId)) {
-      throw new Error(
-        `${ErrorCode.PLUGIN_ERROR}: internal compiler error — the element path for a bound element in a repeat() row could not be computed. Please report this with the row template.`,
-      );
-    }
+    const path = pathOf(elementId);
+    if (!path) throw pathError();
+    elementPaths.set(elementId, path);
   }
 
   // Generate static HTML by removing dynamic expressions
@@ -263,15 +252,8 @@ export const generateStaticRepeatTemplate = (
     eventElementPaths = new Map();
     for (const evt of itemEvents) {
       if (eventElementPaths.has(evt.elementId)) continue; // Already computed
-      const rootId = rootEl.attributes.get('id')?.value;
-      if (rootId === evt.elementId) {
-        eventElementPaths.set(evt.elementId, []);
-      } else {
-        const path = findElementPath(rootEl, evt.elementId, []);
-        if (path) {
-          eventElementPaths.set(evt.elementId, path);
-        }
-      }
+      const path = pathOf(evt.elementId);
+      if (path) eventElementPaths.set(evt.elementId, path);
     }
   }
 
@@ -294,13 +276,7 @@ export const generateStaticRepeatTemplate = (
         });
         continue;
       }
-      const rootId = rootEl.attributes.get('id')?.value;
-      let path: number[] | null = null;
-      if (rootId === sb.id) {
-        path = [];
-      } else {
-        path = findElementPath(rootEl, sb.id, []);
-      }
+      const path = pathOf(sb.id);
       if (path) {
         signalElementBindings.push({
           path,
@@ -320,15 +296,8 @@ export const generateStaticRepeatTemplate = (
   if (directiveAnchorIds && directiveAnchorIds.length > 0) {
     directiveAnchorPaths = new Map();
     for (const anchorId of directiveAnchorIds) {
-      const rootId = rootEl.attributes.get('id')?.value;
-      if (rootId === anchorId) {
-        directiveAnchorPaths.set(anchorId, []);
-      } else {
-        const path = findElementPath(rootEl, anchorId, []);
-        if (path) {
-          directiveAnchorPaths.set(anchorId, path);
-        }
-      }
+      const path = pathOf(anchorId);
+      if (path) directiveAnchorPaths.set(anchorId, path);
     }
   }
 
@@ -339,24 +308,17 @@ export const generateStaticRepeatTemplate = (
     for (const mb of mixedItemBindings) {
       // The bound element carries an injected id like any other bound element, so its
       // path resolves the same way.
-      const rootId = rootEl.attributes.get('id')?.value;
-      const path = rootId === mb.elementId ? [] : findElementPath(rootEl, mb.elementId, []);
-      if (path === null) {
-        throw new Error(
-          `${ErrorCode.PLUGIN_ERROR}: internal compiler error — the element path for a bound element in a repeat() row could not be computed. Please report this with the row template.`,
-        );
-      }
-      {
-        mixedSignalItemBindings.push({
-          path,
-          outerSignalNames: mb.outerSignalNames!,
-          type: mb.type,
-          property: mb.property,
-          domProperty: mb.domProperty,
-          expression: mb.expression,
-          staticValue: mb.staticValue,
-        });
-      }
+      const path = pathOf(mb.elementId);
+      if (path === null) throw pathError();
+      mixedSignalItemBindings.push({
+        path,
+        outerSignalNames: mb.outerSignalNames!,
+        type: mb.type,
+        property: mb.property,
+        domProperty: mb.domProperty,
+        expression: mb.expression,
+        staticValue: mb.staticValue,
+      });
     }
   }
 
@@ -372,170 +334,32 @@ export const generateStaticRepeatTemplate = (
 };
 
 /**
- * Analyze if a text binding at a given position is the sole content of its parent element.
- * This determines whether we can use textContent (no wrapper needed) or need a comment marker.
- *
- * @param templateContent The full template HTML
- * @param bindingStart Start position of the ${...} expression
- * @param bindingEnd End position of the ${...} expression
- * @returns Object with analysis results
+ * The element whose only content is the row text binding at [start, end), or null. The parent is
+ * the innermost element whose content holds the binding. An element the parser left unclosed
+ * (closeTagStart 0) holds nothing, and text outside every element is never sole content. A
+ * sole-content binding is rendered through its element's text node; any other through a comment
+ * marker.
  */
-export const analyzeTextBindingContext = (
+const soleContentParent = (
+  parsed: ReturnType<typeof parseHtmlTemplate>,
   templateContent: string,
-  bindingStart: number,
-  bindingEnd: number,
-): {
-  isSoleContent: boolean;
-  parentTagStart: number;
-  parentTagNameEnd: number;
-  parentCloseTagStart: number;
-} => {
-  // Find the opening tag before this binding
-  let parentTagStart = -1;
-  let parentTagNameEnd = -1;
-  let tagDepth = 0;
-  let i = bindingStart - 1;
-
-  // Scan backwards to find the parent element's opening tag
-  // Skip over ${...} expressions to avoid confusion with > inside handlers
-  while (i >= 0) {
-    // Skip backwards over ${...} expressions
-    if (templateContent[i] === '}') {
-      let depth = 1;
-      i--;
-      while (i >= 0 && depth > 0) {
-        if (templateContent[i] === '}') depth++;
-        else if (templateContent[i] === '{') {
-          depth--;
-          if (depth === 0 && i > 0 && templateContent[i - 1] === '$') {
-            i--; // skip the '$'
-          }
-        }
-        i--;
-      }
-      continue;
-    }
-    if (templateContent[i] === '>') {
-      // Check if this is an opening tag end (not a closing tag)
-      let j = i - 1;
-      while (j >= 0 && templateContent[j] !== '<') {
-        j--;
-      }
-      if (j >= 0) {
-        const tagContent = templateContent.substring(j, i + 1);
-        if (tagContent.startsWith('</')) {
-          // Closing tag - go deeper
-          tagDepth++;
-        } else if (!tagContent.endsWith('/>')) {
-          // Opening tag (not self-closing)
-          if (tagDepth === 0) {
-            parentTagStart = j;
-            // Find end of tag name
-            let k = j + 1;
-            while (k < i && /[\w-]/.test(templateContent[k]!)) {
-              k++;
-            }
-            parentTagNameEnd = k;
-            break;
-          } else {
-            tagDepth--;
-          }
-        }
-      }
-    }
-    i--;
-  }
-
-  if (parentTagStart === -1) {
-    return { isSoleContent: false, parentTagStart: -1, parentTagNameEnd: -1, parentCloseTagStart: -1 };
-  }
-
-  // Find the closing tag after this binding
-  let parentCloseTagStart = -1;
-  tagDepth = 0;
-  i = bindingEnd;
-
-  while (i < templateContent.length) {
-    if (templateContent[i] === '<') {
-      const remaining = templateContent.substring(i);
-      const closeMatch = remaining.match(/^<\/[\w-]+>/);
-      const openMatch = remaining.match(/^<[\w-][^>]*>/);
-
-      if (closeMatch) {
-        if (tagDepth === 0) {
-          parentCloseTagStart = i;
-          break;
-        } else {
-          tagDepth--;
-          i += closeMatch[0].length;
-          continue;
-        }
-      } else if (openMatch && !openMatch[0].endsWith('/>')) {
-        // Opening tag (not self-closing) - go deeper
-        tagDepth++;
-        i += openMatch[0].length;
-        continue;
-      }
-    }
-    i++;
-  }
-
-  if (parentCloseTagStart === -1) {
-    return { isSoleContent: false, parentTagStart, parentTagNameEnd, parentCloseTagStart: -1 };
-  }
-
-  // Now check if the binding is the sole content
-  // Get content between parent open tag end and binding start
-  // Must skip > inside ${...} expressions within attributes
-  let parentOpenTagEnd = parentTagStart;
-  {
-    let inExpr = 0;
-    while (parentOpenTagEnd < templateContent.length) {
-      const ch = templateContent[parentOpenTagEnd];
-      if (ch === '$' && templateContent[parentOpenTagEnd + 1] === '{') {
-        inExpr++;
-        parentOpenTagEnd += 2;
-        continue;
-      }
-      if (ch === '{' && inExpr > 0) {
-        inExpr++;
-      }
-      if (ch === '}' && inExpr > 0) {
-        inExpr--;
-      }
-      if (ch === '>' && inExpr === 0) {
-        parentOpenTagEnd++;
-        break;
-      }
-      parentOpenTagEnd++;
-    }
-  }
-  const contentBefore = templateContent.substring(parentOpenTagEnd, bindingStart);
-  const contentAfter = templateContent.substring(bindingEnd, parentCloseTagStart);
-
-  // Check if there's only whitespace before and after
-  const onlyWhitespaceBefore = /^\s*$/.test(contentBefore);
-  const onlyWhitespaceAfter = /^\s*$/.test(contentAfter);
-
-  // Also check that there are no other elements or bindings
-  const hasOtherElementsBefore = /<[^>]+>/.test(contentBefore);
-  const hasOtherElementsAfter = /<[^>]+>/.test(contentAfter);
-  const hasOtherBindingsBefore = /\$\{[^}]+\}/.test(contentBefore);
-  const hasOtherBindingsAfter = /\$\{[^}]+\}/.test(contentAfter);
-
-  const isSoleContent =
-    onlyWhitespaceBefore &&
-    onlyWhitespaceAfter &&
-    !hasOtherElementsBefore &&
-    !hasOtherElementsAfter &&
-    !hasOtherBindingsBefore &&
-    !hasOtherBindingsAfter;
-
-  return { isSoleContent, parentTagStart, parentTagNameEnd, parentCloseTagStart };
+  start: number,
+  end: number,
+): HtmlElement | null => {
+  // Pre-order: each element that holds the binding comes after its ancestors, so the last is the innermost
+  const holders: HtmlElement[] = [];
+  walkElements(parsed.roots, (el) => {
+    if (el.openTagEnd <= start && end <= el.closeTagStart) holders.push(el);
+  });
+  const parent = holders[holders.length - 1];
+  if (!parent || parent.children.length > 0) return null;
+  return templateContent.slice(parent.openTagEnd, parent.closeTagStart).trim() === templateContent.slice(start, end)
+    ? parent
+    : null;
 };
 
 // ============================================================================
-// Item binding extraction helpers (used by processItemTemplateRecursively)
+// Item binding extraction helpers (used by processItemTemplate)
 // ============================================================================
 
 interface ItemTextMatch {
@@ -543,9 +367,8 @@ interface ItemTextMatch {
   end: number;
   expr: string;
   id: string;
-  isSoleContent: boolean;
-  parentTagStart: number;
-  parentTagNameEnd: number;
+  /** The element the binding is the sole content of, if any */
+  soleParent: HtmlElement | null;
 }
 
 interface ItemAttrMatch {
@@ -570,10 +393,9 @@ const classifyParsedBindings = (
   state: IdState,
   itemEvents: ItemEventBinding[],
   signalBindings: SimpleBinding[],
-  _eventBindings: EventBinding[],
   elementIdMap: Map<HtmlElement, string>,
   textBindingSpans: Map<number, { spanId: string; exprEnd: number; signalName: string }>,
-): { itemEventIdCounter: number } => {
+): void => {
   let itemEventIdCounter = 0;
 
   for (const binding of parsed.bindings) {
@@ -601,7 +423,7 @@ const classifyParsedBindings = (
       // Check if the full expression also references the item variable.
       // If so, this is a "mixed" binding (outer signal + item data) — skip
       // classifying as a signal binding; collectItemAttrBindings will handle it.
-      const fullExpr = (binding as any).jsExpression || (binding as any).fullExpression || '';
+      const fullExpr = binding.jsExpression || binding.fullExpression || '';
       const isMixed =
         fullExpr &&
         (expressionReferencesIdentifier(fullExpr, itemVar) ||
@@ -643,8 +465,6 @@ const classifyParsedBindings = (
       });
     }
   }
-
-  return { itemEventIdCounter };
 };
 
 /**
@@ -695,8 +515,8 @@ const collectItemTextBindings = (
     if (!isInAttr) {
       const expression = innerExpr;
 
-      // Analyze if this binding is the sole content of its parent element
-      const context = analyzeTextBindingContext(templateContent, matchStart, matchEnd);
+      // Is this binding the sole content of its parent element?
+      const soleParent = soleContentParent(parsed, templateContent, matchStart, matchEnd);
 
       const id = `i${state.idCounter++}`;
 
@@ -716,7 +536,7 @@ const collectItemTextBindings = (
         type: 'text',
         expression: expression,
         // sole-content → the element's placeholder Text node; mixed-content → comment marker
-        textBindingMode: context.isSoleContent ? 'textNode' : 'commentMarker',
+        textBindingMode: soleParent ? 'textNode' : 'commentMarker',
         ...(outerSignals.length > 0 ? { outerSignalNames: outerSignals } : {}),
       });
 
@@ -725,9 +545,7 @@ const collectItemTextBindings = (
         end: matchEnd,
         expr: expression,
         id,
-        isSoleContent: context.isSoleContent,
-        parentTagStart: context.parentTagStart,
-        parentTagNameEnd: context.parentTagNameEnd,
+        soleParent,
       });
     }
   }
@@ -821,7 +639,7 @@ const collectItemAttrBindings = (
 /**
  * Process an item template recursively, handling nested conditionals and repeats
  */
-export const processItemTemplateRecursively = (
+export const processItemTemplate = (
   templateContent: string,
   itemVar: string,
   indexVar: string | undefined,
@@ -829,10 +647,9 @@ export const processItemTemplateRecursively = (
   startingId: number,
 ): {
   processedContent: string;
-  itemBindings: ItemBinding[];
-  itemEvents: ItemEventBinding[];
+  bindings: ItemBinding[];
+  events: ItemEventBinding[];
   signalBindings: SimpleBinding[];
-  eventBindings: EventBinding[];
   nestedConditionals: ConditionalBlock[];
   nestedWhenElse: WhenElseBlock[];
   nestedRepeats: RepeatBlock[];
@@ -844,7 +661,6 @@ export const processItemTemplateRecursively = (
   const itemBindings: ItemBinding[] = [];
   const itemEvents: ItemEventBinding[] = [];
   const signalBindings: SimpleBinding[] = [];
-  const eventBindings: EventBinding[] = [];
   const repeatBlocks: RepeatBlock[] = [];
 
   const elementIdMap = new Map<HtmlElement, string>();
@@ -899,7 +715,7 @@ export const processItemTemplateRecursively = (
       ...new Set([...(binding.signalNames || [binding.signalName]), ...nestedItems.extraSignals]),
     ].filter((s) => s !== '');
     const nestedRepeatId = `b${state.idCounter++}`;
-    const nestedProcessed = processItemTemplateRecursively(
+    const nestedProcessed = processItemTemplate(
       rowRefs.html(binding.itemTemplate),
       binding.itemVar,
       binding.indexVar,
@@ -907,36 +723,9 @@ export const processItemTemplateRecursively = (
       state.idCounter,
     );
     state.idCounter = nestedProcessed.nextId;
-    let processedEmptyTemplate: string | undefined;
-    if (binding.emptyTemplate) {
-      processedEmptyTemplate = binding.emptyTemplate
-        .replace(/\s+/g, ' ')
-        .replace(/>\s+</g, '><')
-        .replace(/\s+>/g, '>')
-        .trim();
-    }
-
-    repeatBlocks.push({
-      id: nestedRepeatId,
-      signalName: nestedSignalNames[0] || '',
-      signalNames: nestedSignalNames,
-      itemsExpression: nestedItems.expression,
-      itemVar: binding.itemVar,
-      indexVar: binding.indexVar,
-      itemTemplate: nestedProcessed.processedContent,
-      emptyTemplate: processedEmptyTemplate,
-      trackByFn: binding.trackByFn,
-      startIndex: binding.expressionStart,
-      endIndex: binding.expressionEnd,
-      itemBindings: nestedProcessed.itemBindings,
-      itemEvents: nestedProcessed.itemEvents,
-      signalBindings: nestedProcessed.signalBindings,
-      eventBindings: nestedProcessed.eventBindings,
-      nestedConditionals: nestedProcessed.nestedConditionals,
-      nestedWhenElse: nestedProcessed.nestedWhenElse,
-      nestedRepeats: nestedProcessed.nestedRepeats,
-      rowSignalVars: nestedProcessed.rowSignalVars,
-    });
+    repeatBlocks.push(
+      toRepeatBlock(binding, nestedRepeatId, nestedProcessed, nestedItems.expression, nestedSignalNames),
+    );
   }
 
   const conditionalRanges = conditionals.map((c) => ({ start: c.startIndex, end: c.endIndex }));
@@ -954,7 +743,6 @@ export const processItemTemplateRecursively = (
     state,
     itemEvents,
     signalBindings,
-    eventBindings,
     elementIdMap,
     textBindingSpans,
   );
@@ -980,18 +768,12 @@ export const processItemTemplateRecursively = (
     itemBindings,
   );
 
-  const edits: TemplateEdit[] = [
-    ...buildConditionalEdits(conditionals),
-    ...buildWhenElseEdits(whenElseBlocks, true, injectIdIntoFirstElement),
-  ];
+  const edits: TemplateEdit[] = [...buildConditionalEdits(conditionals), ...buildWhenElseEdits(whenElseBlocks)];
   for (const rep of repeatBlocks) {
     edits.push({ start: rep.startIndex, end: rep.endIndex, replacement: `<template id="${rep.id}"></template>` });
   }
   // Inject comment markers for signal text bindings (AST-driven, no regex)
   for (const [exprPos, { spanId, exprEnd }] of textBindingSpans) {
-    // Use a comment marker <!--id--> followed by the live expression so the
-    // fallback renderer can still evaluate the template literal while the
-    // optimized path locates the adjacent text node via the comment.
     edits.push({
       start: exprPos,
       end: exprEnd,
@@ -1000,13 +782,13 @@ export const processItemTemplateRecursively = (
   }
 
   // Track which parent elements need IDs for sole-content text bindings
-  const parentElementIds = new Map<number, string>(); // tagStart -> id
+  const parentElementIds = new Map<HtmlElement, string>();
 
   for (const textMatch of itemTextMatches) {
-    const { start, end, expr, id, isSoleContent, parentTagStart, parentTagNameEnd: _parentTagNameEnd } = textMatch;
+    const { start, end, expr, id, soleParent } = textMatch;
     const transformedExpr = renameIdentifierInExpression(expr, itemVar, `${itemVar}$()`);
 
-    if (isSoleContent && parentTagStart >= 0) {
+    if (soleParent) {
       // For sole content: just output the expression (no wrapper)
       // The parent element will get the ID
       edits.push({
@@ -1014,11 +796,7 @@ export const processItemTemplateRecursively = (
         end,
         replacement: `\${${transformedExpr}}`,
       });
-
-      // Track that we need to add ID to parent element
-      if (!parentElementIds.has(parentTagStart)) {
-        parentElementIds.set(parentTagStart, id);
-      }
+      parentElementIds.set(soleParent, id);
     } else {
       // For mixed content: inject a comment marker so the optimized path can
       // locate the adjacent text node without a wrapper element.
@@ -1027,22 +805,13 @@ export const processItemTemplateRecursively = (
         end,
         replacement: `<!--${id}-->\${${transformedExpr}}`,
       });
-      // Mark the binding as comment-marker-based so codegen uses nextSibling.data
-      const binding = itemBindings.find((b) => b.elementId === id && b.type === 'text');
-      if (binding) {
-        binding.textBindingMode = 'commentMarker';
-      }
     }
   }
 
   // The parent of a sole-content text binding is a bound element like any other: register it
   // so it shares one id with any attribute or event binding on it, and so buildElementIdEdits
   // injects the id attribute (or leaves a developer-supplied id in place).
-  const elementByTagStart = new Map<number, HtmlElement>();
-  walkElements(parsed.roots, (el) => elementByTagStart.set(el.tagStart, el));
-  for (const [tagStart, id] of parentElementIds) {
-    const parentEl = elementByTagStart.get(tagStart);
-    if (!parentEl) continue;
+  for (const [parentEl, id] of parentElementIds) {
     const elementId = elementIdMap.get(parentEl) ?? (parentEl.attributes.get('id')?.value || id);
     elementIdMap.set(parentEl, elementId);
     if (elementId === id) continue;
@@ -1051,10 +820,7 @@ export const processItemTemplateRecursively = (
     }
   }
   for (const { start, end, attrName, expr } of itemAttrMatches) {
-    let transformedExpr = renameIdentifierInExpression(expr, itemVar, `${itemVar}$()`);
-    if (indexVar) {
-      transformedExpr = renameIdentifierInExpression(transformedExpr, indexVar, indexVar);
-    }
+    const transformedExpr = renameIdentifierInExpression(expr, itemVar, `${itemVar}$()`);
 
     edits.push({
       start,
@@ -1062,7 +828,7 @@ export const processItemTemplateRecursively = (
       replacement: `${attrName}="\${${transformedExpr}}"`,
     });
   }
-  edits.push(...buildElementIdEdits(elementIdMap, allRanges, { eventBindings, itemEvents }));
+  edits.push(...buildElementIdEdits(elementIdMap, allRanges));
   for (const binding of parsed.bindings) {
     if (binding.type === 'event') {
       const alreadyEdited = edits.some((e) => e.start <= binding.expressionStart && e.end >= binding.expressionEnd);
@@ -1073,50 +839,13 @@ export const processItemTemplateRecursively = (
   }
   return {
     processedContent: applyTemplateEdits(templateContent, edits),
-    itemBindings,
-    itemEvents,
+    bindings: itemBindings,
+    events: itemEvents,
     signalBindings,
-    eventBindings,
     nestedConditionals: conditionals,
     nestedWhenElse: whenElseBlocks,
     nestedRepeats: repeatBlocks,
     rowSignalVars: [...rowRefs.used],
     nextId: state.idCounter,
-  };
-};
-
-/**
- * Process an item template (wrapper around processItemTemplateRecursively)
- */
-export const processItemTemplate = (
-  templateContent: string,
-  itemVar: string,
-  indexVar: string | undefined,
-  startingId: number,
-  signalInitializers: Map<string, string | number | boolean> = new Map(),
-): {
-  processedContent: string;
-  bindings: ItemBinding[];
-  events: ItemEventBinding[];
-  signalBindings: SimpleBinding[];
-  eventBindings: EventBinding[];
-  nestedConditionals: ConditionalBlock[];
-  nestedWhenElse: WhenElseBlock[];
-  nestedRepeats: RepeatBlock[];
-  rowSignalVars: string[];
-  nextId: number;
-} => {
-  const result = processItemTemplateRecursively(templateContent, itemVar, indexVar, signalInitializers, startingId);
-  return {
-    processedContent: result.processedContent,
-    bindings: result.itemBindings,
-    events: result.itemEvents,
-    signalBindings: result.signalBindings,
-    eventBindings: result.eventBindings,
-    nestedConditionals: result.nestedConditionals,
-    nestedWhenElse: result.nestedWhenElse,
-    nestedRepeats: result.nestedRepeats,
-    rowSignalVars: result.rowSignalVars,
-    nextId: result.nextId,
   };
 };

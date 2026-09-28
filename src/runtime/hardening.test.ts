@@ -13,7 +13,7 @@ import { computed, effect, signal } from './signal.js';
 const liveSubscribers = (sig: unknown): number => (sig as { _s: unknown[] })._s.filter((cb) => cb != null).length;
 
 describe('F0-3 signal defects (turned on by RT-3)', () => {
-  test.todo('RT-3 R1 an effect that disposes itself during a run keeps no subscription', () => {
+  test('RT-3 R1 an effect that disposes itself during a run keeps no subscription', () => {
     const source = signal(0);
     let runs = 0;
     let stop: () => void = () => {};
@@ -30,7 +30,7 @@ describe('F0-3 signal defects (turned on by RT-3)', () => {
     expect(liveSubscribers(source)).toBe(0);
   });
 
-  test.todo('RT-3 R2 a computed disposed inside its own derivation keeps no subscription on its dependency', () => {
+  test('RT-3 R2 a computed disposed inside its own derivation keeps no subscription on its dependency', () => {
     const source = signal(0);
     let derived: ReturnType<typeof computed<number>> | undefined;
     derived = computed(() => {

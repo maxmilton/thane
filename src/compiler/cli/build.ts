@@ -49,7 +49,7 @@ export async function runBuild(config: BuildConfig): Promise<void> {
   // plugins/minification); esbuild minifies the JavaScript. Nothing edits the emitted files.
   buildContext.minify = config.isProd;
 
-  const basePlugins = [
+  const plugins = [
     ProjectTypesSyncPlugin(projectRoot),
     TSCTypeCheckerPlugin({ strict: config.strictTypeCheck, projectRoot }),
     ThaneLinterPlugin(),
@@ -57,46 +57,40 @@ export async function runBuild(config: BuildConfig): Promise<void> {
     createReactiveBindingPlugin(() => ({ minify: buildContext.minify, selectorMap: buildContext.selectorMap })),
     GlobalCSSBundlerPlugin({ minify: config.isProd, selectorMap: () => buildContext.selectorMap }),
     HTMLBootstrapInjectorPlugin({ entryPoints: config.entryPoints, buildContext }),
-  ];
-
-  const postBuildOptions = {
-    distDir: config.outDir,
-    inputHTMLFilePath: config.inputHTMLFilePath,
-    outputHTMLFilePath: config.outputHTMLFilePath,
-    entryPoints: config.entryPoints,
-    assetsInputDir: config.assetsInputDir,
-    assetsOutputDir: config.assetsOutputDir,
-    serve: config.serve,
-    isProd: config.isProd,
-    useGzip: config.useGzip,
-    buildContext,
-    port: config.port,
-    open: config.open,
-    host: config.host,
-    emptyOutDir: config.emptyOutDir,
-    base: config.base,
-  };
-
-  const prodPlugins = [
-    ...basePlugins,
-    MinificationPlugin(buildContext, {
-      projectRoot,
-      htmlPath: config.inputHTMLFilePath,
-      outDir: config.outDir,
+    ...(config.isProd
+      ? [MinificationPlugin(buildContext, { projectRoot, htmlPath: config.inputHTMLFilePath, outDir: config.outDir })]
+      : []),
+    PostBuildPlugin({
+      distDir: config.outDir,
+      inputHTMLFilePath: config.inputHTMLFilePath,
+      outputHTMLFilePath: config.outputHTMLFilePath,
+      entryPoints: config.entryPoints,
+      assetsInputDir: config.assetsInputDir,
+      assetsOutputDir: config.assetsOutputDir,
+      serve: config.serve,
+      isProd: config.isProd,
+      useGzip: config.useGzip,
+      buildContext,
+      port: config.port,
+      open: config.open,
+      host: config.host,
+      emptyOutDir: config.emptyOutDir,
+      base: config.base,
     }),
-    PostBuildPlugin(postBuildOptions),
   ];
-
-  const devPlugins = [...basePlugins, PostBuildPlugin(postBuildOptions)];
 
   // Resolve esbuild targets: user-specified or built-in defaults
   const targets = config.target.length > 0 ? config.target : [...BROWSER_TARGETS];
 
   // Resolve entry/chunk naming pattern based on hashFileNames
-  const entryNames = config.hashFileNames ? '[name]-[hash]' : '[name]';
-  const chunkNames = config.hashFileNames ? '[name]-[hash]' : '[name]';
+  const names = config.hashFileNames ? '[name]-[hash]' : '[name]';
 
-  const baseEsbuildConfig: BuildOptions = {
+  // Console and debugger statements are dropped in production builds only.
+  const prodDrop: ('console' | 'debugger')[] = [];
+  if (config.dropConsole) prodDrop.push('console');
+  if (config.dropDebugger) prodDrop.push('debugger');
+
+  const buildConfig: BuildOptions = {
     entryPoints: config.entryPoints,
     bundle: true,
     platform: 'browser',
@@ -108,35 +102,16 @@ export async function runBuild(config: BuildConfig): Promise<void> {
     format: 'esm',
     sourcemap: config.sourcemap,
     metafile: true,
-    entryNames,
-    chunkNames,
+    entryNames: names,
+    chunkNames: names,
     legalComments: config.legalComments,
     ...(Object.keys(config.define).length > 0 && { define: config.define }),
-  };
-
-  const devBuildConfig: BuildOptions = {
-    ...baseEsbuildConfig,
-    minify: false,
+    // `minify` implies minifyWhitespace, minifyIdentifiers and minifySyntax.
+    minify: config.isProd,
+    ...(config.isProd && prodDrop.length > 0 && { drop: prodDrop }),
     write: true,
-    plugins: devPlugins,
+    plugins,
   };
-
-  const prodDrop: ('console' | 'debugger')[] = [];
-  if (config.dropConsole) prodDrop.push('console');
-  if (config.dropDebugger) prodDrop.push('debugger');
-
-  const prodBuildConfig: BuildOptions = {
-    ...baseEsbuildConfig,
-    minify: true,
-    minifyWhitespace: true,
-    minifyIdentifiers: true,
-    minifySyntax: true,
-    ...(prodDrop.length > 0 && { drop: prodDrop }),
-    write: true,
-    plugins: prodPlugins,
-  };
-
-  const buildConfig = config.isProd ? prodBuildConfig : devBuildConfig;
 
   try {
     if (!config.serve) {

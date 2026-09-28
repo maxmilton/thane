@@ -4,7 +4,6 @@
  */
 
 import type ts from 'typescript';
-import type { TemplateEditKind } from '../contracts/compiler/template-edits.js';
 
 /**
  * Log level for compiler output
@@ -69,17 +68,6 @@ export interface SignalExpression {
 export interface Range {
   start: number;
   end: number;
-}
-
-/**
- * Template edit operation
- */
-export interface TemplateEdit {
-  type: TemplateEditKind;
-  start: number;
-  end: number;
-  content?: string;
-  elementId?: string;
 }
 
 /**

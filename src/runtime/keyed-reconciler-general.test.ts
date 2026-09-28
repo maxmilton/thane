@@ -316,35 +316,42 @@ describe('general path with static nodes around the rows', () => {
 });
 
 describe('same-length reorder pass: more than two displaced rows before a new key', () => {
-  // The reorder pass stops counting after the third displaced row (`mismatchCount > 2`) without
-  // having checked the remaining keys, so it takes the "all keys exist" branch and dereferences
-  // the missing row part-way through the move loop. Today this throws after some rows have
-  // moved; the rows' records keep the old order, so the DOM and the reconciler disagree until a
-  // later reconcile replaces the rows. In compiled code the error surfaces from the list's
-  // subscriber (re-thrown in a microtask). New finding, not in the plan's defect table; pinned
-  // here so RT-5 keeps it until an approved fix changes it.
-  test('throws a TypeError part-way through the moves, and a later reconcile recovers', () => {
+  // Until H-31 the reorder pass stopped after the third displaced row (`mismatchCount > 2`)
+  // without checking the remaining keys, took the "all keys exist" branch and threw a TypeError
+  // part-way through the moves (K1). It now checks every key first, so a missing one sends the
+  // update to the general path.
+  test('H-31: the general path runs: the missing row is cleaned up, the new one created', () => {
     const { reconcile, order } = setup();
     const [a, b, c, d] = rows('A', 'B', 'C', 'D');
     reconcile([a!, b!, c!, d!]);
-    ops = [];
-    expect(() => reconcile([c!, a!, b!, ...rows('X')])).toThrow(TypeError);
-    expect(ops).toEqual(['insert C before A']);
-    // No row was removed or created; D is still on screen and X is not
-    expect(order()).toEqual(['C', 'A', 'B', 'D', 'anchor']);
+    expect(reconcile([c!, a!, b!, ...rows('X')])).toEqual([
+      'cleanup D',
+      'remove D',
+      'create X@3 at anchor',
+      'insert X before anchor',
+      'insert A before X',
+      'insert B before X',
+    ]);
+    expect(order()).toEqual(['C', 'A', 'B', 'X', 'anchor']);
 
     reconcile(rows('P', 'Q'));
     expect(order()).toEqual(['P', 'Q', 'anchor']);
   });
 
-  test('rows updated by the pass before the throw keep their new value', () => {
-    const { reconcile } = setup();
+  test('H-31: a row updated by the pass is not updated again by the general path', () => {
+    const { reconcile, order } = setup();
     const [a, b, c, d] = rows('A', 'B', 'C', 'D');
     reconcile([a!, b!, c!, d!]);
     const b2 = { id: 'B', v: 2 };
-    ops = [];
-    expect(() => reconcile([b2, c!, a!, ...rows('X')])).toThrow(TypeError);
-    expect(ops).toEqual(['update B@0 v2', 'insert B before A', 'insert C before A']);
+    expect(reconcile([b2, c!, a!, ...rows('X')])).toEqual([
+      'update B@0 v2',
+      'cleanup D',
+      'remove D',
+      'create X@3 at anchor',
+      'insert X before anchor',
+      'insert A before X',
+    ]);
+    expect(order()).toEqual(['B', 'C', 'A', 'X', 'anchor']);
   });
 
   test('two displaced rows before the new key take the general path instead', () => {
