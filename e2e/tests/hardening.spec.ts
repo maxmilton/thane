@@ -996,9 +996,10 @@ test.describe('text bindings next to elements and directives', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('whitespace between two elements still goes', async ({ page }) => {
+  test('a space between two elements on one line stays; with a line break it goes', async ({ page }) => {
     const probe = await mountProbe(page, 'h53');
-    await expect.poll(() => h53Text(page, 'elements')).toBe('xy');
+    await expect.poll(() => h53Text(page, 'elements')).toBe('x y');
+    await expect.poll(() => h53Text(page, 'lines')).toBe('xy');
     expect(probe.pageErrors).toEqual([]);
   });
 });

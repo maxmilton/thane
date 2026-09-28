@@ -45,7 +45,7 @@ import {
   type TemplateEdit,
 } from './template-utils.js';
 import type { Range } from '../../types.js';
-import { outsideVerbatim } from '../minification/template-minifier.js';
+import { condenseBetweenTags, outsideVerbatim } from '../minification/template-minifier.js';
 import { VOID } from './dom-model.js';
 
 /**
@@ -217,19 +217,21 @@ export const generateStaticRepeatTemplate = (
   // The marks stay: the row's code finds its text markers, anchors and child hosts by them in the
   // template as emitted, which is written without them
 
-  // Aggressively strip whitespace BEFORE inserting comment marker placeholders.
+  // Strip whitespace BEFORE inserting comment marker placeholders.
+  // - Between two tags, condense it: gone when it holds a line break, one space when it does not,
+  //   as in component templates
   // - Collapse runs to single space
-  // - Remove all inter-element whitespace (><), except next to a text marker, where it is text: one
-  //   space stays between a binding and a sibling (an element or anchor after it, an element's end, a
-  //   void element or an anchor before it, another binding), as in component templates.
-  //   Between a binding and its parent's own tags it goes.
+  // - Next to a comment it goes, except next to a text marker, where it is text: one space stays
+  //   between a binding and a sibling (an element or anchor after it, an element's end, a void element
+  //   or an anchor before it, another binding), as in component templates. Between a binding and its
+  //   parent's own tags it goes.
   // - Strip trailing whitespace before > in opening tags (<a > → <a>)
   // Sole-content elements become empty (<td></td>) — the row creates their text node on fill.
   // Verbatim elements (<pre>, <textarea>, …) keep their whitespace.
   staticHtml = outsideVerbatim(staticHtml, (html) =>
-    html
+    condenseBetweenTags(html)
       .replace(/\s+/g, ' ')
-      .replace(/(?<!<!--[ib]\d+--)>\s+<(?!!--[ib]\d+-->)/g, '><')
+      .replace(/(?<=--)(?<!<!--[ib]\d+--)>\s+<(?!!--[ib]\d+-->)|(?<!--)>\s+<(?=!--)(?!!--[ib]\d+-->)/g, '><')
       .replace(/(<!--[ib]\d+-->)\s+(?=<(?![A-Za-z]|!--[ib]\d+[(|).]?-->))/g, '$1')
       .replace(SPACE_BEFORE_MARKER_AFTER_NON_SIBLING, '>')
       .replace(/\s+>/g, '>')
@@ -814,11 +816,12 @@ export const processItemTemplate = (
     const { start, end, expr, id, soleParent } = textMatch;
 
     if (soleParent) {
-      // For sole content: just output the expression (no wrapper)
-      // The parent element will get the ID
+      // For sole content: just output the expression (no wrapper), in place of the element's whole
+      // content: the row writes the element's text, so whitespace around the binding would only be
+      // a node every row clones. The parent element will get the ID
       edits.push({
-        start,
-        end,
+        start: soleParent.openTagEnd,
+        end: soleParent.closeTagStart,
         replacement: `\${${expr}}`,
       });
       parentElementIds.set(soleParent, id);

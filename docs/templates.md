@@ -115,7 +115,7 @@ This injects the pre-built HTML fragment at that position.
 Compiled templates keep the text you write, with whitespace tidied the same way in development and production builds:
 
 - A run of spaces, tabs and newlines inside text becomes one space.
-- Whitespace-only text between two elements, and at the start or end of an element's content, is removed: `<b>x</b> <i>y</i>` renders as "xy". To keep such a space, put it inside one of the elements (`<b>x </b><i>y</i>`) or write it as `&#32;`.
+- Whitespace-only text between two tags is condensed, as Vue's `condense` rule does: when it holds a line break it is removed (that is the template's own formatting), and when it does not it stays as one space, so `<b>x</b> <i>y</i>` renders as "x y". Next to a list's or a directive's anchor it is always removed.
 - A space next to a text binding is kept, whether the binding's neighbour is text, another binding, an element or a directive: `<b>Name:</b> ${name()}` and `${count()} <small>items</small>` render with their space. At the edges of an element it is not kept reliably: a space after the last binding (`<b>${a()} </b>`) is removed, and one before the first binding is kept in component templates but removed in `repeat()` rows. Put such a space outside the element.
 - Inside `<pre>`, `<textarea>`, `<script>` and `<style>`, content is kept exactly as written.
 

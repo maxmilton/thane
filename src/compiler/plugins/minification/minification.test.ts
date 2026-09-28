@@ -154,7 +154,8 @@ export const App = defineComponent('test-app', () => ({
 }));
 mount({ component: App });
 `);
-    expect(js).toContain('<section><h1>Title</h1></section>');
+    // Whitespace on one line between tags is one space; with a line break in it, it would go
+    expect(js).toContain('<section> <h1>Title</h1> </section>');
     expect(js).toContain('.card{padding:1rem}');
   });
 });

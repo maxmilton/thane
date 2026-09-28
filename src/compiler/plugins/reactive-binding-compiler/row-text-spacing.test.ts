@@ -134,21 +134,28 @@ const ROW_SHAPES: Record<string, Shape> = {
     text: ' John',
     lostSpace: 'next to an element',
   },
-  // Between the two elements the whitespace still goes; next to the binding it stays
+  // Between the two elements a space on one line stays, as it does next to the binding
   betweenElements: {
     source: '<b>x</b> <i>y</i> ${it.a}',
+    template: '<b>x</b> <i>y</i> <!----> <!---->',
+    values: ['John'],
+    text: 'x y John',
+    lostSpace: 'next to an element',
+  },
+  // At the start of the binding's parent the whitespace goes; after its last element one space stays
+  edges: {
+    source: ' ${it.a} <b>x</b> ',
+    template: '<!----> <!----> <b>x</b> ',
+    values: ['John'],
+    text: 'John x ',
+    lostSpace: 'next to an element',
+  },
+  // Whitespace that holds a line break goes between tags: it is the template's own formatting
+  lineBreaks: {
+    source: '\n  <b>x</b>\n  <i>y</i>\n  ${it.a}',
     template: '<b>x</b><i>y</i> <!----> <!---->',
     values: ['John'],
     text: 'xy John',
-    lostSpace: 'next to an element',
-  },
-  // At the edges of the binding's parent the whitespace still goes
-  edges: {
-    source: ' ${it.a} <b>x</b> ',
-    template: '<!----> <!----> <b>x</b>',
-    values: ['John'],
-    text: 'John x',
-    lostSpace: 'next to an element',
   },
   when: {
     source: '${it.a} <span ${when(it.on)}>w</span> ${it.b}',
@@ -192,7 +199,8 @@ const COMPONENT_SHAPES: Record<string, Shape> = {
   },
   afterElement: { source: '<b>B</b> ${a()}', template: '<b>B</b> <!---->A<!---->', text: 'B A' },
   afterVoid: { source: '<input> ${a()}', template: '<input> <!---->A<!---->', text: ' A' },
-  betweenElements: { source: '<b>x</b> <i>y</i>', template: '<b>x</b><i>y</i>', text: 'xy' },
+  betweenElements: { source: '<b>x</b> <i>y</i>', template: '<b>x</b> <i>y</i>', text: 'x y' },
+  lineBreaks: { source: '<b>x</b>\n  <i>y</i>', template: '<b>x</b><i>y</i>', text: 'xy' },
   // The whitespace before the end of the binding's parent still goes
   trailing: { source: '<b>${a()} </b>x', template: '<b><!---->A<!----></b>x', text: 'Ax' },
 };

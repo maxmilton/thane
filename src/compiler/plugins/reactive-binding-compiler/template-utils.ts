@@ -20,7 +20,7 @@ import {
   type ParsedTemplate,
   type BindingInfo as ParsedBindingInfo,
 } from '../../utils/html-parser/index.js';
-import { outsideVerbatim } from '../minification/template-minifier.js';
+import { condenseBetweenTags, outsideVerbatim } from '../minification/template-minifier.js';
 import { safeEvaluateCondition } from './template-processing.js';
 import type { processItemTemplate } from './repeat-analysis.js';
 
@@ -286,7 +286,7 @@ export const collectWhenElseBlocks = (
 
 /** A repeat()'s empty template with its whitespace collapsed (outside verbatim elements). */
 export const collapseEmptyTemplate = (template: string): string =>
-  outsideVerbatim(template, (t) => t.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim());
+  outsideVerbatim(template, (t) => condenseBetweenTags(t).replace(/\s+/g, ' ').replace(/\s+>/g, '>').trim());
 
 const _componentRowRe = /^\s*([A-Za-z_$][\w$]*)\((.*)\)\s*$/s;
 
@@ -400,16 +400,15 @@ export const applyTemplateEdits = (source: string, edits: TemplateEdit[]): strin
   for (const edit of edits) {
     result = result.substring(0, edit.start) + edit.replacement + result.substring(edit.end);
   }
-  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style>.
-  // Between a tag and an anchor comment it goes as it does between two tags: anchors stand where
-  // `<template>` placeholders stood before A1, and a list's container must hold only its rows and
-  // its anchor for a clear to empty it at once. A text marker keeps the whitespace before it,
-  // which is text, and so does a binding's boundary (`<!---->`) before an element or an anchor;
-  // before its parent's end tag it goes.
+  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style>. Between two
+  // tags it is condensed: gone when it holds a line break, one space when it does not. Next to an
+  // anchor comment it goes: a list's container must hold only its rows and its anchor for a clear to
+  // empty it at once. A text marker keeps the whitespace before it, which is text, and so does a
+  // binding's boundary (`<!---->`) before an element or an anchor; before its parent's end tag it goes.
   return outsideVerbatim(result, (html) =>
-    html
+    condenseBetweenTags(html)
       .replace(/\s+/g, ' ')
-      .replace(/(?<!<!----)>\s+<(?![!-])|>\s+<(?=\/)/g, '><')
+      .replace(/(?<=--)(?<!<!----)>\s+<(?![!-])|(?<=--)>\s+<(?=\/)/g, '><')
       .replace(/(?<!<!----)>\s+(?=<!--[ib]\d+[(|).]-->)/g, '>')
       .replace(/(<!--[ib]\d+-->)(<!---->)/g, '$1 $2')
       .replace(/\s+>/g, '>')

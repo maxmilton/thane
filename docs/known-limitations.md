@@ -67,7 +67,7 @@ The empty template of a `repeat()`, its third argument, is inserted as written, 
 
 ### Whitespace Between Elements
 
-Whitespace-only text between two elements is removed from compiled templates, so `<b>x</b> <i>y</i>` renders as "xy", where a browser would show "x y". Put the space inside one of the elements (`<b>x </b><i>y</i>`) or write it as `&#32;`. Whitespace next to a text binding is kept; see [Templates](templates.md#whitespace).
+Whitespace-only text between two tags that holds a line break is removed from compiled templates: two elements written on separate lines render without a space between them, where a browser would show one. Write them on one line (`<b>x</b> <i>y</i>` keeps its space), put the space inside one of the elements, or write it as `&#32;`. See [Templates](templates.md#whitespace).
 
 ## Runtime Constraints
 

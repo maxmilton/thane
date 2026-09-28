@@ -48,9 +48,9 @@ describe('sole content: text node', () => {
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
-      'surrounded by whitespace',
+      'surrounded by whitespace, which goes: the row writes the whole text',
       '<li>  ${item.name}  </li>',
-      '<li data-thane-ref="i1"> ${item.name} </li>',
+      '<li data-thane-ref="i1">${item.name}</li>',
       [['i1', 'text', 'item.name', 'textNode']],
     ],
     [
