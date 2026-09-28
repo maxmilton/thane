@@ -5,7 +5,7 @@
  * by e2e/tests/hardening.spec.ts where a browser is needed.
  */
 import { describe, expect, test } from 'bun:test';
-import { buildAndReadJs } from '../../testing/build-project.js';
+import { buildAndReadJs, PROD_BUILD } from '../../testing/build-project.js';
 
 const DEV = { config: { strictTypeCheck: false } };
 
@@ -55,6 +55,20 @@ describe('H-02 template text reads back as the source means it', () => {
     expect(cooked(new RegExp(`\\?\\?= __T\\(${LITERAL}\\)`).exec(js)?.[1])).toBe('<li>e\\q</li>');
     // `notExpr` is text, not a binding: nothing reads it
     expect(js).not.toMatch(/[^{]notExpr/);
+  });
+
+  test('an escape that is invalid outside a tagged template is shown as written', async () => {
+    // html`<p>C:\users \x1 \u12 \u{zz} \08 \9 ok</p>` is valid source (a tagged template may hold
+    // invalid escapes), but each of these fails in the untagged literal the template is emitted into
+    const source = app(
+      '  return { template: html`<p>C:\\users \\x1 \\u12 \\u{zz} \\08 \\9 ok \\u0041 \\x42 \\0</p>` };',
+    );
+    const js = await buildAndReadJs(source, DEV);
+    const main = cooked(new RegExp(`\\b__tpl = __T\\(${LITERAL}\\)`).exec(js)?.[1]);
+    expect(main).toBe('<p>C:\\users \\x1 \\u12 \\u{zz} \\08 \\9 ok A B \0</p>');
+    // A production build minifies the template before emitting it, through the same escaper
+    const prod = await buildAndReadJs(source, { config: { ...PROD_BUILD } });
+    expect(prod).toContain('C:\\\\users \\\\x1');
   });
 });
 

@@ -74,14 +74,21 @@ export function attributeDomProperty(attrName: string, element: HtmlElement | nu
 }
 
 /**
+ * An escape sequence that is valid in an untagged template literal, or a lone backslash: a tagged
+ * template may also hold invalid ones (`\u` without hex digits, `\x1`, `\08`, `\9`).
+ */
+const _templateEscapeRe = /\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|u\{[0-9a-fA-F]+\}|0(?![0-9])|[^xu0-9])|\\|`|\$\{/g;
+
+/**
  * The one escaper for every template the compiler emits into a JS template literal (H-02).
  * Templates are carried as written in the source (raw), so the escape sequences the developer
  * wrote (`\\`, `` \` ``, `\${`, `\n`, …) are kept as they are; a backtick or `${` that is not
  * escaped (text the compiler put there) is escaped, so the literal can neither end early nor
- * interpolate.
+ * interpolate. An escape that only a tagged template allows (`` html`C:\users` ``) gets its
+ * backslash doubled, so it is shown as written instead of failing the build.
  */
 export function escapeTemplateLiteral(s: string): string {
-  return s.replace(/\\[\s\S]|`|\$\{/g, (m) => (m[0] === '\\' ? m : '\\' + m));
+  return s.replace(_templateEscapeRe, (m) => (m === '\\' ? '\\\\' : m[0] === '\\' ? m : '\\' + m));
 }
 
 /**
