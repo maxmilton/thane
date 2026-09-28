@@ -196,10 +196,11 @@ describe('setup shapes: lifecycle hooks', () => {
 });
 
 describe('setup shapes: several return statements and nested functions', () => {
-  test('return inside if: the last template becomes __tpl; features and stripping come from the first return (defect)', async () => {
-    // Every return object's template is compiled and blanked, `__tpl` is the last one, and the
-    // strip pass works on the first `return {…}` it meets. With `flag` true this component
-    // renders "b" with the first branch's onMount.
+  test('return inside if: the last return counts (H-07); a second return object cannot work (K5)', async () => {
+    // Every return object's template is compiled and blanked, and `__tpl` is the last one. The
+    // last return object is the component's: it decides lean or full and loses its dead
+    // properties. The early return keeps its blanked template and an onMount that a lean
+    // registration never calls. H-38 turns a second return object into a build error.
     const r = await compile(`export const App = defineComponent(() => {
   if (flag) {
     return { template: html\`<p>a</p>\`, onMount: () => { log('a'); } };
@@ -209,35 +210,34 @@ describe('setup shapes: several return statements and nested functions', () => {
     expect(r.tpl).toBe('<p>b</p>');
     expect(r.registration).toBe(
       [
-        'var App = __registerComponent("app", () => {',
+        'var App = __registerComponentLean("app", () => {',
         '  if (flag) {',
-        '    return { onMount: () => {',
+        '    return { template: ``, onMount: () => {',
         '      log("a");',
         '    } };',
         '  }',
-        '  return { template: `` };',
+        '  return {};',
         '}, __tpl);',
       ].join('\n'),
     );
   });
 
-  test('styles only in a later return: lean, never called, styles silently dropped (defect)', async () => {
+  test('styles only in a later return: the last return counts (H-07), styles called and imported', async () => {
     const r = await compile(`export const App = defineComponent(() => {
   if (flag) {
     return { template: html\`<p>a</p>\` };
   }
   return { template: html\`<p>b</p>\`, styles: css\`p { color: red; }\` };
 });`);
-    expect(r.registration.startsWith('var App = __registerComponentLean("app", () => {')).toBe(true);
-    expect(r.registration).toContain('return { template: ``, styles: `p { color: red; }` };');
-    // Detection reads the first return only (before CE-3 an early walk imported
-    // __enableComponentStyles anyway, and esbuild dropped the unused import)
-    expect([r.stylesCall, r.stylesImported]).toEqual([false, false]);
+    expect(r.registration.startsWith('var App = __registerComponent("app", () => {')).toBe(true);
+    expect(r.registration).toContain('return { template: `` };');
+    expect(r.registration).toContain('return { styles: `p { color: red; }` };');
+    expect([r.stylesCall, r.stylesImported]).toEqual([true, true]);
   });
 
-  test('nested arrow and function expression returns are skipped; a function declaration is not (P8, H-07)', async () => {
-    // The strip pass takes `{ a: 1 }` from `function decl()` as the return object: no lifecycle is
-    // found, the registration is lean, the real return keeps `template: ``` and onMount never runs.
+  test('nested arrow, function expression and function declaration returns are skipped (P8, H-07)', async () => {
+    // Before H-07 the strip pass took `{ a: 1 }` from `function decl()` as the return object: no
+    // lifecycle was found, the registration was lean and onMount never ran.
     const r = await compile(`export const App = defineComponent(() => {
   const arrow = () => ({ template: 1 });
   const fexpr = function () { return { styles: 'x' }; };
@@ -248,7 +248,7 @@ describe('setup shapes: several return statements and nested functions', () => {
     expect(r.tpl).toBe('<p>a</p>');
     expect(r.registration).toBe(
       [
-        'var App = __registerComponentLean("app", () => {',
+        'var App = __registerComponent("app", () => {',
         '  const arrow = () => ({ template: 1 });',
         '  const fexpr = function() {',
         '    return { styles: "x" };',
@@ -259,7 +259,7 @@ describe('setup shapes: several return statements and nested functions', () => {
         '  void arrow;',
         '  void fexpr;',
         '  void decl;',
-        '  return { template: ``, onMount: () => {',
+        '  return { onMount: () => {',
         '    log("m");',
         '  } };',
         '}, __tpl);',

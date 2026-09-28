@@ -2,9 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
 import { generateInitBindingsFunction } from './codegen.js';
 import { transformDefineComponentSource } from './index.js';
-import { CLOSURE_ACCESS } from './types.js';
+import type { EmitOptions } from './types.js';
 
 type Init = [string, string | number | boolean];
+const DEV: EmitOptions = { html: (template) => template, selector: (name) => name };
 const inits = (entries: Init[] = []) => new Map<string, string | number | boolean>(entries);
 const processTemplate = (template: string, initializers = inits()) =>
   processHtmlTemplateWithConditionals(template, initializers, 0);
@@ -16,8 +17,7 @@ const generate = (template: string, initializers = inits()) => {
     r.whenElseBlocks,
     r.repeatBlocks,
     r.eventBindings,
-    'x.ts',
-    CLOSURE_ACCESS,
+    DEV,
   ).code;
 };
 

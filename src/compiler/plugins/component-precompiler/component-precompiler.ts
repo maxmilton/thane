@@ -16,6 +16,7 @@ import { transformDefineComponentSource } from '../reactive-binding-compiler/ind
 import type { CompileOptions } from '../reactive-binding-compiler/index.js';
 import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
 import { ErrorCode, createError } from '../../errors.js';
+import { INTERNAL_RUNTIME_SPECIFIER, RUNTIME_HELPER } from '../../../contracts/index.js';
 
 const NAME = PLUGIN_NAME.COMPONENT;
 
@@ -130,7 +131,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
 
     // ── Mount-call optimiser (Mode A → mountComponent) ────────────────
     // Rewrites `import { mount } from 'thane'` + `mount({ component: X, target?: T, props?: P })`
-    // into `import { mountComponent } from 'thane'` + `mountComponent(X, T, P)` when there is no
+    // into `import { mountComponent } from 'thane/runtime'` + `mountComponent(X, T, P)` when there is no
     // `router` key, so the generic mount() wrapper, _routerMount hook, and __setRouterMount
     // are all tree-shaken away for non-router apps.
     const rewriteMountToMountComponent = (source: string): string | null => {
@@ -198,16 +199,20 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
       // 4. Replace the mount call text
       const callStart = mc.getStart(sf);
       const callEnd = mc.getEnd();
-      let result = source.substring(0, callStart) + `mountComponent(${args.join(', ')})` + source.substring(callEnd);
+      const call = `${RUNTIME_HELPER.MOUNT_COMPONENT}(${args.join(', ')})`;
+      let result = source.substring(0, callStart) + call + source.substring(callEnd);
 
-      // 5. Fix the import: replace `mount` with `mountComponent` in the thane import
+      // 5. Fix the imports: `mount` leaves the thane import, and mountComponent comes from the
+      //    compiler's entry, with the other helpers compiled code calls
       result = result.replace(/import\s*\{([^}]*)\}\s*from\s*['"]thane['"]/, (_match, specifiers: string) => {
         const specs = specifiers
           .split(',')
           .map((s: string) => s.trim())
           .filter(Boolean);
-        const updated = specs.map((s: string) => (s === 'mount' ? 'mountComponent' : s));
-        return `import { ${updated.join(', ')} } from 'thane'`;
+        if (!specs.includes('mount')) return `import { ${specs.join(', ')} } from 'thane'`;
+        const rest = specs.filter((s: string) => s !== 'mount');
+        const runtimeImport = `import { ${RUNTIME_HELPER.MOUNT_COMPONENT} } from '${INTERNAL_RUNTIME_SPECIFIER}'`;
+        return rest.length > 0 ? `import { ${rest.join(', ')} } from 'thane';\n${runtimeImport}` : runtimeImport;
       });
 
       return result;
@@ -356,7 +361,8 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           ErrorCode.PLUGIN_ERROR,
         );
         logger.diagnostic(diagnostic);
-        return undefined;
+        // A component the compiler cannot process must fail the build rather than ship uncompiled
+        return { errors: [{ text: diagnostic.message, location: { file: args.path } }] };
       }
     });
   },

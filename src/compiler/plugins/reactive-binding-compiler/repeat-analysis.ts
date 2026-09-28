@@ -111,7 +111,6 @@ const ensureRowElementId = (el: HtmlElement, state: IdState, prefix: 'b' | 'i'):
 export const generateStaticRepeatTemplate = (
   itemTemplate: string,
   itemBindings: ItemBinding[],
-  _itemVar: string,
   itemEvents?: ItemEventBinding[],
   signalBindings?: SimpleBinding[],
   directiveAnchorIds?: string[],

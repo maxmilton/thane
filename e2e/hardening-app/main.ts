@@ -5,7 +5,7 @@
  * and errors. `&manual=1` skips the mount, for tests that measure state before mounting and call
  * `window.__mountProbe()` themselves. A mount that throws is recorded in `window.__mountErrors`.
  */
-import { mountComponent, type ComponentHTMLSelector } from 'thane';
+import { mount, type ComponentHTMLSelector } from 'thane';
 import { I1 } from './probes/i1-index-child-props.js';
 import { L1 } from './probes/l1-destroy-rows.js';
 import { L2 } from './probes/l2-hidden-rows.js';
@@ -71,7 +71,7 @@ win.__mountProbe = (): boolean => {
     return false;
   }
   try {
-    win.__handle = mountComponent(component, target);
+    win.__handle = mount({ component, target });
     return true;
   } catch (error) {
     win.__mountErrors.push(String(error));

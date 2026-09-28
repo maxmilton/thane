@@ -28,21 +28,14 @@ import { signal } from './signal.js';
 import type { ReadonlySignal, Signal } from './types.js';
 
 // ─────────────────────────────────────────────────────────────
-//  Register pattern — module augmentation for type-safe routes
+//  Route type registry — augmented by generated files
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Augment this interface via `declare module 'thane'` to enable
- * type-safe `navigate()`.
- *
- * ```ts
- * const Routes = defineRoutes({ ... });
- * type Routes = typeof Routes;
- *
- * declare module 'thane' {
- *   interface Register { routes: Routes }
- * }
- * ```
+ * The hidden files that `thane build`, `dev`, `serve` and `types` generate in
+ * `.thane/types` augment these interfaces with the app's route paths (`Register`) and
+ * the route pattern of each page component's selector (`RouteComponentRegister`). That
+ * makes `navigate()`, `RoutePaths` and a page's `ctx.route` type-safe.
  */
 declare global {
   namespace ThaneTypeRegistry {
@@ -50,12 +43,6 @@ declare global {
     interface RouteComponentRegister {}
   }
 }
-
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface Register extends ThaneTypeRegistry.Register {}
-
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface RouteComponentRegister extends ThaneTypeRegistry.RouteComponentRegister {}
 
 // ─────────────────────────────────────────────────────────────
 //  Type-safe route path utilities
@@ -94,8 +81,8 @@ type RegisteredRoutePaths<T extends Record<string, any>> = T extends { readonly 
   ? P
   : RouteKeys<T>;
 
-type EffectiveRegister = ThaneTypeRegistry.Register & Register;
-type EffectiveRouteComponentRegister = ThaneTypeRegistry.RouteComponentRegister & RouteComponentRegister;
+type EffectiveRegister = ThaneTypeRegistry.Register;
+type EffectiveRouteComponentRegister = ThaneTypeRegistry.RouteComponentRegister;
 
 type ExplicitRegisterRoutePaths = EffectiveRegister extends { routePaths: infer P extends string } ? P : never;
 type ExplicitRegisterRouteParamNames = EffectiveRegister extends { routeParamNames: infer P extends string }

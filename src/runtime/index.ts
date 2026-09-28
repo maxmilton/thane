@@ -34,7 +34,7 @@ declare global {
 
   /**
    * Navigate to a path (router).
-   * Type-safe when `Register` is augmented in `routes.ts`.
+   * Type-safe once Thane has generated the route types (any `thane` command does).
    */
   function navigate(path: import('./router.js').RoutePaths): void;
 
@@ -50,74 +50,18 @@ declare global {
   const currentPath: import('./types.js').ReadonlySignal<string>;
 }
 
-// Export types
-export type { Signal, ReadonlySignal, ComponentRoot } from './types.js';
-
-// Export signal and reactive primitives
+// The public API: what an app calls, and the types an app writes in its own code. Every other
+// type stays in the module declarations, so hovers and inference still show it. Compiler helpers
+// are in ./internal.ts ('thane/runtime'), the router values in ./router-exports.ts ('thane/router').
+export type { Signal, ReadonlySignal } from './types.js';
 export { signal, batch, computed, effect, untrack } from './signal.js';
-
-// Export component (public API only — internal symbols live in ./internal.ts)
 export {
   defineComponent,
   registerGlobalStyles,
-  mountComponent,
+  mount,
+  unmount,
   type ComponentContext,
-  type ComponentReturnType,
   type ComponentHTMLSelector,
+  type MountHandle,
 } from './component.js';
-
-// Export mount (public API) and unmount
-export { mount, unmount, type MountOptions, type MountHandle } from './component.js';
-
-// Router types — re-exported so `declare module 'thane' { interface Register { ... } }` works.
-// VALUE exports live in the 'thane/router' subpath to keep router code tree-shakable.
-export type {
-  Register,
-  RegisteredRoutes,
-  Route,
-  RouteComponent,
-  LazyRouteComponent,
-  EagerRouteComponent,
-  RoutesMap,
-  RoutesConfig,
-  RouterConfig,
-  ScrollRestorationConfig,
-  RoutePaths,
-  ExtractRouteParams,
-  RouteContextForSelector,
-  RouteComponentRegister,
-  UntypedRouteContext,
-  RouteToPath,
-} from './router.js';
-
-// ─────────────────────────────────────────────────────────────
-//  Template tag shims
-//
-//  Compiler replaces html`` / css`` at build time. These shims
-//  exist for unit tests and non-compiled contexts.
-// ─────────────────────────────────────────────────────────────
-
-/** Escape HTML-significant chars in interpolated values. */
-const _esc = (val: unknown): string => {
-  const s = String(val);
-  if (!/[&<>"']/.test(s)) return s;
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-};
-
-/** Runtime shim for `html` — replaced by compiler in production builds. */
-export const html = (strings: TemplateStringsArray, ...values: unknown[]): string => {
-  let result = strings[0]!;
-  for (let i = 0; i < values.length; i++) {
-    result += _esc(values[i]) + strings[i + 1]!;
-  }
-  return result;
-};
-
-/** Runtime shim for `css` — plain concatenation (no escaping needed). */
-export const css = (strings: TemplateStringsArray, ...values: unknown[]): string =>
-  String.raw({ raw: strings }, ...values);
+export type { RoutePaths } from './router.js';

@@ -9,6 +9,7 @@ import {
   __registerComponentLean,
   createKeyedReconciler,
   __sig,
+  mountComponent,
 } from './internal.js';
 
 describe('runtime internal contract', () => {
@@ -21,6 +22,7 @@ describe('runtime internal contract', () => {
     [RUNTIME_HELPER.REGISTER_COMPONENT_LEAN]: __registerComponentLean,
     [RUNTIME_HELPER.DESTROY_CHILD]: __dc,
     [RUNTIME_HELPER.SIGNAL]: __sig,
+    [RUNTIME_HELPER.MOUNT_COMPONENT]: mountComponent,
   };
 
   test('expected map covers all runtime helper names', () => {
@@ -38,5 +40,6 @@ describe('runtime internal contract', () => {
     expect(expected[RUNTIME_HELPER.REGISTER_COMPONENT_LEAN]).toBe(__registerComponentLean);
     expect(expected[RUNTIME_HELPER.DESTROY_CHILD]).toBe(__dc);
     expect(expected[RUNTIME_HELPER.SIGNAL]).toBe(__sig);
+    expect(expected[RUNTIME_HELPER.MOUNT_COMPONENT]).toBe(mountComponent);
   });
 });

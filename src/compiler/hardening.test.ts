@@ -65,25 +65,22 @@ const undeclaredNames = (js: string): string[] => {
 const callsRuntimeDefineComponent = (js: string): boolean => /(?<!function\s+)\bdefineComponent\s*\(/.test(js);
 
 describe('F0-3 compile-time defects (turned on by the task in each title)', () => {
-  test.todo(
-    'H-08 C1 a doc comment mentioning defineComponent() above the component leaves the component intact',
-    async () => {
-      const js = await buildAndReadJs(mainFor('Cmt', 'cmt'), {
-        ...DEV,
-        extraFiles: {
-          'src/cmt.ts':
-            "import { defineComponent, signal } from 'thane';\n" +
-            '/** Built with defineComponent() like every component. */\n' +
-            'export const Cmt = defineComponent(() => {\n' +
-            '  const n = signal(1);\n' +
-            '  return { template: html`<p class="c1">${n()}</p>` };\n' +
-            '});\n',
-        },
-      });
-      expect(undeclaredNames(js)).toEqual([]);
-      expect(callsRuntimeDefineComponent(js)).toBe(false);
-    },
-  );
+  test('H-08 C1 a doc comment mentioning defineComponent() above the component leaves the component intact', async () => {
+    const js = await buildAndReadJs(mainFor('Cmt', 'cmt'), {
+      ...DEV,
+      extraFiles: {
+        'src/cmt.ts':
+          "import { defineComponent, signal } from 'thane';\n" +
+          '/** Built with defineComponent() like every component. */\n' +
+          'export const Cmt = defineComponent(() => {\n' +
+          '  const n = signal(1);\n' +
+          '  return { template: html`<p class="c1">${n()}</p>` };\n' +
+          '});\n',
+      },
+    });
+    expect(undeclaredNames(js)).toEqual([]);
+    expect(callsRuntimeDefineComponent(js)).toBe(false);
+  });
 
   test.todo('H-09 C2 a component whose path contains "scripts" is compiled', async () => {
     const js = await buildAndReadJs(mainFor('Tr', 'transcripts/tr'), {

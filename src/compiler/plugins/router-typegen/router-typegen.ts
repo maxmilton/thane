@@ -1,16 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { Plugin } from 'esbuild';
 import ts from 'typescript';
-import {
-  collectFilesRecursively,
-  extractComponentDefinitions,
-  logger,
-  PLUGIN_NAME,
-  sourceCache,
-} from '../../utils/index.js';
+import { collectFilesRecursively, extractComponentDefinitions, sourceCache } from '../../utils/index.js';
 
-const NAME = PLUGIN_NAME.TYPES_SYNC;
 const GENERATED_ROOT_DIR = '.thane';
 const GENERATED_TYPES_DIR = 'types';
 const GENERATED_ROUTER_DIR = 'router';
@@ -397,15 +389,3 @@ export const syncProjectTypes = async (projectRoot: string = process.cwd()): Pro
 
   return generatedCount;
 };
-
-export const ProjectTypesSyncPlugin = (projectRoot?: string): Plugin => ({
-  name: NAME,
-  setup(build) {
-    build.onStart(async () => {
-      const generatedCount = await syncProjectTypes(projectRoot ?? process.cwd());
-      if (generatedCount > 0) {
-        logger.info(NAME, `Generated hidden type file(s) for ${generatedCount} route table(s)`);
-      }
-    });
-  },
-});

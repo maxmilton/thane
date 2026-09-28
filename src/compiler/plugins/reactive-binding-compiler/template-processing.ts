@@ -410,8 +410,8 @@ export const processHtmlTemplateWithConditionals = (
   templateContent: string,
   signalInitializers: Map<string, string | number | boolean>,
   startingId: number,
-): ProcessedTemplate & { hasConditionals: boolean } => {
-  const result = processTemplate(
+): ProcessedTemplate =>
+  processTemplate(
     templateContent,
     signalInitializers,
     startingId,
@@ -419,12 +419,6 @@ export const processHtmlTemplateWithConditionals = (
     { detectNonSignalBindings: true },
     { value: 0 },
   );
-  return {
-    ...result,
-    hasConditionals:
-      result.conditionals.length > 0 || result.whenElseBlocks.length > 0 || result.repeatBlocks.length > 0,
-  };
-};
 
 /**
  * Process a sub-template within a whenElse block, handling nested conditionals

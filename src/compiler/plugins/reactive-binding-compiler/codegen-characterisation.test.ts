@@ -16,15 +16,17 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
 import { generateInitBindingsFunction, generateStaticTemplate } from './codegen.js';
-import { CLOSURE_ACCESS, type AccessPattern, type ConditionalBlock, type WhenElseBlock } from './types.js';
+import type { ConditionalBlock, EmitOptions, WhenElseBlock } from './types.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
 import { minifyHTML } from '../minification/template-minifier.js';
 
 const GOLDEN = join(import.meta.dir, 'codegen-characterisation.golden.txt');
 const UPDATE = process.env['UPDATE_GOLDEN'] === '1';
 
-/** The production access pattern: minified templates and short selectors. */
-const PROD: AccessPattern = { ...CLOSURE_ACCESS, html: minifyHTML, selector: (name) => `m-${name.length}` };
+/** Development output: templates and selectors as written. */
+const DEV: EmitOptions = { html: (template) => template, selector: (name) => name };
+/** Production output: minified templates and short selectors. */
+const PROD: EmitOptions = { html: minifyHTML, selector: (name) => `m-${name.length}` };
 
 interface Mount {
   /** Anchor id written into the template as `<template id="…"></template>` */
@@ -39,7 +41,7 @@ interface Case {
   name: string;
   template: string;
   initializers?: [string, string | number | boolean][];
-  ap?: AccessPattern;
+  emit?: EmitOptions;
   mounts?: Mount[];
 }
 
@@ -299,19 +301,19 @@ const cases: Case[] = [
     name: 'escaping: the same templates, production',
     template:
       '<p title="a\\b">`q` ${t()}</p><ul>${repeat(items(), (it) => html`<li title="c\\d">${it.x} e\\f</li>`, html`<li>g\\h</li>`)}</ul><ol>${repeat(items(), (it) => html`<li>s\\t</li>`)}</ol><div ${when(a())}><i>`w`\\</i></div>',
-    ap: PROD,
+    emit: PROD,
   },
   {
     name: 'production: nested rows, row directives and a child mount',
     template:
       '<ul>${repeat(groups(), (g) => html`<li class="row">  <b ${when(on())}>${lbl()}</b>  <ol>${repeat(g.items, (it) => html`<li>  ${it.label}  </li>`)}</ol><template id="b900"></template></li>`)}</ul>',
-    ap: PROD,
+    emit: PROD,
     mounts: [{ anchorId: 'b900', componentName: 'Kid', propsExpression: '{ g }', owner: firstRepeat }],
   },
 ];
 
 const render = (c: Case): string => {
-  const ap = c.ap ?? CLOSURE_ACCESS;
+  const emit = c.emit ?? DEV;
   const r = processHtmlTemplateWithConditionals(c.template, new Map(c.initializers ?? []), 0);
   let mounts: Map<string, { cm: ChildMountInfo; globalIndex: number }[]> | undefined;
   if (c.mounts) {
@@ -323,7 +325,6 @@ const render = (c: Case): string => {
         selector: `x-${m.componentName.toLowerCase()}`,
         propsExpression: m.propsExpression,
         anchorId: m.anchorId,
-        templatePosition: 0,
       };
       mounts!.set(owner, [...(mounts!.get(owner) ?? []), { cm, globalIndex }]);
     });
@@ -334,17 +335,16 @@ const render = (c: Case): string => {
     r.whenElseBlocks,
     r.repeatBlocks,
     r.eventBindings,
-    'x.ts',
-    ap,
+    emit,
     mounts,
   );
   return [
     '--- template',
     r.processedContent,
-    '--- initializeBindings',
-    out.code.replace(/^\n+/, ''),
+    '--- binding function body',
+    out.code,
     '--- static templates',
-    generateStaticTemplate(r.processedContent, ap).replace(/^\n/, ''),
+    generateStaticTemplate(r.processedContent, emit).replace(/^\n/, ''),
     ...(out.staticTemplates ?? []),
   ].join('\n');
 };

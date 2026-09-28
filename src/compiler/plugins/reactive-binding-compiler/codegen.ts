@@ -2,7 +2,7 @@
  * Code generation for reactive binding compiler
  *
  * Generates JavaScript code for bindings, subscriptions, static templates,
- * imports, and the initializeBindings function.
+ * imports, and the body of the component's binding function.
  */
 
 import type {
@@ -14,10 +14,10 @@ import type {
   ExpressionBinding,
   EventBinding,
   ItemEventBinding,
-  AccessPattern,
+  EmitOptions,
   StaticTemplateInfo,
 } from './types.js';
-import { CLOSURE_ACCESS, isExpressionBinding, isSimpleBinding } from './types.js';
+import { isExpressionBinding, isSimpleBinding } from './types.js';
 import { generateStaticRepeatTemplate } from './repeat-analysis.js';
 import { walkDirectives } from './directive-tree.js';
 import {
@@ -30,7 +30,7 @@ import {
 import { injectIdIntoFirstElement, escapeTemplateLiteral } from '../../utils/html-parser/index.js';
 import type { ImportInfo } from '../../types.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
-import type { GeneratedInitBindingsArtifact } from '../../../contracts/index.js';
+import type { GeneratedInitBindingsArtifact, RuntimeHelperName } from '../../../contracts/index.js';
 import { INTERNAL_RUNTIME_SPECIFIER, PUBLIC_RUNTIME_SPECIFIER } from '../../../contracts/index.js';
 
 /**
@@ -76,7 +76,7 @@ const extractRepeatSourceExpression = (itemsExpression: string): string | null =
   return match?.[1] ?? null;
 };
 
-const buildRepeatSubscriptionSources = (rep: RepeatBlock, ap: AccessPattern): string[] => {
+const buildRepeatSubscriptionSources = (rep: RepeatBlock): string[] => {
   const directSource = extractRepeatSourceExpression(rep.itemsExpression);
   if (directSource) {
     return [directSource];
@@ -84,9 +84,8 @@ const buildRepeatSubscriptionSources = (rep: RepeatBlock, ap: AccessPattern): st
 
   const sources: string[] = [];
   for (const signalName of rep.signalNames) {
-    const signalSource = ap.signal(signalName);
-    if (!sources.includes(signalSource)) {
-      sources.push(signalSource);
+    if (!sources.includes(signalName)) {
+      sources.push(signalName);
     }
   }
 
@@ -260,14 +259,13 @@ const buildSelectionSubscription = (
   sel: SelectionBinding,
   path: number[],
   write: (target: string, value: string) => string,
-  ap: AccessPattern,
 ): string => {
   const nav = (managed: string) => (path.length === 0 ? `${managed}.el` : pathToSiblingNav(`${managed}.el`, path));
   const prev = `_sel_${repId}_${index}`;
   const rc = `_rc_${repId}`;
   return (
-    `let ${prev} = ${ap.signalCall(sel.signalName)}; ` +
-    `_subs.push(${ap.signal(sel.signalName)}.subscribe((_v) => { ` +
+    `let ${prev} = ${sel.signalName}(); ` +
+    `_subs.push(${sel.signalName}.subscribe((_v) => { ` +
     `const _o = ${rc}.get(${prev}); if (_o) ${write(nav('_o'), sel.offValue)}; ` +
     `const _n = ${rc}.get(_v); if (_n) ${write(nav('_n'), sel.onValue)}; ` +
     `${prev} = _v; }, true));`
@@ -538,7 +536,7 @@ const simpleWrite = (binding: SimpleBinding, value: string): string => {
  * Generate binding update code for a single simple binding.
  * For text bindings, navigates from comment marker to adjacent text node.
  */
-export const generateBindingUpdateCode = (binding: SimpleBinding): string => simpleWrite(binding, 'v');
+const generateBindingUpdateCode = (binding: SimpleBinding): string => simpleWrite(binding, 'v');
 
 /**
  * The DOM write for an expression binding, as a function of the value expression, keyed on
@@ -560,13 +558,12 @@ const expressionWrite = (binding: {
 /**
  * Generate initial value assignment code for a simple binding
  */
-export const generateInitialValueCode = (binding: SimpleBinding, ap: AccessPattern = CLOSURE_ACCESS): string =>
-  simpleWrite(binding, ap.signalCall(binding.signalName));
+const generateInitialValueCode = (binding: SimpleBinding): string => simpleWrite(binding, `${binding.signalName}()`);
 
 /**
  * Group simple bindings by their signal name for consolidated subscriptions
  */
-export const groupBindingsBySignal = (bindings: SimpleBinding[]): Map<string, SimpleBinding[]> => {
+const groupBindingsBySignal = (bindings: SimpleBinding[]): Map<string, SimpleBinding[]> => {
   const groups = new Map<string, SimpleBinding[]>();
   for (const binding of bindings) {
     const existing = groups.get(binding.signalName) || [];
@@ -579,17 +576,13 @@ export const groupBindingsBySignal = (bindings: SimpleBinding[]): Map<string, Si
 /**
  * Generate a consolidated subscription for multiple bindings of the same signal
  */
-export const generateConsolidatedSubscription = (
-  signalName: string,
-  bindings: SimpleBinding[],
-  ap: AccessPattern = CLOSURE_ACCESS,
-): string => {
+const generateConsolidatedSubscription = (signalName: string, bindings: SimpleBinding[]): string => {
   if (bindings.length === 1) {
     const update = generateBindingUpdateCode(bindings[0]!);
-    return `${ap.signal(signalName)}.subscribe(v => { ${update}; }, true)`;
+    return `${signalName}.subscribe(v => { ${update}; }, true)`;
   }
   const updates = bindings.map((b) => `      ${generateBindingUpdateCode(b)};`).join('\n');
-  return `${ap.signal(signalName)}.subscribe(v => {\n${updates}\n    }, true)`;
+  return `${signalName}.subscribe(v => {\n${updates}\n    }, true)`;
 };
 
 /**
@@ -634,7 +627,6 @@ const generateRepeatNestedCondInitFn = (
   nestedBindings: BindingInfo[],
   nestedEventBindings: EventBinding[],
   outerItemVar: string,
-  ap: AccessPattern,
 ): string => {
   const hasSignalBindings = nestedBindings.length > 0;
   const hasEvents = nestedEventBindings.length > 0;
@@ -666,7 +658,7 @@ const generateRepeatNestedCondInitFn = (
   // Initial values for signal bindings
   for (const sb of simpleNested) {
     const renamedSignalName = sb.signalName === outerItemVar ? 'item' : sb.signalName;
-    const signalCall = ap.signalCall(renamedSignalName);
+    const signalCall = `${renamedSignalName}()`;
     if (sb.type === 'text') {
       parts.push(`  if (_n_${elVar(sb.id)}) _n_${elVar(sb.id)}.nextSibling.data = ${signalCall} ?? '';`);
     } else if (sb.type === 'attr' && sb.property) {
@@ -704,9 +696,9 @@ const generateRepeatNestedCondInitFn = (
       })
       .filter(Boolean);
     if (updates.length === 1) {
-      parts.push(`  _nsubs.push(${ap.signal(signalName)}.subscribe(v => { ${updates[0]}; }, true));`);
+      parts.push(`  _nsubs.push(${signalName}.subscribe(v => { ${updates[0]}; }, true));`);
     } else if (updates.length > 1) {
-      parts.push(`  _nsubs.push(${ap.signal(signalName)}.subscribe(v => { ${updates.join('; ')}; }, true));`);
+      parts.push(`  _nsubs.push(${signalName}.subscribe(v => { ${updates.join('; ')}; }, true));`);
     }
   }
   for (const eb of exprNested) {
@@ -714,7 +706,7 @@ const generateRepeatNestedCondInitFn = (
     if (!gw) continue;
     const updFn = `() => { if (_n_${elVar(eb.id)}) ${gw.update}; }`;
     for (const sig of eb.signalNames) {
-      const renamedSig = sig === outerItemVar ? 'item' : ap.signal(sig);
+      const renamedSig = sig === outerItemVar ? 'item' : sig;
       parts.push(`  _nsubs.push(${renamedSig}.subscribe(${updFn}, true));`);
     }
   }
@@ -727,8 +719,15 @@ const generateRepeatNestedCondInitFn = (
   return parts.join('\n');
 };
 
+/** A when() condition that is a bare signal read (`show()`): bound by `__bindIf` on the signal itself. */
+const isSimpleConditional = (cond: ConditionalBlock): boolean =>
+  cond.signalNames.length === 1 && cond.jsExpression === `${cond.signalName}()`;
+
 /**
- * Generate the initializeBindings function and static templates
+ * Generate the body of the component's binding function (`__b`) and the static templates.
+ * Child components are mounted where their anchor is: the top-level ones by the body itself,
+ * the others by the directive that contains them. `helpers` holds every runtime helper the
+ * generated code calls, so that the component imports exactly those.
  */
 export const generateInitBindingsFunction = (
   bindings: BindingInfo[],
@@ -736,12 +735,18 @@ export const generateInitBindingsFunction = (
   whenElseBlocks: WhenElseBlock[] = [],
   repeatBlocks: RepeatBlock[] = [],
   eventBindings: EventBinding[] = [],
-  _filePath: string = '',
-  ap: AccessPattern = CLOSURE_ACCESS,
+  emit: EmitOptions,
   childMountsByDirective?: Map<string, { cm: ChildMountInfo; globalIndex: number }[]>,
-): GeneratedInitBindingsArtifact => {
+  topLevelChildMounts: { cm: ChildMountInfo; globalIndex: number }[] = [],
+): GeneratedInitBindingsArtifact & { helpers: Set<RuntimeHelperName> } => {
   const lines: string[] = [];
   const staticTemplates: string[] = []; // Collect static templates for repeat optimizations
+  const helpers = new Set<RuntimeHelperName>();
+  /** A runtime helper's name, recorded as used where the call to it is emitted. */
+  const use = (helper: RuntimeHelperName): RuntimeHelperName => {
+    helpers.add(helper);
+    return helper;
+  };
 
   // ── Helper: generate child component mount lines for directive-nested mounts ──
   // Returns { setupLines, cleanupExprs } — consumers add setupLines as statements
@@ -766,7 +771,7 @@ export const generateInitBindingsFunction = (
           propsExpr = renameIdentifierInExpression(propsExpr, repeatCtx.indexVar, '_idx');
         }
       }
-      setupLines.push(`${indent}const ${varName} = document.createElement('${ap.selector(cm.selector)}');`);
+      setupLines.push(`${indent}const ${varName} = document.createElement('${emit.selector(cm.selector)}');`);
       if (repeatCtx) {
         setupLines.push(
           `${indent}const ${anchorVar} = (_el.id === '${cm.anchorId}' ? _el : _el.querySelector('#${cm.anchorId}'));`,
@@ -775,7 +780,7 @@ export const generateInitBindingsFunction = (
         setupLines.push(`${indent}const ${anchorVar} = _gid('${cm.anchorId}');`);
       }
       setupLines.push(`${indent}if (${anchorVar}) ${anchorVar}.replaceWith(${varName});`);
-      cleanupExprs.push(`${BIND_FN.DESTROY_CHILD}(${cm.componentName}.__f(${varName}, ${propsExpr}))`);
+      cleanupExprs.push(`${use(BIND_FN.DESTROY_CHILD)}(${cm.componentName}.__f(${varName}, ${propsExpr}))`);
     }
     return { setupLines, cleanupExprs };
   };
@@ -794,8 +799,7 @@ export const generateInitBindingsFunction = (
       repeat: () => false,
     },
   );
-  lines.push('  initializeBindings = () => {');
-  lines.push(`    ${ap.rootAlias}`);
+  lines.push(`    const r = ctx.root;`);
   lines.push(`    const _gid = (id) => r.querySelector('#' + id);`);
   // Collect top-level subscription unsubscribe handles for cleanup on destroy
   lines.push(`    const _subs = [];`);
@@ -846,11 +850,11 @@ export const generateInitBindingsFunction = (
   }
   // Simple bindings: initial value assignment + consolidated subscription
   for (const binding of simpleBindings) {
-    lines.push(`    ${generateInitialValueCode(binding, ap)};`);
+    lines.push(`    ${generateInitialValueCode(binding)};`);
   }
   const signalGroups = groupBindingsBySignal(simpleBindings);
   for (const [signalName, signalBindings] of signalGroups) {
-    lines.push(`    _subs.push(${generateConsolidatedSubscription(signalName, signalBindings, ap)});`);
+    lines.push(`    _subs.push(${generateConsolidatedSubscription(signalName, signalBindings)});`);
   }
   // Expression bindings: multi-subscribe pattern
   // e.g. const _upd_b2 = () => { b2.nextSibling.data = count() + 1; };
@@ -867,21 +871,20 @@ export const generateInitBindingsFunction = (
     lines.push(`    let ${guard}; const ${updFn} = () => { ${guardedWrite(guard, write, expr).update}; };`);
     lines.push(`    ${updFn}();`);
     for (const sig of signals) {
-      lines.push(`    _subs.push(${ap.signal(sig)}.subscribe(${updFn}, true));`);
+      lines.push(`    _subs.push(${sig}.subscribe(${updFn}, true));`);
     }
   });
 
   // The call that binds a when() block: `__bindIf` for a bare signal read, otherwise
   // `__bindIfExpr` over every signal the condition reads. Callers add their wrapper.
   const whenCall = (cond: ConditionalBlock, initCode: string, anchorVar?: string): string => {
-    const template = escapeTemplateLiteral(ap.html(cond.templateContent));
+    const template = escapeTemplateLiteral(emit.html(cond.templateContent));
     const anchor = anchorVar ? `, ${anchorVar}` : '';
-    const isSimple = cond.signalNames.length === 1 && cond.jsExpression === ap.signalCall(cond.signalName);
-    if (isSimple) {
-      return `${BIND_FN.IF}(r, ${ap.signal(cond.signalName)}, '${cond.id}', \`${template}\`, ${initCode}${anchor})`;
+    if (isSimpleConditional(cond)) {
+      return `${use(BIND_FN.IF)}(r, ${cond.signalName}, '${cond.id}', \`${template}\`, ${initCode}${anchor})`;
     }
-    const signals = cond.signalNames.map((s) => ap.signal(s)).join(', ');
-    return `${BIND_FN.IF_EXPR}(r, [${signals}], () => ${cond.jsExpression}, '${cond.id}', \`${template}\`, ${initCode}${anchor})`;
+    const signals = cond.signalNames.join(', ');
+    return `${use(BIND_FN.IF_EXPR)}(r, [${signals}], () => ${cond.jsExpression}, '${cond.id}', \`${template}\`, ${initCode}${anchor})`;
   };
 
   // The two `__bindIfExpr` calls that bind a whenElse() block: the then branch on the condition,
@@ -892,9 +895,9 @@ export const generateInitBindingsFunction = (
     elseInit: string,
     anchors?: [thenAnchor: string, elseAnchor: string],
   ): [string, string] => {
-    const signals = we.signalNames.map((s) => ap.signal(s)).join(', ');
+    const signals = we.signalNames.join(', ');
     const call = (condition: string, id: string, template: string, init: string, anchor: string | undefined) =>
-      `${BIND_FN.IF_EXPR}(r, [${signals}], () => ${condition}, '${id}', \`${escapeTemplateLiteral(ap.html(injectIdIntoFirstElement(template, id)))}\`, ${init}${anchor ? `, ${anchor}` : ''})`;
+      `${use(BIND_FN.IF_EXPR)}(r, [${signals}], () => ${condition}, '${id}', \`${escapeTemplateLiteral(emit.html(injectIdIntoFirstElement(template, id)))}\`, ${init}${anchor ? `, ${anchor}` : ''})`;
     return [
       call(we.jsExpression, we.thenId, we.thenTemplate, thenInit, anchors?.[0]),
       call(`!(${we.jsExpression})`, we.elseId, we.elseTemplate, elseInit, anchors?.[1]),
@@ -915,7 +918,7 @@ export const generateInitBindingsFunction = (
     const syncVar = `_syncEmpty_${rep.id}`;
     lines.push(`    const ${itemsVar} = () => ${rep.itemsExpression};`);
     if (rep.emptyTemplate) {
-      const escapedEmptyTemplate = ap.html(rep.emptyTemplate).replace(/`/g, '\\`');
+      const escapedEmptyTemplate = emit.html(rep.emptyTemplate).replace(/`/g, '\\`');
       lines.push(`    let ${emptyVar};`);
       lines.push(
         `    const ${syncVar} = (items) => { items.length ? ${emptyVar}?.remove() : ${containerVar}.insertBefore(${emptyVar} ??= _T(\`${escapedEmptyTemplate}\`).content.firstElementChild, ${anchorVar}); };`,
@@ -926,7 +929,7 @@ export const generateInitBindingsFunction = (
     const onChange = rep.emptyTemplate
       ? `const items = ${itemsVar}(); ${reconcilerVar}.reconcile(items); ${syncVar}(items);`
       : `${reconcilerVar}.reconcile(${itemsVar}());`;
-    buildRepeatSubscriptionSources(rep, ap).forEach((source, sourceIdx) => {
+    buildRepeatSubscriptionSources(rep).forEach((source, sourceIdx) => {
       const sourceVar = `_rsrc_${rep.id}_${sourceIdx}`;
       lines.push(`    const ${sourceVar} = ${source};`);
       lines.push(
@@ -950,13 +953,13 @@ export const generateInitBindingsFunction = (
     const bind = (write: string, signalNames: string[] | undefined, signalName: string) => {
       fill.push(write);
       for (const s of signalNames ?? [signalName]) {
-        subscriptions.push(`${scope.cleanups}.push(${ap.signal(s)}.subscribe(() => { ${write}; }, true))`);
+        subscriptions.push(`${scope.cleanups}.push(${s}.subscribe(() => { ${write}; }, true))`);
       }
     };
     (staticInfo.signalElementBindings ?? []).forEach((sb, i) => {
       const varName = `${scope.prefix}${i}`;
       nav.push(`const ${varName} = ${sb.path.length === 0 ? scope.row : pathToSiblingNav(scope.row, sb.path)}`);
-      const signalCall = sb.expression ?? ap.signalCall(sb.signalName);
+      const signalCall = sb.expression ?? `${sb.signalName}()`;
       // Only attr/style — text bindings use signalCommentBindings
       if (sb.type === 'attr' && sb.property) {
         bind(attributeWrite(varName, sb, signalCall), sb.signalNames, sb.signalName);
@@ -967,7 +970,7 @@ export const generateInitBindingsFunction = (
     const commentBindings = staticInfo.signalCommentBindings ?? [];
     for (const scb of commentBindings) {
       const cmVar = `${scope.commentMap}['${scb.commentId}']`;
-      const signalCall = scb.expression ?? ap.signalCall(scb.signalName);
+      const signalCall = scb.expression ?? `${scb.signalName}()`;
       bind(`if (${cmVar}) ${cmVar}.nextSibling.data = ${signalCall} ?? ''`, scb.signalNames, scb.signalName);
     }
     return { nav, fill, subscriptions, needsCommentMap: commentBindings.length > 0 && !scope.hasCommentMap };
@@ -975,7 +978,7 @@ export const generateInitBindingsFunction = (
 
   // One repeat() list: the anchor lookup, the row template, the row factory and the
   // subscriptions, written as statements into `lines`. Component-level lists write straight
-  // into initializeBindings; a list inside a when()/whenElse() branch writes into that
+  // into the binding function; a list inside a when()/whenElse() branch writes into that
   // branch's initializer, where a block-scoped `_subs` collects its unsubscribes.
   const emitRepeat = (rep: RepeatBlock, lines: string[]): void => {
     const indexVar = rep.indexVar || '_idx';
@@ -994,18 +997,15 @@ export const generateInitBindingsFunction = (
       const reconcilerVar = `_rc_${rep.id}`;
       let propsExpr = directRepeatComponent.propsExpression;
       propsExpr = renameIdentifierInExpression(propsExpr, rep.itemVar, 'item');
-      if (rep.indexVar && rep.indexVar !== indexVar) {
-        propsExpr = renameIdentifierInExpression(propsExpr, rep.indexVar, indexVar);
-      }
 
       lines.push(`    const ${anchorVar} = _gid('${rep.id}');`);
       lines.push(`    const ${containerVar} = ${anchorVar}.parentNode;`);
-      lines.push(`    const ${reconcilerVar} = ${BIND_FN.KEYED_RECONCILER}(${containerVar}, ${anchorVar},`);
+      lines.push(`    const ${reconcilerVar} = ${use(BIND_FN.KEYED_RECONCILER)}(${containerVar}, ${anchorVar},`);
       lines.push(`      (item, ${indexVar}, _ref) => {`);
       lines.push(`        const _el = document.createElement('div');`);
-      lines.push(`        ${ap.staticPrefix}_insertBefore.call(${containerVar}, _el, _ref);`);
+      lines.push(`        _insertBefore.call(${containerVar}, _el, _ref);`);
       lines.push(
-        `        return { el: _el, cleanups: [${BIND_FN.DESTROY_CHILD}(${directRepeatComponent.componentName}.__f(_el, ${propsExpr}))], value: item, update: () => {} };`,
+        `        return { el: _el, cleanups: [${use(BIND_FN.DESTROY_CHILD)}(${directRepeatComponent.componentName}.__f(_el, ${propsExpr}))], value: item, update: () => {} };`,
       );
       lines.push(`      },`);
       lines.push(`    ${keyArg(rep)});`);
@@ -1024,7 +1024,6 @@ export const generateInitBindingsFunction = (
       const staticInfo = generateStaticRepeatTemplate(
         rep.itemTemplate,
         rep.itemBindings,
-        rep.itemVar,
         rep.itemEvents,
         rep.signalBindings,
         directiveAnchorIds.length > 0 ? directiveAnchorIds : undefined,
@@ -1060,7 +1059,9 @@ export const generateInitBindingsFunction = (
         const templateId = `__tpl_${rep.id}`;
 
         // Generate static template IIFE
-        staticTemplates.push(`  const ${templateId} = _T(\`${rowTemplateLiteral(ap.html(staticInfo.staticHtml))}\`);`);
+        staticTemplates.push(
+          `  const ${templateId} = _T(\`${rowTemplateLiteral(emit.html(staticInfo.staticHtml))}\`);`,
+        );
 
         // Fully inlined repeat — inline navigation code, no runtime navigatePath
         // Generate inlined navigation code for each bound element
@@ -1226,13 +1227,8 @@ export const generateInitBindingsFunction = (
                 guardedWrite(guards.next(), (v) => attributeWrite(varName, mb, v), expr, mb.staticValue).fill,
               );
               selectionSubscriptions.push(
-                buildSelectionSubscription(
-                  rep.id,
-                  i,
-                  selection,
-                  mb.path,
-                  (target, value) => attributeWrite(target, mb, value),
-                  ap,
+                buildSelectionSubscription(rep.id, i, selection, mb.path, (target, value) =>
+                  attributeWrite(target, mb, value),
                 ),
               );
               continue;
@@ -1252,9 +1248,7 @@ export const generateInitBindingsFunction = (
               // 'item' is captured in the createItem closure — correct per-row value. The guard
               // means a signal change that leaves this row's value alone costs no DOM write.
               for (const sigName of mb.outerSignalNames) {
-                signalSubscriptions.push(
-                  `_cleanups.push(${ap.signal(sigName)}.subscribe(() => { ${gw.update}; }, true))`,
-                );
+                signalSubscriptions.push(`_cleanups.push(${sigName}.subscribe(() => { ${gw.update}; }, true))`);
               }
             }
           }
@@ -1268,7 +1262,7 @@ export const generateInitBindingsFunction = (
         const containerVar = `_ct_${rep.id}`;
         const reconcilerVar = `_rc_${rep.id}`;
 
-        lines.push(`    const ${tplContentVar} = ${ap.staticPrefix}${templateId}.content.firstElementChild;`);
+        lines.push(`    const ${tplContentVar} = ${templateId}.content.firstElementChild;`);
         lines.push(`    const ${anchorVar} = _gid('${rep.id}');`);
         lines.push(`    const ${containerVar} = ${anchorVar}.parentNode;`);
         // Partition item events into delegated (container listener) vs non-delegatable (per-item)
@@ -1327,15 +1321,15 @@ export const generateInitBindingsFunction = (
         if (batchRows) {
           lines.push(`    const _bind_${rep.id} = (_el, item, ${indexVar}) => {`);
         } else {
-          lines.push(`    const ${reconcilerVar} = ${BIND_FN.KEYED_RECONCILER}(${containerVar}, ${anchorVar},`);
+          lines.push(`    const ${reconcilerVar} = ${use(BIND_FN.KEYED_RECONCILER)}(${containerVar}, ${anchorVar},`);
           lines.push(`      (item, ${indexVar}, _ref) => {`);
-          lines.push(`        const _el = ${ap.staticPrefix}_cloneNode.call(${tplContentVar}, true);`);
+          lines.push(`        const _el = _cloneNode.call(${tplContentVar}, true);`);
         }
         if (useDelegation) {
           lines.push(`        _el.__d = item;`);
         }
         for (const v of rowSignalVars) {
-          lines.push(`        const ${v} = ${BIND_FN.SIGNAL}(${v === `${rep.itemVar}$` ? 'item' : indexVar});`);
+          lines.push(`        const ${v} = ${use(BIND_FN.SIGNAL)}(${v === `${rep.itemVar}$` ? 'item' : indexVar});`);
         }
         for (const navStmt of navStatements) {
           lines.push(`        ${navStmt};`);
@@ -1369,7 +1363,7 @@ export const generateInitBindingsFunction = (
           lines.push(`        ${eventAddStatements.join('; ')};`);
         }
         if (!batchRows) {
-          lines.push(`        ${ap.staticPrefix}_insertBefore.call(${containerVar}, _el, _ref);`);
+          lines.push(`        _insertBefore.call(${containerVar}, _el, _ref);`);
         }
         for (const sl of repMountInfo.setupLines) {
           lines.push(sl);
@@ -1393,7 +1387,6 @@ export const generateInitBindingsFunction = (
             cond.nestedBindings,
             cond.nestedEventBindings,
             rep.itemVar,
-            ap,
           );
           lines.push(`        _cleanups.push(${whenCall(cond, condInitNested, `_cond_${elVar(cond.id)}`)});`);
         }
@@ -1406,8 +1399,8 @@ export const generateInitBindingsFunction = (
           const elseNavExpr = pathToSiblingNav('_el', elseAnchorPath);
           lines.push(`        const _cond_${elVar(we.thenId)} = ${thenNavExpr};`);
           lines.push(`        const _cond_${elVar(we.elseId)} = ${elseNavExpr};`);
-          const thenInitFn = generateRepeatNestedCondInitFn(we.thenBindings, [], rep.itemVar, ap);
-          const elseInitFn = generateRepeatNestedCondInitFn(we.elseBindings, [], rep.itemVar, ap);
+          const thenInitFn = generateRepeatNestedCondInitFn(we.thenBindings, [], rep.itemVar);
+          const elseInitFn = generateRepeatNestedCondInitFn(we.elseBindings, [], rep.itemVar);
           for (const call of whenElseCalls(we, thenInitFn, elseInitFn, [
             `_cond_${elVar(we.thenId)}`,
             `_cond_${elVar(we.elseId)}`,
@@ -1426,19 +1419,18 @@ export const generateInitBindingsFunction = (
           const innerStaticInfo = generateStaticRepeatTemplate(
             nr.itemTemplate,
             nr.itemBindings,
-            nr.itemVar,
             nr.itemEvents,
             nr.signalBindings,
           );
           const innerTplId = `__tpl_${nr.id}`;
           staticTemplates.push(
-            `  const ${innerTplId} = _T(\`${rowTemplateLiteral(ap.html(innerStaticInfo.staticHtml))}\`);`,
+            `  const ${innerTplId} = _T(\`${rowTemplateLiteral(emit.html(innerStaticInfo.staticHtml))}\`);`,
           );
           const innerIndexVar = nr.indexVar || '_idx';
-          lines.push(`        const _nrTc_${nr.id} = ${ap.staticPrefix}${innerTplId}.content.firstElementChild;`);
-          lines.push(`        const _nrRc_${nr.id} = ${BIND_FN.KEYED_RECONCILER}(_nrC_${nr.id}, _nrA_${nr.id},`);
+          lines.push(`        const _nrTc_${nr.id} = ${innerTplId}.content.firstElementChild;`);
+          lines.push(`        const _nrRc_${nr.id} = ${use(BIND_FN.KEYED_RECONCILER)}(_nrC_${nr.id}, _nrA_${nr.id},`);
           lines.push(`          (_nrItem, ${innerIndexVar}, _nrRef) => {`);
-          lines.push(`            const _nrEl = ${ap.staticPrefix}_cloneNode.call(_nrTc_${nr.id}, true);`);
+          lines.push(`            const _nrEl = _cloneNode.call(_nrTc_${nr.id}, true);`);
           // Inner item bindings fill & navigation (element-based), redundancy-guarded like the
           // outer rows. Guards are allocated here in binding order and reused by the update path.
           const innerGuards = createGuardAllocator('_nrp');
@@ -1504,7 +1496,7 @@ export const generateInitBindingsFunction = (
           if (innerCommentFillStatements.length > 0) {
             lines.push(`            ${innerCommentFillStatements.join('; ')};`);
           }
-          lines.push(`            ${ap.staticPrefix}_insertBefore.call(_nrC_${nr.id}, _nrEl, _nrRef);`);
+          lines.push(`            _insertBefore.call(_nrC_${nr.id}, _nrEl, _nrRef);`);
           // Inner signal bindings navigation, fill & subscription (Step 13 for nested repeats), and
           // inner signal text bindings via comment markers, sharing _nricm with the item bindings
           const {
@@ -1545,15 +1537,13 @@ export const generateInitBindingsFunction = (
           );
           lines.push(`          },`);
           lines.push(`        ${keyArg(nr)});`);
-          // Subscribe to the signal driving the nested repeat
-          const nrSignalRef = ap.signal(nr.signalName);
           // Check if the items expression references the outer item variable
           const nrItemsExpr = renameIdentifierInExpression(nr.itemsExpression, rep.itemVar, 'item');
           lines.push(`        _nrRc_${nr.id}.reconcile(${nrItemsExpr});`);
           // If the nested repeat is driven by a signal, subscribe
           if (nr.signalName) {
             lines.push(
-              `        _cleanups.push(${nrSignalRef}.subscribe(() => { _nrRc_${nr.id}.reconcile(${nrItemsExpr}); }, true));`,
+              `        _cleanups.push(${nr.signalName}.subscribe(() => { _nrRc_${nr.id}.reconcile(${nrItemsExpr}); }, true));`,
             );
           }
           lines.push(`        _cleanups.push(() => { _nrRc_${nr.id}.clearAll(); });`);
@@ -1587,9 +1577,9 @@ export const generateInitBindingsFunction = (
         }
         if (batchRows) {
           if (!leanRows) lines.push(`    };`);
-          lines.push(`    const ${reconcilerVar} = ${BIND_FN.KEYED_RECONCILER}(${containerVar}, ${anchorVar},`);
+          lines.push(`    const ${reconcilerVar} = ${use(BIND_FN.KEYED_RECONCILER)}(${containerVar}, ${anchorVar},`);
           lines.push(
-            `      (item, ${indexVar}, _ref) => { const _el = ${ap.staticPrefix}_cloneNode.call(${tplContentVar}, true); const _m = _bind_${rep.id}(_el, item, ${indexVar}); ${ap.staticPrefix}_insertBefore.call(${containerVar}, _el, _ref); return _m; },`,
+            `      (item, ${indexVar}, _ref) => { const _el = _cloneNode.call(${tplContentVar}, true); const _m = _bind_${rep.id}(_el, item, ${indexVar}); _insertBefore.call(${containerVar}, _el, _ref); return _m; },`,
           );
           lines.push(
             `    ${keyFnExpr}, { size: ${ROW_BATCH_SIZE}, row: ${tplContentVar}, bind: _bind_${rep.id}${leanRows ? `, update: _update_${rep.id}` : ''} }${usesIndex ? ', true' : ''});`,
@@ -1624,21 +1614,23 @@ export const generateInitBindingsFunction = (
         }
 
         const templateId = `__tpl_${rep.id}`;
-        staticTemplates.push(`  const ${templateId} = _T(\`${rowTemplateLiteral(ap.html(staticInfo.staticHtml))}\`);`);
+        staticTemplates.push(
+          `  const ${templateId} = _T(\`${rowTemplateLiteral(emit.html(staticInfo.staticHtml))}\`);`,
+        );
 
         const tplContentVar = `_tc_${rep.id}`;
         const anchorVar = `_a_${rep.id}`;
         const containerVar = `_ct_${rep.id}`;
         const reconcilerVar = `_rc_${rep.id}`;
 
-        lines.push(`    const ${tplContentVar} = ${ap.staticPrefix}${templateId}.content.firstElementChild;`);
+        lines.push(`    const ${tplContentVar} = ${templateId}.content.firstElementChild;`);
         lines.push(`    const ${anchorVar} = _gid('${rep.id}');`);
         lines.push(`    const ${containerVar} = ${anchorVar}.parentNode;`);
 
-        lines.push(`    const ${reconcilerVar} = ${BIND_FN.KEYED_RECONCILER}(${containerVar}, ${anchorVar},`);
+        lines.push(`    const ${reconcilerVar} = ${use(BIND_FN.KEYED_RECONCILER)}(${containerVar}, ${anchorVar},`);
         lines.push(`      (item, ${indexVar}, _ref) => {`);
-        lines.push(`        const _el = ${ap.staticPrefix}_cloneNode.call(${tplContentVar}, true);`);
-        lines.push(`        ${ap.staticPrefix}_insertBefore.call(${containerVar}, _el, _ref);`);
+        lines.push(`        const _el = _cloneNode.call(${tplContentVar}, true);`);
+        lines.push(`        _insertBefore.call(${containerVar}, _el, _ref);`);
         // Child component mounts inside repeat items (Step 7 + Step 10)
         const fbRepMountInfo = generateMountInfo(rep.id, '        ', {
           itemVar: rep.itemVar,
@@ -1699,7 +1691,7 @@ export const generateInitBindingsFunction = (
     const simpleNestedBindings = bindings.filter(isSimpleBinding);
     const exprNestedBindings = bindings.filter(isExpressionBinding);
     for (const binding of simpleNestedBindings) {
-      initLines.push(`      ${generateInitialValueCode(binding, ap)};`);
+      initLines.push(`      ${generateInitialValueCode(binding)};`);
     }
     exprNestedBindings.forEach((binding, idx) => {
       const updFn = `_upd_${elVar(binding.id)}_${idx}`;
@@ -1741,7 +1733,7 @@ export const generateInitBindingsFunction = (
     initLines.push('      return [');
     const signalGroups = groupBindingsBySignal(simpleNestedBindings);
     for (const [signalName, signalBindings] of signalGroups) {
-      initLines.push(`        ${generateConsolidatedSubscription(signalName, signalBindings, ap)},`);
+      initLines.push(`        ${generateConsolidatedSubscription(signalName, signalBindings)},`);
     }
     for (const ce of weMountInfo.cleanupExprs) {
       initLines.push(`        ${ce},`);
@@ -1750,7 +1742,7 @@ export const generateInitBindingsFunction = (
       const updFn = `_upd_${elVar(binding.id)}_${idx}`;
       const signals = binding.signalNames;
       for (const sig of signals) {
-        initLines.push(`        ${ap.signal(sig)}.subscribe(${updFn}, true),`);
+        initLines.push(`        ${sig}.subscribe(${updFn}, true),`);
       }
     });
     for (const cond of nestedConds) {
@@ -1853,21 +1845,30 @@ export const generateInitBindingsFunction = (
     }
   }
 
+  // Child components outside every directive: mounted once, destroyed with the component
+  for (const { cm, globalIndex } of topLevelChildMounts) {
+    const varName = `_cm${globalIndex}`;
+    lines.push(`    const ${varName} = document.createElement('${emit.selector(cm.selector)}');`);
+    lines.push(`    _gid('${cm.anchorId}').replaceWith(${varName});`);
+    lines.push(
+      `    _subs.push(${use(BIND_FN.DESTROY_CHILD)}(${cm.componentName}.__f(${varName}, ${cm.propsExpression})));`,
+    );
+  }
+
   // Return cleanup function that unsubscribes all top-level subscriptions
   lines.push(`    return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };`);
-  lines.push('  };');
 
-  return { code: '\n\n' + lines.join('\n'), staticTemplates };
+  return { code: lines.join('\n'), staticTemplates, helpers };
 };
 
 /**
  * Generate a static template property for pre-compiled HTML
  */
-export const generateStaticTemplate = (content: string, ap: AccessPattern = CLOSURE_ACCESS): string => {
-  const escapedContent = ap.html(content).replace(/`/g, '\\`');
+export const generateStaticTemplate = (content: string, emit: EmitOptions): string => {
+  const escapedContent = emit.html(content).replace(/`/g, '\\`');
   return `
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
-  ${ap.staticTemplatePrefix} = _T(\`${escapedContent}\`);`;
+  const __tpl = _T(\`${escapedContent}\`);`;
 };
 
 /**

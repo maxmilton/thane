@@ -1,8 +1,7 @@
 === top: simple text, attr, class, style and expression bindings ===
 --- template
 <p id="b0" class="" style="color: "><!--b1--> <!----> and <!--b2--> <!----></p><input id="b3"><b id="b4" title=""><!--b5--> <!----></b>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -33,15 +32,13 @@
     _subs.push(a.subscribe(_upd_b4_1, true));
     _subs.push(b.subscribe(_upd_b4_1, true));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<p id="b0" class="" style="color: "><!--b1--> <!----> and <!--b2--> <!----></p><input id="b3"><b id="b4" title=""><!--b5--> <!----></b>`);
 === top: events with modifiers ===
 --- template
 <button id="b0">+</button><button id="b1">go</button><input id="b2"><div id="b3">x</div>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -50,15 +47,13 @@
     _gid('b2')?.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; save(); });
     _gid('b3')?.addEventListener('click', (e) => { if (e.target !== e.currentTarget) return; (close)(e); });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<button id="b0">+</button><button id="b1">go</button><input id="b2"><div id="b3">x</div>`);
 === top: when simple and expression, with bindings and events inside ===
 --- template
 <div id="b0"><button id="b1">A</button><!--b2--> <!----></div><template id="b3"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -84,15 +79,13 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<div id="b0"><button id="b1">A</button><!--b2--> <!----></div><template id="b3"></template>`);
 === top: whenElse with bindings and events in both branches ===
 --- template
 <template id="b0"></template><template id="b1"></template><p><!--b3--> <!----></p>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -119,30 +112,26 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template><template id="b1"></template><p><!--b3--> <!----></p>`);
 === top: whenElse with a simple signal condition ===
 --- template
 <section><template id="b0"></template><template id="b1"></template></section>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
     _subs.push(__bindIfExpr(r, [flag], () => flag(), 'b0', `<b id="b0">yes</b>`, () => []));
     _subs.push(__bindIfExpr(r, [flag], () => !(flag()), 'b1', `<i id="b1">no</i>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<section><template id="b0"></template><template id="b1"></template></section>`);
 === nested: when simple and expression, whenElse and a list inside a when ===
 --- template
 <template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -201,7 +190,6 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template>`);
@@ -212,8 +200,7 @@
 === nested: expression bindings inside a when and a whenElse branch ===
 --- template
 <template id="b0"></template><template id="b3"></template><template id="b4"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -248,15 +235,13 @@
     }));
     _subs.push(__bindIfExpr(r, [c], () => !(c()), 'b4', `<s id="b4">n</s>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template><template id="b3"></template><template id="b4"></template>`);
 === nested: directives inside whenElse branches, events in a branch list ===
 --- template
 <template id="b0"></template><template id="b1"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -341,7 +326,6 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template><template id="b1"></template>`);
@@ -353,8 +337,7 @@
 === nested: whenElse inside a whenElse branch inside a when ===
 --- template
 <template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -382,15 +365,13 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template>`);
 === walkers: text only in a whenElse nested in a when (comment factory without _cm) ===
 --- template
 <template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -409,15 +390,13 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template>`);
 === walkers: text only in a row-level when inside a when (no comment factory) ===
 --- template
 <template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -457,7 +436,6 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template>`);
@@ -468,8 +446,7 @@
 === walkers: text only inside a whenElse branch list (no comment factory) ===
 --- template
 <template id="b0"></template><template id="b1"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -506,7 +483,6 @@
     }));
     _subs.push(__bindIfExpr(r, [a], () => !(a()), 'b1', `<p id="b1">none</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template><template id="b1"></template>`);
@@ -517,8 +493,7 @@
 === walkers: events in a when, in a whenElse inside a when, and in rows ===
 --- template
 <template id="b0"></template><ul><template id="b8"></template></ul><template id="b6"></template><template id="b7"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -596,7 +571,6 @@
     const _rsrc_b8_0 = ys;
     _subs.push(typeof _rsrc_b8_0?.subscribe === 'function' ? _rsrc_b8_0.subscribe(() => { _rc_b8.reconcile(_items_b8()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template><ul><template id="b8"></template></ul><template id="b6"></template><template id="b7"></template>`);
@@ -608,8 +582,7 @@
 === walkers: a list only inside a whenElse inside a when (prototype caches) ===
 --- template
 <template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -647,7 +620,6 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template>`);
@@ -658,8 +630,7 @@
 === walkers: a list only inside a when inside a whenElse (prototype caches) ===
 --- template
 <template id="b0"></template><template id="b1"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -697,7 +668,6 @@
     }));
     _subs.push(__bindIfExpr(r, [b], () => !(b()), 'b1', `<p id="b1">n</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template><template id="b1"></template>`);
@@ -708,8 +678,7 @@
 === walkers: no list anywhere (no prototype caches) ===
 --- template
 <template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -728,15 +697,13 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template>`);
 === rows: direct child component, no empty template, key property ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -754,7 +721,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -764,8 +730,7 @@
 === rows: direct child component with index, empty template and key function ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -786,7 +751,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -796,8 +760,7 @@
 === rows: direct child component over a derived source ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -817,7 +780,6 @@
     const _rsrc_b0_1 = flag;
     _subs.push(typeof _rsrc_b0_1?.subscribe === 'function' ? _rsrc_b0_1.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -827,8 +789,7 @@
 === rows: template rows, no key, empty template ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -856,7 +817,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -867,8 +827,7 @@
 === rows: template rows over a derived source with an empty template and key property ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -898,7 +857,6 @@
     const _rsrc_b0_1 = flag;
     _subs.push(typeof _rsrc_b0_1?.subscribe === 'function' ? _rsrc_b0_1.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -909,8 +867,7 @@
 === rows: template rows over a member source ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -935,7 +892,6 @@
     const _rsrc_b0_0 = store.items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -946,8 +902,7 @@
 === rows: no bindings, no key, no empty template ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -966,7 +921,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -977,8 +931,7 @@
 === rows: no bindings, empty template and key property ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1000,7 +953,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1011,8 +963,7 @@
 === rows: no bindings over a derived source, key function ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1033,7 +984,6 @@
     const _rsrc_b0_1 = n;
     _subs.push(typeof _rsrc_b0_1?.subscribe === 'function' ? _rsrc_b0_1.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1044,8 +994,7 @@
 === rows: no bindings with a child mount and a named index ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1067,7 +1016,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1078,8 +1026,7 @@
 === rows: no bindings with a child mount, empty template ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1104,7 +1051,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1115,8 +1061,7 @@
 === rows: bindings with two child mounts ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1148,7 +1093,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1159,8 +1103,7 @@
 === mounts: child mount inside a when ===
 --- template
 <template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1178,15 +1121,13 @@
       ];
     }));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template>`);
 === mounts: child mount inside a whenElse branch ===
 --- template
 <template id="b0"></template><template id="b1"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1200,15 +1141,13 @@
     }));
     _subs.push(__bindIfExpr(r, [a], () => !(a()), 'b1', `<p id="b1">n</p>`, () => []));
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<template id="b0"></template><template id="b1"></template>`);
 === rows: lean batch rows with sole-content text, attrs and a key property ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1235,7 +1174,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1246,8 +1184,7 @@
 === rows: comment-marker item bindings ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1276,7 +1213,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1287,8 +1223,7 @@
 === rows: delegated and non-delegatable events ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1317,7 +1252,6 @@
     _ct_b0.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; pick(item); if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling) { e.stopPropagation(); remove(e); return; } });
     _ct_b0.addEventListener('keydown', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling.nextElementSibling) { if (e.key !== 'Enter') return; save(item, i, e); return; } });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1328,8 +1262,7 @@
 === rows: non-delegatable events on elements without bindings ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1355,7 +1288,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1366,8 +1298,7 @@
 === rows: index bindings ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1396,7 +1327,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1407,8 +1337,7 @@
 === rows: selection binding and mixed signal-item bindings ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1441,7 +1370,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1452,8 +1380,7 @@
 === rows: signal attr, style and text bindings next to item comment bindings ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1486,7 +1413,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1497,8 +1423,7 @@
 === rows: signal text binding without item comment bindings ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1526,7 +1451,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1537,8 +1461,7 @@
 === rows: expression signal bindings over several signals ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1572,7 +1495,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1583,8 +1505,7 @@
 === rows: signal bindings on the row element itself ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1613,7 +1534,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1624,8 +1544,7 @@
 === rows: when simple and expression, whenElse, with row signals ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1696,7 +1615,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1707,8 +1625,7 @@
 === rows: row-level when with several bindings on one signal ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1743,7 +1660,6 @@
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1754,8 +1670,7 @@
 === nested rows: element, comment and signal bindings ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1808,7 +1723,6 @@
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1820,8 +1734,7 @@
 === nested rows: signal text without item comment bindings, key property ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1866,7 +1779,6 @@
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1878,8 +1790,7 @@
 === nested rows: expression signal bindings and bindings on the inner row element ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1925,7 +1836,6 @@
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1937,8 +1847,7 @@
 === nested rows: no bindings, driven by a component signal ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -1976,7 +1885,6 @@
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -1988,8 +1896,7 @@
 === nested rows: only comment-marker item bindings ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -2028,7 +1935,6 @@
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);
@@ -2040,8 +1946,7 @@
 === escaping: backslash, backtick and newline in row, branch and main templates (dev) ===
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -2091,7 +1996,6 @@
     const _rsrc_b3_0 = items;
     _subs.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<p title="a\b">\`q\` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>`);
@@ -2103,8 +2007,7 @@
 === escaping: the same templates, production ===
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -2154,7 +2057,6 @@
     const _rsrc_b3_0 = items;
     _subs.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<p title="a\b">\`q\` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>`);
@@ -2166,8 +2068,7 @@
 === production: nested rows, row directives and a child mount ===
 --- template
 <ul><template id="b0"></template></ul>
---- initializeBindings
-  initializeBindings = () => {
+--- binding function body
     const r = ctx.root;
     const _gid = (id) => r.querySelector('#' + id);
     const _subs = [];
@@ -2221,7 +2122,6 @@
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
-  };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(`<ul><template id="b0"></template></ul>`);

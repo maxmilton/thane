@@ -73,7 +73,7 @@ describe('registration import follows the registration call', () => {
     expect([r.called, r.stylesCalled]).toEqual(['__registerComponent', true]);
   });
 
-  test('styles only in a later return: detection reads the first return, so neither called nor imported', () => {
+  test('styles only in a later return: detection reads the last return (H-07), so called and imported', () => {
     const r = compile(`() => {
   if (flag) {
     return { template: html\`<p>a</p>\` };
@@ -81,6 +81,6 @@ describe('registration import follows the registration call', () => {
   return { template: html\`<p>b</p>\`, styles: css\`p { color: red; }\` };
 }`);
     expectImportsFollowCalls(r);
-    expect([r.called, r.stylesCalled]).toEqual(['__registerComponentLean', false]);
+    expect([r.called, r.stylesCalled]).toEqual(['__registerComponent', true]);
   });
 });

@@ -10,13 +10,10 @@ import type { BuildConfig } from './types.js';
 import { consoleColors, createBuildContext, BROWSER_TARGETS, resolveProjectRoot } from '../utils/index.js';
 
 import { clearAllDebounceTimers } from '../plugins/post-build-processor/file-copy.js';
-import { ProjectTypesSyncPlugin } from '../plugins/router-typegen/router-typegen.js';
 import { TSCTypeCheckerPlugin } from '../plugins/tsc-type-checker/tsc-type-checker.js';
 import { ComponentPrecompilerPlugin } from '../plugins/component-precompiler/component-precompiler.js';
-import { createReactiveBindingPlugin } from '../plugins/reactive-binding-compiler/index.js';
 import { ThaneLinterPlugin } from '../plugins/thane-linter/thane-linter.js';
 import { GlobalCSSBundlerPlugin } from '../plugins/global-css-bundler/global-css-bundler.js';
-import { HTMLBootstrapInjectorPlugin } from '../plugins/html-bootstrap-injector/html-bootstrap-injector.js';
 import { MinificationPlugin } from '../plugins/minification/minification.js';
 import { PostBuildPlugin } from '../plugins/post-build-processor/post-build-processor.js';
 
@@ -50,13 +47,10 @@ export async function runBuild(config: BuildConfig): Promise<void> {
   buildContext.minify = config.isProd;
 
   const plugins = [
-    ProjectTypesSyncPlugin(projectRoot),
     TSCTypeCheckerPlugin({ strict: config.strictTypeCheck, projectRoot }),
     ThaneLinterPlugin(),
     ComponentPrecompilerPlugin(buildContext),
-    createReactiveBindingPlugin(() => ({ minify: buildContext.minify, selectorMap: buildContext.selectorMap })),
     GlobalCSSBundlerPlugin({ minify: config.isProd, selectorMap: () => buildContext.selectorMap }),
-    HTMLBootstrapInjectorPlugin({ entryPoints: config.entryPoints, buildContext }),
     ...(config.isProd
       ? [MinificationPlugin(buildContext, { projectRoot, htmlPath: config.inputHTMLFilePath, outDir: config.outDir })]
       : []),

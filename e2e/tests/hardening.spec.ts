@@ -105,7 +105,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-16 P6 child-component rows inside a when() mount when it shows', async ({ page }) => {
+  test('H-16 P6 child-component rows inside a when() mount when it shows', async ({ page }) => {
     const probe = await mountProbe(page, 'p6');
     await expect(page.locator('.card')).toHaveCount(0);
 
@@ -124,7 +124,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-07 P8 onMount runs when the setup declares a helper that returns an object', async ({ page }) => {
+  test('H-07 P8 onMount runs when the setup declares a helper that returns an object', async ({ page }) => {
     const probe = await mountProbe(page, 'p8');
     await expect(page.locator('.p8')).toHaveText('p8');
     await expect(page.locator('#app')).toHaveAttribute('data-mounted', 'yes');

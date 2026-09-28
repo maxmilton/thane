@@ -4,28 +4,8 @@
 
 import type { ReactiveBindingKind, TextBindingMode } from '../../../contracts/index.js';
 
-/**
- * Access pattern abstraction for code generation.
- *
- * Codegen and template-processing use this to emit the correct
- * member-access syntax for each component model:
- *
- *  - **class-based**: `this.signal`, `this.shadowRoot`, `this.constructor.X`, `.call(this, e)`
- *  - **defineComponent (closure)**: bare `signal`, `ctx.root`, plain `X`, `.call(null, e)`
- */
-export interface AccessPattern {
-  /** Wrap a signal name for read access, e.g. `"this." + name` or bare `name` */
-  signal: (name: string) => string;
-  /** Wrap a signal call expression, e.g. `"this.foo()"` or `"foo()"` */
-  signalCall: (name: string) => string;
-  /** Root element expression used by initializeBindings, e.g. `"this.shadowRoot"` or `"ctx.root"` */
-  root: string;
-  /** Alias variable for root inside initializeBindings, e.g. `"const r = this.shadowRoot;"` or `"const r = ctx.root;"` */
-  rootAlias: string;
-  /** Prefix for static template class properties, e.g. `"this.constructor."` or `""` */
-  staticPrefix: string;
-  /** Static template declaration format: class property or standalone const */
-  staticTemplatePrefix: string;
+/** What the code generator emits differently in a production build. */
+export interface EmitOptions {
   /**
    * Prepare a compiled template's HTML for emission. Identity in development; the HTML
    * minifier in production. Every template the generated code carries goes through it, so
@@ -35,18 +15,6 @@ export interface AccessPattern {
   /** The name a component selector is emitted under: itself, or its production short name */
   selector: (name: string) => string;
 }
-
-/** Access pattern for defineComponent (closure-based) */
-export const CLOSURE_ACCESS: AccessPattern = {
-  signal: (name) => name,
-  signalCall: (name) => `${name}()`,
-  root: 'ctx.root',
-  rootAlias: 'const r = ctx.root;',
-  staticPrefix: '',
-  staticTemplatePrefix: 'const __tpl',
-  html: (template) => template,
-  selector: (name) => name,
-};
 
 export interface ConditionalBlock {
   id: string;
