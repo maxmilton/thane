@@ -133,6 +133,7 @@ The simplification and hardening round fixed these defects in valid code:
   - `navigate()` pushes no scroll state when scroll restoration is off.
 - Deleting a folder under the assets folder while `thane dev` runs removes it from the output. On Windows the emptied folder could stay: its last event could be a `change`, which was ignored, and removing the folder and its file at the same moment could fail.
 - A production build's short selector names depend only on the components its entry points reach. Every component under the project was planned, so adding one anywhere (another app, a test fixture) renamed the selectors of an app that never used it. Selectors named in the project's other sources, such as its e2e tests, still keep their names.
+- A shorthand property that names a row's item, such as `{ row }` in a handler inside a row's `when()` or `whenElse()`, compiles to `{ row: … }`. It failed the build. Row expressions are also rewritten without being printed again, so a template inside keeps its `html` tag as written.
 
 ### Removed
 

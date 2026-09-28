@@ -27,8 +27,7 @@ import {
   extractSignalsFromExpression,
   type HtmlElement,
 } from '../../utils/html-parser/index.js';
-import ts from 'typescript';
-import { expressionReferencesIdentifier } from '../../utils/index.js';
+import { expressionReferencesIdentifier, replaceReferences } from '../../utils/index.js';
 import {
   collectConditionalBlocks,
   collectWhenElseBlocks,
@@ -57,41 +56,6 @@ const SPACE_BEFORE_MARKER_AFTER_NON_SIBLING = new RegExp(
   `(?<!<\\/[^<>]*|<(?:${[...VOID].join('|')})\\b[^<>]*|<!--[ib]\\d+[(|).]?--)>\\s+(?=<!--[ib]\\d+-->)`,
   'gi',
 );
-
-/**
- * `expr` with each reference to the variable `name` replaced by `replacement`. Everything else keeps
- * its text: printed again, a nested directive's html`` template would read `html \`…\``, which the
- * template parser takes for markup. A function inside that declares its own `name` shadows it there,
- * as in JavaScript.
- */
-const replaceReferences = (expr: string, name: string, replacement: string): string => {
-  const sf = ts.createSourceFile('__row.ts', `(${expr})`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const edits: [start: number, end: number, text: string][] = [];
-  const binds = (n: ts.BindingName): boolean =>
-    ts.isIdentifier(n) ? n.text === name : n.elements.some((e) => !ts.isOmittedExpression(e) && binds(e.name));
-  const isPropertyName = (node: ts.Identifier): boolean => {
-    const p = node.parent;
-    return (
-      ((ts.isPropertyAccessExpression(p) || ts.isPropertyAssignment(p) || ts.isMethodDeclaration(p)) &&
-        p.name === node) ||
-      ((ts.isGetAccessorDeclaration(p) || ts.isSetAccessorDeclaration(p)) && p.name === node) ||
-      (ts.isBindingElement(p) && p.propertyName === node)
-    );
-  };
-  const visit = (node: ts.Node): void => {
-    if (ts.isFunctionLike(node) && node.parameters.some((p) => binds(p.name))) return;
-    if (ts.isShorthandPropertyAssignment(node) && node.name.text === name) {
-      edits.push([node.name.end, node.name.end, `: ${replacement}`]);
-    } else if (ts.isIdentifier(node) && node.text === name && !isPropertyName(node)) {
-      edits.push([node.getStart(sf), node.end, replacement]);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
-  let out = `(${expr})`;
-  for (const [start, end, text] of edits.reverse()) out = out.slice(0, start) + text + out.slice(end);
-  return out.slice(1, -1);
-};
 
 /**
  * Inside a row, nested directives (when/whenElse/repeat) cannot close over the row factory's

@@ -28,7 +28,7 @@ export {
   hasHtmlTemplates,
   toCamelCase,
   pascalToKebab,
-  renameIdentifierInExpression,
+  replaceReferences,
   expressionReferencesIdentifier,
   parseArrowFunction,
 } from './ast-utils.js';

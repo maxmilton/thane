@@ -187,6 +187,13 @@ describe('RW-2 row directives use the branch initializer', () => {
     );
   });
 
+  test('a shorthand property that names the item keeps its key in a row branch', async () => {
+    const js = await buildRows(
+      list('<li>${whenElse(r.on, html`<button @click=${() => bump({ r })}>t</button>`, html`<i>n</i>`)}</li>'),
+    );
+    expect(js).toMatch(/\.addEventListener\("click", \(\) => bump\(\{ r: r\$\(\) \}\)\);/);
+  });
+
   test('a child component in a pre-rendered row when() is mounted by its initializer (P7)', async () => {
     const js = await buildRows(list('<li><div ${when(show())}>${RwNestKid({ label: r.first })}</div></li>'));
     expect(js).toMatch(/__dc\(RwNestKid\.__f\(\w+, \{ label: r\.first \}\)\)/);

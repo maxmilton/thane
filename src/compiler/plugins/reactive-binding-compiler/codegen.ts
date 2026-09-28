@@ -22,7 +22,7 @@ import { walkDirectives } from './directive-tree.js';
 import {
   toCamelCase,
   BIND_FN,
-  renameIdentifierInExpression,
+  replaceReferences,
   parseArrowFunction,
   expressionReferencesIdentifier,
 } from '../../utils/index.js';
@@ -453,9 +453,7 @@ const rowItemName = (rep: RepeatBlock): string =>
 
 /** A row expression as the row factory reads it: the item under the factory's name for it */
 const inRow = (rep: RepeatBlock, expr: string): string =>
-  rep.itemVar && rep.itemVar !== rowItemName(rep)
-    ? renameIdentifierInExpression(expr, rep.itemVar, rowItemName(rep))
-    : expr;
+  rep.itemVar && rep.itemVar !== rowItemName(rep) ? replaceReferences(expr, rep.itemVar, rowItemName(rep)) : expr;
 
 // ============================================================================
 // Event Delegation Types & Helpers
@@ -519,7 +517,7 @@ const partitionItemEvents = (
     let handlerExpr = evt.handlerExpression;
     handlerExpr = inRow(rep, handlerExpr);
     if (rep.indexVar) {
-      handlerExpr = renameIdentifierInExpression(handlerExpr, rep.indexVar, indexVar);
+      handlerExpr = replaceReferences(handlerExpr, rep.indexVar, indexVar);
     }
     handlerExpr = inlineRowHandler(handlerExpr);
 
@@ -655,7 +653,7 @@ const buildNonDelegatableEventStatements = (
     let handlerExpr = evt.handlerExpression;
     handlerExpr = inRow(rep, handlerExpr);
     if (rep.indexVar) {
-      handlerExpr = renameIdentifierInExpression(handlerExpr, rep.indexVar, indexVar);
+      handlerExpr = replaceReferences(handlerExpr, rep.indexVar, indexVar);
     }
     handlerExpr = inlineRowHandler(handlerExpr);
     const bodyParts: string[] = [];
