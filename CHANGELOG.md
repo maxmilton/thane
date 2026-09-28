@@ -137,6 +137,7 @@ The simplification and hardening round fixed these defects in valid code:
 - A shorthand property that names a row's item, such as `{ row }` in a handler inside a row's `when()` or `whenElse()`, compiles to `{ row: … }`. It failed the build. Row expressions are also rewritten without being printed again, so a template inside keeps its `html` tag as written.
 - `--analyze` writes `metafile.json` in `thane dev` and `thane serve` too, after every rebuild. It did in `thane build` only.
 - A folder without its own `package.json` or `tsconfig.json` builds as part of the enclosing one, as before, but the build now warns about it, naming both folders.
+- A keyed list reordered while rows are added or removed keeps its rows in place for the next change. When the last row moved to the front and a row went (`A, B, C` to `C, A`), a row could be placed after the list's comment anchor, and the next added row then showed before it (`C, D, A` instead of `C, A, D`). The reconciler's tests modelled the anchor as an element, which hid it.
 
 ### Removed
 

@@ -80,7 +80,7 @@ interface Row {
 const setup = (layout: { before?: FakeNode[]; after?: FakeNode[]; trackIndex?: boolean } = {}) => {
   const host = new FakeNode('host');
   const list = new FakeNode('list');
-  const anchor = new FakeNode('anchor');
+  const anchor = new FakeNode('anchor', false);
   host.appendChild(list);
   for (const n of layout.before ?? []) list.appendChild(n);
   list.appendChild(anchor);

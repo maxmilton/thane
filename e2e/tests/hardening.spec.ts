@@ -1412,3 +1412,16 @@ test.describe('@namespace in a component stylesheet', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 });
+
+test.describe('a keyed list reordered while a row goes', () => {
+  test('R1 the rows stay before the list anchor, so a later append goes last', async ({ page }) => {
+    const probe = await mountProbe(page, 'r1');
+    const rows = page.locator('ul.r1 > li');
+    await expect(rows).toHaveText(['A', 'B', 'C', 'T']);
+    await setProbe(page, 'r1', 'items', [{ id: 'C' }, { id: 'A' }]);
+    await expect(rows).toHaveText(['C', 'A', 'T']);
+    await setProbe(page, 'r1', 'items', [{ id: 'C' }, { id: 'A' }, { id: 'D' }]);
+    await expect(rows).toHaveText(['C', 'A', 'D', 'T']);
+    expect(probe.pageErrors).toEqual([]);
+  });
+});

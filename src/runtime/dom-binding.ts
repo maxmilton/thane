@@ -277,11 +277,13 @@ export function createKeyedReconciler<T>(
     if (parent) parent.insertBefore(container, next);
   };
 
-  const applyOrder = (next: ManagedItem<T>[], currentEl: Element | null) => {
+  // Rows are single elements side by side, followed by the list's anchor (a comment). The walk goes
+  // node by node, so it ends at the anchor, and a row placed after the last one goes before it
+  const applyOrder = (next: ManagedItem<T>[], currentEl: ChildNode | null) => {
     const len = next.length;
     for (let i = 0; i < len; i++) {
       const wanted = next[i]!.el;
-      if (wanted === currentEl) currentEl = currentEl.nextElementSibling || null;
+      if (wanted === currentEl) currentEl = currentEl.nextSibling;
       else container.insertBefore(wanted, currentEl);
     }
     managedItems.length = len;

@@ -6,7 +6,7 @@
  * order and the exact sequence of DOM operations, cleanups, creations and updates, with static
  * nodes around the rows. Unlike keyed-reconciler.test.ts, the fake DOM here distinguishes element
  * from non-element nodes, so `nextElementSibling` / `previousElementSibling` / `firstElementChild`
- * skip comments and text as a browser does.
+ * skip comments and text as a browser does. The list's anchor is a comment, as in compiled code.
  */
 import { describe, expect, test } from 'bun:test';
 import { createKeyedReconciler } from './dom-binding.js';
@@ -85,7 +85,7 @@ interface Row {
 const setup = (layout: { before?: FakeNode[]; after?: FakeNode[]; trackIndex?: boolean } = {}) => {
   const host = new FakeNode('host');
   const list = new FakeNode('list');
-  const anchor = new FakeNode('anchor');
+  const anchor = new FakeNode('anchor', false);
   host.appendChild(list);
   for (const n of layout.before ?? []) list.appendChild(n);
   list.appendChild(anchor);
@@ -144,6 +144,19 @@ describe('general path: a new first row', () => {
       'insert X before B',
     ]);
     expect(order()).toEqual(['X', 'B', 'C', 'anchor']);
+  });
+});
+
+describe('general path: the rows stay before the anchor', () => {
+  test('the last row moved to the front while a row goes: the rest follow it, before the anchor', () => {
+    const { reconcile, order } = setup({ after: [new FakeNode('tail')] });
+    const [a, b, c, d] = rows('A', 'B', 'C', 'D');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([c!, a!])).toEqual(['cleanup B', 'remove B', 'insert A before anchor']);
+    expect(order()).toEqual(['C', 'A', 'anchor', 'tail']);
+    // an append then goes after the last row, as it goes before the anchor
+    reconcile([c!, a!, d!]);
+    expect(order()).toEqual(['C', 'A', 'D', 'anchor', 'tail']);
   });
 });
 
