@@ -263,6 +263,8 @@ export function defineRoutes<const T extends RoutesConfig>(
       const outlet = shellHandle.root.querySelector<HTMLElement>(`#${outletId}`) ?? document.getElementById(outletId);
 
       if (!outlet) {
+        // The shell goes again: the app did not start, and must not stay half mounted
+        shellHandle.destroy();
         throw new Error(
           `[thane] Router outlet element with id="${outletId}" not found. ` +
             "In Mode B (shell + router), your shell component's template must contain " +
@@ -339,7 +341,7 @@ interface NormalizedScrollRestorationConfig {
 }
 
 const normalizeScrollRestoration = (config?: boolean | ScrollRestorationConfig): NormalizedScrollRestorationConfig => {
-  const c: ScrollRestorationConfig = typeof config === 'object' ? config : {};
+  const c: ScrollRestorationConfig = config && typeof config === 'object' ? config : {};
   return {
     enabled: config !== false,
     behavior: c.behavior ?? 'auto',
@@ -472,6 +474,15 @@ interface MatchResult {
   params: Record<string, string>;
 }
 
+/** A route parameter as the URL means it (`a%20b` is `a b`); a malformed escape is kept as written. */
+const decodeParam = (segment: string): string => {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+};
+
 /** @internal — exported for unit testing only. */
 export const matchRoute = (pathname: string, routes: RoutesMap, notFound?: Route): MatchResult | null => {
   // 1. Exact match (fastest path)
@@ -492,7 +503,7 @@ export const matchRoute = (pathname: string, routes: RoutesMap, notFound?: Route
       const pp = patternParts[i]!;
       const seg = pathParts[i]!;
       if (pp.startsWith(':')) {
-        params[pp.slice(1)] = seg;
+        params[pp.slice(1)] = decodeParam(seg);
       } else if (pp !== seg) {
         matched = false;
         break;
@@ -622,7 +633,12 @@ export function navigate(path: RoutePaths): void {
   if (target.pathname + target.search + target.hash === locationUrl() + window.location.hash) return;
   persistCurrentScrollPosition();
   _pendingScrollAction = 'navigate';
-  window.history.pushState({ [SCROLL_STATE_KEY]: { left: _scrollConfig.left, top: _scrollConfig.top } }, '', path);
+  // The entry carries the position to restore only when the router restores scroll positions
+  window.history.pushState(
+    _scrollConfig.enabled ? { [SCROLL_STATE_KEY]: { left: _scrollConfig.left, top: _scrollConfig.top } } : null,
+    '',
+    path,
+  );
   void loadRoute();
 }
 
@@ -655,10 +671,10 @@ export function startRouter(
     console.warn('[thane-router] Router already started — only one instance is allowed.');
     return;
   }
+  _scrollConfig = normalizeScrollRestoration(routerConfig?.scrollRestoration);
   _started = true;
   _config = config;
   _target = target;
-  _scrollConfig = normalizeScrollRestoration(routerConfig?.scrollRestoration);
   _pendingPopScrollPosition = readScrollPositionFromHistoryState(window.history.state);
   _pendingScrollAction = _pendingPopScrollPosition ? 'pop' : 'init';
 

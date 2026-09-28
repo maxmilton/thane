@@ -37,6 +37,7 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 - **`@import` in a stylesheet is removed at build time, with a warning.** Thane applies every stylesheet as a constructed stylesheet, and browsers ignore `@import` there; load such a file with a `<link>` in `index.html`. `@charset` is removed too, and `@layer a, b;` is written as empty `@layer` blocks, so none of them unscopes the rule after it any more.
 - **New build error THANE009** for a template the compiler cannot bind reliably: markup the browser rebuilds where a binding needs a position (text directly in a table, an `<a>` inside an `<a>`, non-option content in a `<select>`), or a comment in the form of the compiler's own markers (`<!--b0-->`). THANE007 now also reports a `repeat()` row that is only a nested `repeat()`: the list could not move such a row with its inner rows.
 - **`thane/runtime` is the compiler's own entry.** Compiled components import their helpers from it, including `mountComponent`, `__batchRows`, `__T` and `__nc`. Apps must not import it: it is not an API, and it changes whenever the compiled output does.
+- **Route parameters are decoded.** `/users/ada%20lovelace` gives `route.params.id` the value `ada lovelace`, as other routers do; it was `ada%20lovelace`. A segment that is not valid percent-encoding is kept as written.
 
 ### Fixed
 
@@ -125,6 +126,11 @@ The simplification and hardening round fixed these defects in valid code:
   - THANE402 reports a shorthand `onMount`, an accessor and a string-named hook.
   - THANE401 and THANE402 inspect `return ({…})`.
   - THANE407 counts every `defineComponent()` call, a bare or parenthesised one too.
+- Router:
+  - route parameters are decoded (`%20` is a space); a malformed escape is kept as written. See Changed;
+  - `scrollRestoration: null` counts as the default. It threw, and left the router stuck as "already started";
+  - a shell without its outlet is destroyed again before the error, instead of staying mounted;
+  - `navigate()` pushes no scroll state when scroll restoration is off.
 
 ### Removed
 

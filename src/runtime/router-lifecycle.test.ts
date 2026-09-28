@@ -248,13 +248,13 @@ describe('scroll restoration option', () => {
     expect(await scenario({ scrollRestoration: {} })).toEqual(enabledDefault);
   });
 
-  test('false: nothing is saved, reset or restored; navigate still pushes the default offsets', async () => {
+  test('false: nothing is saved, reset or restored, and navigate pushes no scroll state', async () => {
     expect(await scenario({ scrollRestoration: false })).toEqual([
       'addEventListener popstate',
       'outlet.innerHTML = ""',
       'mount A into outlet',
       '--- navigate /b',
-      'pushState {"__thaneScroll":{"left":0,"top":0}} /b',
+      'pushState null /b',
       'destroy A',
       'outlet.innerHTML = ""',
       'outlet.innerHTML = ""',
@@ -317,11 +317,8 @@ describe('scroll restoration option', () => {
     expect(await scenario({ scrollRestoration: 'yes' })).toEqual(enabledDefault);
   });
 
-  test('null throws a TypeError from startRouter', () => {
-    install('http://app.test/a');
-    expect(() => startRouter(routes(), new FakeElement('outlet') as any, { scrollRestoration: null as any })).toThrow(
-      TypeError,
-    );
+  test('null counts as enabled with the defaults', async () => {
+    expect(await scenario({ scrollRestoration: null })).toEqual(enabledDefault);
   });
 
   test('after stopRouter the defaults apply again', async () => {
@@ -701,7 +698,7 @@ describe('mount({ router })', () => {
     expect(log).toContain('mount A into router-main');
   });
 
-  test('Mode B without an outlet throws, and the shell stays mounted', () => {
+  test('Mode B without an outlet throws, and the shell goes again', () => {
     install('http://app.test/a');
     expect(() =>
       mount({
@@ -714,6 +711,6 @@ describe('mount({ router })', () => {
         "In Mode B (shell + router), your shell component's template must contain " +
         'an element with id="router-outlet".',
     );
-    expect(log).toEqual(['mount Shell into body']);
+    expect(log).toEqual(['mount Shell into body', 'destroy Shell', 'body.innerHTML = ""']);
   });
 });

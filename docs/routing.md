@@ -141,6 +141,8 @@ export const UserPage = defineComponent('user-page', ({ route }) => {
 });
 ```
 
+Parameters are decoded: `/users/ada%20lovelace` gives `id` the value `ada lovelace`. A segment that is not valid percent-encoding (`/users/100%`) is kept as written.
+
 ## Route Context
 
 Every component has access to route context via `ctx.route`:

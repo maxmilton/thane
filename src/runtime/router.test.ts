@@ -138,10 +138,10 @@ describe('matchRoute', () => {
     expect(result!.route.title).toBe('Empty 404');
   });
 
-  test('param values can contain special characters (url-encoded segments)', () => {
-    const result = matchRoute('/users/hello%20world', routes);
-    expect(result).not.toBeNull();
-    expect(result!.params).toEqual({ id: 'hello%20world' });
+  test('param values are decoded; a malformed escape is kept as written', () => {
+    expect(matchRoute('/users/hello%20world', routes)!.params).toEqual({ id: 'hello world' });
+    expect(matchRoute('/users/caf%C3%A9', routes)!.params).toEqual({ id: 'café' });
+    expect(matchRoute('/users/100%', routes)!.params).toEqual({ id: '100%' });
   });
 
   test('matches route with trailing static and param', () => {
