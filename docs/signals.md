@@ -99,10 +99,7 @@ Computed signals:
 - **Differential tracking** — if a re-evaluation reads different signals than before, subscriptions are updated automatically. New deps are added, old deps are removed.
 - **Subscribe** — computeds expose `.subscribe()` just like regular signals.
 
-A computed is only marked dirty when its dependency notifies it, so while that notification is still waiting, a read returns the previous value. That happens in two places:
-
-- **Inside a `batch()` function.** The batch holds every notification back until it ends, so a computed read inside the function is stale; read it after `batch()` returns.
-- **While subscribers run.** A subscriber that writes a signal and then reads a computed over it sees the old value, because the signal is notified only after the current subscribers finish. The same holds for a computed built on other computeds, read in a subscriber of their source.
+A read is always fresh. Inside a `batch()` function, and while subscribers run, a source can have changed without having notified the computed yet; a computed read there computes again when any signal was written since it last computed:
 
 ```typescript
 import { signal, computed, batch } from 'thane';
@@ -112,12 +109,11 @@ const doubled = computed(() => price() * 2);
 
 batch(() => {
   price(20);
-  doubled(); // 20 — the previous value
+  doubled(); // 40
 });
-doubled(); // 40
 ```
 
-Where the new value is needed at once, read the source signals directly.
+Its subscribers are still notified once, with the final value, after the batch or the cascade.
 
 ### Disposing a Computed
 
@@ -189,7 +185,7 @@ Key behaviors:
 - Notifications are **deferred** until the outermost batch ends. Each changed signal is then notified **once**, with its final value, in the order the signals were first set. An effect that reads several of them runs once per changed signal, and sees the final values every time; a `computed` over several of them notifies once.
 - Batches **nest** — only the outermost batch triggers notifications.
 - A `batch()` called inside a subscriber notifies its signals, and any signal the cascade set before it, before it returns. The follow-up writes their subscribers make wait, like any write inside a subscriber, until the outer notification has finished.
-- A `computed` read inside the batch function returns its previous value (see [Computed Signals](#computed-signals)).
+- A `computed` read inside the batch function returns the value its sources give it now (see [Computed Signals](#computed-signals)).
 
 ---
 

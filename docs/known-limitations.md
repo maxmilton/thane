@@ -133,9 +133,9 @@ Only one router instance is supported. Calling `mount()` with a `router` option 
 
 Cycles are detected in development builds only: when subscribers keep setting each other's signals, a development build stops the cycle with an error after 500 rounds. A production build has no check, so there a cycle that never settles ends in a stack overflow (`RangeError: Maximum call stack size exceeded`), and afterwards later writes may never be notified. See [Signals](signals.md#circular-dependencies).
 
-### Stale `computed` Reads in a Batch or a Cascade
+### A Signal Notified Twice in One Cascade
 
-A `computed` is marked dirty when one of its sources notifies it, and re-evaluates on its next read; until then a read returns the previous value. Inside a `batch()` function, and while subscribers run, those notifications can still be waiting: a read in the batch function, in a subscriber that has just set one of the computed's sources, or of a `computed` built on other `computed`s in a subscriber of their source, returns the old value. Read the computed after the batch, or read the source signals directly there. See [Signals](signals.md#computed-signals).
+When a cascade has several signals waiting, they are notified one after the other. A signal that one of the earlier ones sets again is notified at once, with its new value, and then once more in its own turn, with the same value. A subscriber that must run once per change can compare the value with the one it saw last.
 
 ## Missing Features
 

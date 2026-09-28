@@ -20,8 +20,8 @@
  * Computed:
  *   - Dirty-marked when a dependency notifies; re-evaluated lazily, on the next read
  *   - A diamond notifies the join once, with the final value
- *   - Reads are not glitch-free: until its dependencies have notified it, a computed returns its
- *     previous value (inside a batch() function, or in a subscriber whose cascade has not run yet)
+ *   - Reads are fresh: read inside a notification pass or a batch() function, where a source may have
+ *     changed without notifying yet, a computed computes again when any signal was written since
  */
 
 import type { Signal, ReadonlySignal } from './types.js';
@@ -121,6 +121,7 @@ export const signal = <T>(initialValue: T): Signal<T> => {
 
     if (!Object.is(fn._v, newValue)) {
       fn._v = newValue!;
+      _writes++;
 
       if (_notificationDepth) {
         _pendingSignals.add(fn as unknown as SignalInternal<unknown>);
@@ -144,6 +145,9 @@ export const signal = <T>(initialValue: T): Signal<T> => {
 
 /** @internal — above 0 while subscribers or a batch() function run; a write then waits in _pendingSignals. */
 let _notificationDepth = 0;
+
+/** @internal — counts the writes that changed a value: a computed read in a notification pass compares it */
+let _writes = 0;
 
 /**
  * Hook for computed-signal deferred-notification flush.
@@ -252,7 +256,8 @@ const _computedPendingQueue: (() => void)[] = [];
 /**
  * Create a derived signal that auto-tracks dependencies and re-evaluates lazily.
  *
- * Uses dirty-marking + pull-on-read to prevent diamond glitches.
+ * Dirty-marked by its sources and computed again on the next read, which is always fresh; a diamond
+ * notifies the join once, with the final value.
  * Returned value is a ReadonlySignal with `.dispose()` to unsubscribe.
  *
  * @example
@@ -293,7 +298,15 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
   const depUnsubs = new Map<Signal<unknown>, () => void>();
   // Subscriber slots, kept like a signal's (sharedSubscribe, _compact); notification stays separate
   const slots: Slots<T> = { _s: [], _nc: 0, _nn: 0 };
+  // The write count when the value was computed: read inside a notification pass or a batch()
+  // function, where a dependency may have changed without notifying yet, a computed whose count is
+  // behind computes again, so the read is fresh
+  let computedAt = -1;
+  // The value the subscribers were last given: a change is measured against it, not against the
+  // value, which a fresh read may already have updated
+  let notified: T = undefined as T;
   const notifySubs = () => {
+    notified = value;
     const subscribers = slots._s;
     const len = subscribers.length;
     slots._nc++;
@@ -325,8 +338,6 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
    * During a notification cascade, defers to the computed pending queue.
    */
   let pendingNotify = false;
-  let pendingOldValue: T = undefined as T;
-  let hasPendingOldValue = false;
   const markDirty = () => {
     if (disposed) return;
     dirty = true;
@@ -335,8 +346,6 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
     if (_notificationDepth > 0) {
       if (!pendingNotify) {
         pendingNotify = true;
-        pendingOldValue = value;
-        hasPendingOldValue = true;
         _computedPendingQueue.push(notifyIfChanged);
       }
       return;
@@ -344,14 +353,12 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
     notifyIfChanged();
   };
 
-  /** Re-evaluate if value changed and notify subscribers. */
+  /** Re-evaluate, and notify the subscribers when the value is not the one they were last given. */
   const notifyIfChanged = () => {
-    const oldVal = hasPendingOldValue ? pendingOldValue : value;
     pendingNotify = false;
-    hasPendingOldValue = false;
     if (disposed || slots._s.length === slots._nn) return;
-    evaluate();
-    if (hasError || !Object.is(oldVal, value)) notifySubs();
+    if (dirty || computedAt !== _writes) evaluate();
+    if (hasError || !Object.is(notified, value)) notifySubs();
   };
 
   /** Unsubscribe from all tracked dependencies and clear the map */
@@ -367,6 +374,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
    * the delta. When the dep set is stable (common case), this is O(0) work.
    */
   const evaluate = () => {
+    computedAt = _writes;
     const newDeps = new Set<Signal<unknown>>();
     _evalDeps = newDeps;
     const prev = _activeTracker;
@@ -407,6 +415,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
 
   // Initial evaluation
   evaluate();
+  notified = value;
 
   // The computed signal function — read-only
   const fn = (() => {
@@ -419,7 +428,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
       parentTracker._track(fn as unknown as Signal<unknown>);
     }
 
-    if (dirty) {
+    if (dirty || (_notificationDepth > 0 && computedAt !== _writes)) {
       evaluate();
     }
     if (hasError) throw error;
@@ -432,6 +441,7 @@ export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose:
     if (!skipInitial) {
       // Re-evaluate if dirty before calling subscriber
       if (dirty && !disposed) evaluate();
+      notified = value;
       if (hasError) {
         // Clean up the subscriber before throwing so no orphan subscription leaks.
         // The caller catches the error and knows the subscribe failed cleanly.
