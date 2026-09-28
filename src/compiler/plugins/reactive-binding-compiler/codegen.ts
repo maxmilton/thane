@@ -24,6 +24,7 @@ import {
   BIND_FN,
   replaceReferences,
   parseArrowFunction,
+  isFunctionExpressionText,
   expressionReferencesIdentifier,
 } from '../../utils/index.js';
 import { escapeTemplateLiteral } from '../../utils/html-parser/index.js';
@@ -475,8 +476,8 @@ interface PartitionedEvents {
 /**
  * Turn a row event attribute's expression into statements for the row listener body, where
  * the event is `e`. An arrow function is inlined (its parameter aliased to `e` when it has
- * another name); a plain reference is called with the event; a call expression such as
- * `select(item.id)` runs as written.
+ * another name); a function expression or a plain reference is called with the event; any
+ * other expression, such as the call `select(item.id)`, runs as written.
  */
 const inlineRowHandler = (handlerExpr: string): string => {
   const arrow = parseArrowFunction(handlerExpr);
@@ -487,6 +488,7 @@ const inlineRowHandler = (handlerExpr: string): string => {
     if (/^[A-Za-z_$][\w$]*$/.test(param)) return `{ const ${param} = e; ${body}; }`;
     return `(${handlerExpr})(e)`;
   }
+  if (isFunctionExpressionText(handlerExpr)) return `(${handlerExpr})(e)`;
   const trimmed = handlerExpr.trim();
   if (/^[A-Za-z_$][\w$.]*$/.test(trimmed)) return `${trimmed}(e)`;
   return handlerExpr;
@@ -776,10 +778,10 @@ const generateConsolidatedSubscription = (signalName: string, bindings: SimpleBi
 };
 
 /**
- * Turn an event attribute's expression into the listener to register. Arrow functions and
- * plain references are passed through (they receive the event); a call expression such as
- * `navigate('/x')` is wrapped so it runs on the event, not at bind time; modifiers add
- * their guards around the call.
+ * Turn an event attribute's expression into the listener to register. Functions (arrow
+ * functions and function expressions) and plain references are passed through (they receive
+ * the event); any other expression, such as the call `navigate('/x')`, is wrapped so it runs
+ * on the event, not at bind time; modifiers add their guards around the call.
  */
 const compileEventHandler = (evt: EventBinding): string => {
   const handlerCode = evt.handlerExpression;
@@ -788,9 +790,9 @@ const compileEventHandler = (evt: EventBinding): string => {
   const hasStop = evt.modifiers.includes('stop');
   const hasSelf = evt.modifiers.includes('self');
   const keyModifiers = evt.modifiers.filter((m) => m !== 'prevent' && m !== 'stop' && m !== 'self');
-  const isArrow = parseArrowFunction(handlerCode) !== null;
+  const isFunction = isFunctionExpressionText(handlerCode);
   const isSimpleRef = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(handlerCode.trim());
-  const isFnCall = !isArrow && !isSimpleRef;
+  const isFnCall = !isFunction && !isSimpleRef;
 
   if (hasModifiers && (hasPrevent || hasStop || hasSelf || keyModifiers.length > 0)) {
     const bodyParts: string[] = [];

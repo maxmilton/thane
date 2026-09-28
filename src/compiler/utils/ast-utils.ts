@@ -253,10 +253,21 @@ export const expressionReferencesIdentifier = (expression: string, identifierNam
   return found;
 };
 
+/** The expression `expression` is, parentheses removed, and its source file; null when it is not one expression. */
+const parseWholeExpression = (expression: string): { node: ts.Expression; sf: ts.SourceFile } | null => {
+  const sf = ts.createSourceFile('__expr.ts', `(${expression})`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const statement = sf.statements.length === 1 ? sf.statements[0] : undefined;
+  if (!statement || !ts.isExpressionStatement(statement)) return null;
+  let node = statement.expression;
+  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  return { node, sf };
+};
+
 /**
  * Parse an arrow function expression and return its parameter list and body.
  * Uses TS AST to correctly handle destructuring, defaults, and nested parens.
- * Returns null if the expression is not an arrow function.
+ * Returns null if the expression is not an arrow function, including one that only
+ * contains an arrow, such as a call with an arrow argument.
  */
 export const parseArrowFunction = (
   expression: string,
@@ -265,22 +276,18 @@ export const parseArrowFunction = (
   body: string;
   isBlockBody: boolean;
 } | null => {
-  const wrapped = `(${expression})`;
-  const sf = ts.createSourceFile('__expr.ts', wrapped, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-
-  let result: { params: string; body: string; isBlockBody: boolean } | null = null;
-
-  const visit = (node: ts.Node) => {
-    if (result) return;
-    if (ts.isArrowFunction(node)) {
-      const params = node.parameters.map((p) => p.getText(sf)).join(', ');
-      const body = node.body.getText(sf);
-      const isBlockBody = ts.isBlock(node.body);
-      result = { params, body, isBlockBody };
-      return;
-    }
-    ts.forEachChild(node, visit);
+  const parsed = parseWholeExpression(expression);
+  if (!parsed || !ts.isArrowFunction(parsed.node)) return null;
+  const { node, sf } = parsed;
+  return {
+    params: node.parameters.map((p) => p.getText(sf)).join(', '),
+    body: node.body.getText(sf),
+    isBlockBody: ts.isBlock(node.body),
   };
-  visit(sf);
-  return result;
+};
+
+/** True when the expression is an arrow function or a function expression. */
+export const isFunctionExpressionText = (expression: string): boolean => {
+  const parsed = parseWholeExpression(expression);
+  return parsed !== null && (ts.isArrowFunction(parsed.node) || ts.isFunctionExpression(parsed.node));
 };
