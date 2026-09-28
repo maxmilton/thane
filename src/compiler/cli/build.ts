@@ -52,7 +52,14 @@ export async function runBuild(config: BuildConfig): Promise<void> {
     ComponentPrecompilerPlugin(buildContext),
     GlobalCSSBundlerPlugin({ minify: config.isProd, selectorMap: () => buildContext.selectorMap }),
     ...(config.isProd
-      ? [MinificationPlugin(buildContext, { projectRoot, htmlPath: config.inputHTMLFilePath, outDir: config.outDir })]
+      ? [
+          MinificationPlugin(buildContext, {
+            projectRoot,
+            htmlPath: config.inputHTMLFilePath,
+            outDir: config.outDir,
+            entryPoints: config.entryPoints,
+          }),
+        ]
       : []),
     PostBuildPlugin({
       distDir: config.outDir,

@@ -10,6 +10,7 @@ import ts from 'typescript';
 import type { ComponentDefinition } from '../types.js';
 import { extractComponentDefinitions } from './ast-utils.js';
 import { sourceCache } from './cache.js';
+import { createModuleResolver } from './module-graph.js';
 
 /** Re-export chains longer than this are not followed (a cycle, or a pathological barrel). */
 const MAX_REEXPORT_DEPTH = 16;
@@ -17,20 +18,6 @@ const MAX_REEXPORT_DEPTH = 16;
 const fileKey = (filePath: string): string => {
   const resolved = path.resolve(filePath);
   return ts.sys.useCaseSensitiveFileNames ? resolved : resolved.toLowerCase();
-};
-
-const readCompilerOptions = (projectRoot: string): ts.CompilerOptions => {
-  const fallback: ts.CompilerOptions = {
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    target: ts.ScriptTarget.ES2022,
-  };
-  const configPath = ts.findConfigFile(projectRoot, ts.sys.fileExists, 'tsconfig.json');
-  if (!configPath) return fallback;
-  const read = ts.readConfigFile(configPath, ts.sys.readFile);
-  if (read.error) return fallback;
-  const { options } = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(configPath));
-  return { ...fallback, ...options };
 };
 
 export interface ComponentResolver {
@@ -47,12 +34,7 @@ export const createComponentResolver = (
   projectRoot: string,
   scanned: Iterable<ComponentDefinition>,
 ): ComponentResolver => {
-  const options = readCompilerOptions(projectRoot);
-  const resolutionCache = ts.createModuleResolutionCache(
-    projectRoot,
-    (name) => (ts.sys.useCaseSensitiveFileNames ? name : name.toLowerCase()),
-    options,
-  );
+  const resolveImport = createModuleResolver(projectRoot);
 
   const definitionsByFile = new Map<string, Map<string, ComponentDefinition>>();
   for (const def of scanned) {
@@ -61,14 +43,6 @@ export const createComponentResolver = (
     if (!defs) definitionsByFile.set(key, (defs = new Map()));
     defs.set(def.name, def);
   }
-
-  /** The file an import specifier leads to, or null for packages and anything unresolved */
-  const resolveImport = (specifier: string, fromFile: string): string | null => {
-    if (specifier === 'thane' || specifier.startsWith('thane/')) return null;
-    const resolved = ts.resolveModuleName(specifier, fromFile, options, ts.sys, resolutionCache).resolvedModule;
-    if (!resolved || resolved.isExternalLibraryImport || resolved.resolvedFileName.endsWith('.d.ts')) return null;
-    return resolved.resolvedFileName;
-  };
 
   const parsedFile = async (filePath: string): Promise<ts.SourceFile | null> =>
     (await sourceCache.get(path.resolve(filePath)))?.sourceFile ?? null;
