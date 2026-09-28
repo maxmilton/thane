@@ -24,7 +24,7 @@ Source (.ts, .css)
 Output (dist/)
 ```
 
-- **Type Checker.** At the start of every build it generates the hidden type files in `.thane/types` (the `.css` declarations and the route types) and then type-checks the project with its own `tsconfig.json`. esbuild waits for it. Type errors are warnings, or fail the build with `--strict-type-check`.
+- **Type Checker.** At the start of every build it generates the hidden type files in `.thane/types` (the `.css` declarations and the route types) and then type-checks the project with its own `tsconfig.json`, with each template event handler typed for its event ([Event Handling](event-handling.md#event-object)). esbuild waits for it. Type errors are warnings, or fail the build with `--strict-type-check`.
 - **Thane Linter.** Runs the lint rules on each `.ts` file that defines a component or calls `mount()`. An error stops that file; warnings are printed.
 - **Component Compiler** (log tag `component-compiler`). For each `.ts` file that holds an `html` template it replaces child component calls with anchors, compiles the component (see [Template Compilation](#template-compilation)), compiles its `css` templates and removes the `html` tags. A module that holds only `css` templates has them compiled too. In a file without templates that calls `mount({ component })` once (usually the entry file), it rewrites the call to a direct mount that leaves the router out of the bundle. A component it cannot compile fails the build with the error, once.
 - **Global CSS Bundler.** Loads every imported `.css` file, applies the same stylesheet transforms as `css` templates, and exports the result as a string.
