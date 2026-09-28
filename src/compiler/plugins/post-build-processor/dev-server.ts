@@ -2,13 +2,10 @@
  * Post-Build Processor — HTTP dev server
  */
 
-import { basename, join, extname, relative, resolve } from 'node:path';
-import { brotliCompress, constants as zlibConstants } from 'node:zlib';
-import { promisify } from 'node:util';
+import { basename, join, extname, relative, resolve, sep } from 'node:path';
 import type { Server } from 'bun';
 import { consoleColors, ansi, getContentType, logger } from '../../utils/index.js';
-
-const brotliCompressAsync = promisify(brotliCompress);
+import { compress } from './compression.js';
 
 const promptForPort = async (): Promise<number> => {
   process.stdout.write(`${ansi.yellow}Enter a different port number: ${ansi.reset}`);
@@ -36,6 +33,25 @@ export interface DevServerOptions {
 }
 
 const BROWSER_ERROR_SENTINEL = 'THANE_BROWSER_ERROR';
+
+/**
+ * The file a request path points at inside `distDir`, or null when the path is malformed or
+ * leaves the directory. A URL pathname is percent-encoded (`My%20Logo.png`); it is decoded
+ * before it is resolved, so file names with spaces or non-ASCII characters are found, and the
+ * containment check runs on the decoded path, so an encoded `..%2F` cannot slip past it.
+ */
+export const resolveRequestPath = (distDir: string, pathname: string): string | null => {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return null;
+  }
+  const root = resolve(distDir);
+  const requested = resolve(root, '.' + decoded);
+  if (requested !== root && !requested.startsWith(root + sep)) return null;
+  return requested;
+};
 
 type ResolvedBrowserLocation = {
   source: string;
@@ -235,13 +251,7 @@ export class DevServer {
         return null;
       }
 
-      const requestedPath = resolve(this.options.distDir, '.' + parsed.pathname);
-      const canonicalDistDir = resolve(this.options.distDir);
-      if (!requestedPath.startsWith(canonicalDistDir)) {
-        return null;
-      }
-
-      return requestedPath;
+      return resolveRequestPath(this.options.distDir, parsed.pathname);
     } catch {
       return null;
     }
@@ -355,24 +365,13 @@ export class DevServer {
       };
 
       if (canCompress) {
-        const brotliQuality = isProd ? 11 : 4;
         headers['Vary'] = 'Accept-Encoding';
         const raw = await Bun.file(filePath).bytes();
+        const encoding = acceptEncoding.includes('br') ? 'br' : acceptEncoding.includes('gzip') ? 'gzip' : null;
 
-        if (acceptEncoding.includes('br')) {
-          headers['Content-Encoding'] = 'br';
-          const compressed = await brotliCompressAsync(raw, {
-            params: {
-              [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
-              [zlibConstants.BROTLI_PARAM_QUALITY]: brotliQuality,
-              [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
-            },
-          });
-          return new Response(compressed, { headers });
-        } else if (acceptEncoding.includes('gzip')) {
-          headers['Content-Encoding'] = 'gzip';
-          const compressed = Bun.gzipSync(raw, { level: 9 });
-          return new Response(compressed, { headers });
+        if (encoding) {
+          headers['Content-Encoding'] = encoding;
+          return new Response(await compress(raw, encoding, isProd), { headers });
         }
       }
 
@@ -400,8 +399,8 @@ export class DevServer {
           return new Response('WebSocket upgrade failed', { status: 400 });
         }
 
-        const requestedPath = resolve(canonicalDistDir, '.' + requestedUrl);
-        if (!requestedPath.startsWith(canonicalDistDir)) {
+        const requestedPath = resolveRequestPath(canonicalDistDir, requestedUrl);
+        if (requestedPath === null) {
           return new Response('Forbidden', { status: 403 });
         }
 
@@ -413,27 +412,22 @@ export class DevServer {
           if (await file.exists()) {
             const stat = await file.stat();
             if (stat?.isFile()) {
-              return compressAndRespond(
+              return await compressAndRespond(
                 requestedPath,
                 req,
                 getContentType(requestedUrl),
                 'public, max-age=31536000, immutable',
               );
-            } else if (!hasFileExtension) {
-              return compressAndRespond(indexPath, req, 'text/html', 'no-cache');
             }
-            return new Response('Not Found', { status: 404 });
           }
-          if (!hasFileExtension) {
-            return compressAndRespond(indexPath, req, 'text/html', 'no-cache');
-          }
-          return new Response('Not Found', { status: 404 });
         } catch {
-          if (!hasFileExtension) {
-            return compressAndRespond(indexPath, req, 'text/html', 'no-cache');
-          }
-          return new Response('Not Found', { status: 404 });
+          // Not a readable file: answered below like a missing one
         }
+
+        // Anything that is not a file: a missing asset, or a client route served by index.html (if there is one)
+        return hasFileExtension || !(await Bun.file(indexPath).exists())
+          ? new Response('Not Found', { status: 404 })
+          : compressAndRespond(indexPath, req, 'text/html', 'no-cache');
       },
       websocket: {
         message: (_ws, rawMessage) => {

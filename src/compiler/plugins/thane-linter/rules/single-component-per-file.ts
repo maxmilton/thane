@@ -15,36 +15,26 @@
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
-import { ErrorCode, createError } from '../../../errors.js';
-import { FN } from '../../../utils/constants.js';
-
-const isDefineComponentExpr = (node: ts.Expression): boolean => {
-  if (ts.isCallExpression(node)) {
-    const callee = node.expression;
-    return ts.isIdentifier(callee) && callee.text === FN.DEFINE_COMPONENT;
-  }
-  return false;
-};
+import { ErrorCode } from '../../../errors.js';
+import { createReporter, isDefineComponentExpr } from './lint-utils.js';
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
-  const locations: { line: number; character: number; node: ts.Node }[] = [];
+  const { diagnostics, report } = createReporter(sourceFile, filePath, ErrorCode.SINGLE_COMPONENT_PER_FILE, 'error');
+  const locations: ts.Node[] = [];
 
   const visit = (node: ts.Node) => {
     // Match: [export] const X = defineComponent(...)
     if (ts.isVariableStatement(node)) {
       for (const decl of node.declarationList.declarations) {
         if (decl.initializer && isDefineComponentExpr(decl.initializer)) {
-          const { line, character } = sourceFile.getLineAndCharacterOfPosition(decl.getStart());
-          locations.push({ line, character, node: decl });
+          locations.push(decl);
         }
       }
     }
 
     // Also catch: export default defineComponent(...)
     if (ts.isExportAssignment(node) && !node.isExportEquals && isDefineComponentExpr(node.expression)) {
-      const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-      locations.push({ line, character, node });
+      locations.push(node);
     }
 
     ts.forEachChild(node, visit);
@@ -55,14 +45,10 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
   if (locations.length > 1) {
     // Report on every call after the first
     for (let i = 1; i < locations.length; i++) {
-      const loc = locations[i]!;
-      diagnostics.push(
-        createError(
-          `Only one defineComponent() is allowed per file. Found ${locations.length} calls — ` +
-            'the compiler processes only one component per file. Split additional components into separate files.',
-          { file: filePath, line: loc.line + 1, column: loc.character + 1 },
-          ErrorCode.SINGLE_COMPONENT_PER_FILE,
-        ),
+      report(
+        locations[i]!,
+        `Only one defineComponent() is allowed per file. Found ${locations.length} calls — ` +
+          'the compiler processes only one component per file. Split additional components into separate files.',
       );
     }
   }

@@ -4,7 +4,6 @@
  */
 
 import type ts from 'typescript';
-import type { TemplateEditKind } from '../contracts/compiler/template-edits.js';
 
 /**
  * Log level for compiler output
@@ -50,36 +49,14 @@ export interface ComponentDefinition {
  */
 export interface TemplateInfo {
   node: ts.TaggedTemplateExpression;
-  expressions: SignalExpression[];
   templateStart: number;
   templateEnd: number;
-}
-
-/**
- * Signal expression in template
- */
-export interface SignalExpression {
-  signalName: string;
-  fullExpression: string;
-  start: number;
-  end: number;
 }
 
 /** A start/end character range for source positions and overlap checking. */
 export interface Range {
   start: number;
   end: number;
-}
-
-/**
- * Template edit operation
- */
-export interface TemplateEdit {
-  type: TemplateEditKind;
-  start: number;
-  end: number;
-  content?: string;
-  elementId?: string;
 }
 
 /**
@@ -95,8 +72,7 @@ export interface ImportInfo {
 
 /**
  * Shared build context passed across plugins to avoid duplicate work.
- * The filesystem scan results are populated once during onStart and
- * shared by ComponentPrecompiler and HTMLBootstrapInjector.
+ * The filesystem scan results are populated once and read by ComponentPrecompiler.
  */
 export interface BuildContext {
   /** All .ts files discovered by the shared scan */
@@ -105,6 +81,8 @@ export interface BuildContext {
   componentsByName: Map<string, ComponentDefinition>;
   /** Component definitions found during the scan, keyed by selector */
   componentsBySelector: Map<string, ComponentDefinition>;
-  /** Selector minification map, populated by MinificationPlugin during onEnd */
+  /** Production build: templates and stylesheets are minified where the compiler emits them */
+  minify?: boolean;
+  /** Selector renames, planned by MinificationPlugin before each build and applied by the compiler */
   selectorMap?: import('./plugins/minification/selector-minifier.js').SelectorMap;
 }

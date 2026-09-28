@@ -31,7 +31,7 @@ describe('A prop read as props.x() in a template is a signal read', () => {
 
   test('a when() condition on a prop is driven by the prop', async () => {
     const js = await buildAndReadJs(child('<p ${when(props.show())}>x</p>'));
-    expect(js).toMatch(/__bindIf\(r, props\.show, /);
+    expect(js).toMatch(/__bindIf\(_ws_b\d+, _we_b\d+, props\.show, /);
   });
 
   test('a prop called with arguments is not treated as a signal', async () => {

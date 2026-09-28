@@ -15,12 +15,12 @@ import { lifecycleArrowFunction } from './lifecycle-arrow-function.js';
 import { requireConstTaggedTemplates } from './require-const-tagged-templates.js';
 import { noNestedHtmlTags } from './no-nested-html-tags.js';
 import { noConditionalTemplateInit } from './no-conditional-template-init.js';
-import { noElementId } from './no-element-id.js';
 import { singleComponentPerFile } from './single-component-per-file.js';
 import { componentConstDeclaration } from './component-const-declaration.js';
 import { noAliasedComponentExport } from './no-aliased-component-export.js';
 import { noCrossFileHtmlTemplate } from './no-cross-file-html-template.js';
 import { duplicateMountTarget } from './duplicate-mount-target.js';
+import { singleReturnObject } from './single-return-object.js';
 import type { LintRuleDefinition } from './types.js';
 
 export { noDefaultExportComponent } from './no-default-export-component.js';
@@ -29,12 +29,12 @@ export { lifecycleArrowFunction } from './lifecycle-arrow-function.js';
 export { requireConstTaggedTemplates } from './require-const-tagged-templates.js';
 export { noNestedHtmlTags } from './no-nested-html-tags.js';
 export { noConditionalTemplateInit } from './no-conditional-template-init.js';
-export { noElementId } from './no-element-id.js';
 export { singleComponentPerFile } from './single-component-per-file.js';
 export { componentConstDeclaration } from './component-const-declaration.js';
 export { noAliasedComponentExport } from './no-aliased-component-export.js';
 export { noCrossFileHtmlTemplate } from './no-cross-file-html-template.js';
 export { duplicateMountTarget } from './duplicate-mount-target.js';
+export { singleReturnObject } from './single-return-object.js';
 
 /**
  * All built-in lint rules, in registration order.
@@ -47,10 +47,10 @@ export const allRules: readonly LintRuleDefinition[] = [
   requireConstTaggedTemplates,
   noNestedHtmlTags,
   noConditionalTemplateInit,
-  noElementId,
   singleComponentPerFile,
   componentConstDeclaration,
   noAliasedComponentExport,
   noCrossFileHtmlTemplate,
   duplicateMountTarget,
+  singleReturnObject,
 ];

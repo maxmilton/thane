@@ -4,39 +4,17 @@
 
 import type { ReactiveBindingKind, TextBindingMode } from '../../../contracts/index.js';
 
-/**
- * Access pattern abstraction for code generation.
- *
- * Codegen and template-processing use this to emit the correct
- * member-access syntax for each component model:
- *
- *  - **class-based**: `this.signal`, `this.shadowRoot`, `this.constructor.X`, `.call(this, e)`
- *  - **defineComponent (closure)**: bare `signal`, `ctx.root`, plain `X`, `.call(null, e)`
- */
-export interface AccessPattern {
-  /** Wrap a signal name for read access, e.g. `"this." + name` or bare `name` */
-  signal: (name: string) => string;
-  /** Wrap a signal call expression, e.g. `"this.foo()"` or `"foo()"` */
-  signalCall: (name: string) => string;
-  /** Root element expression used by initializeBindings, e.g. `"this.shadowRoot"` or `"ctx.root"` */
-  root: string;
-  /** Alias variable for root inside initializeBindings, e.g. `"const r = this.shadowRoot;"` or `"const r = ctx.root;"` */
-  rootAlias: string;
-  /** Prefix for static template class properties, e.g. `"this.constructor."` or `""` */
-  staticPrefix: string;
-  /** Static template declaration format: class property or standalone const */
-  staticTemplatePrefix: string;
+/** What the code generator emits differently in a production build. */
+export interface EmitOptions {
+  /**
+   * Prepare a compiled template's HTML for emission. Identity in development; the HTML
+   * minifier in production. Every template the generated code carries goes through it, so
+   * templates are minified here, as HTML, and never later as part of a JavaScript file.
+   */
+  html: (template: string) => string;
+  /** The name a component selector is emitted under: itself, or its production short name */
+  selector: (name: string) => string;
 }
-
-/** Access pattern for defineComponent (closure-based) */
-export const CLOSURE_ACCESS: AccessPattern = {
-  signal: (name) => name,
-  signalCall: (name) => `${name}()`,
-  root: 'ctx.root',
-  rootAlias: 'const r = ctx.root;',
-  staticPrefix: '',
-  staticTemplatePrefix: 'const __tpl',
-};
 
 export interface ConditionalBlock {
   id: string;
@@ -84,14 +62,15 @@ export interface RepeatBlock {
   itemVar: string; // e.g., "country"
   indexVar?: string | undefined; // e.g., "index" (optional)
   itemTemplate: string; // HTML template for each item (processed)
+  /** A row that is a component call: the component and its props, as written (H-44) */
+  componentRow?: { componentName: string; propsExpression: string } | undefined;
   emptyTemplate?: string | undefined; // HTML template shown when list is empty
-  trackByFn?: string | undefined; // Custom trackBy function source (deprecated - no longer used)
+  trackByFn?: string | undefined; // Custom trackBy function source: the reconciler's row key (its property name for `(x) => x.prop`)
   startIndex: number; // Position in HTML where ${repeat starts
   endIndex: number; // Position after }
   itemBindings: ItemBinding[]; // Bindings inside item template that reference item/index
   itemEvents: ItemEventBinding[]; // Event handlers inside item template
   signalBindings: SimpleBinding[]; // Component-level signal bindings inside repeat items (always simple)
-  eventBindings: EventBinding[]; // Event bindings not involving item
   nestedConditionals: ConditionalBlock[];
   nestedWhenElse: WhenElseBlock[];
   nestedRepeats: RepeatBlock[];
@@ -172,8 +151,8 @@ export interface SimpleBinding extends BindingBase {
 /**
  * An expression text binding referencing one or more signals.
  * The full JS expression is evaluated on each signal change.
- * Text bindings are rendered via comment markers: `<!--bN-->value`.
- * Updates target `commentNode.nextSibling.data` (the text node after the comment).
+ * Text bindings are rendered after a marker comment (`<!--bN-->value<!---->` while compiled, the
+ * marker emitted without its id); updates write the text node after it, reached by path.
  */
 export interface ExpressionBinding extends BindingBase {
   signalNames: string[];
@@ -233,8 +212,6 @@ export interface StaticTemplateInfo {
     commentId: string;
     signalName: string;
   }>;
-  /** Navigation paths for directive anchors: conditional/repeat anchors inside item template (Step 14/15) */
-  directiveAnchorPaths?: Map<string, number[]>;
   /** Item bindings that also reference outer signals — need per-item subscriptions */
   mixedSignalItemBindings?: Array<{
     path: number[];

@@ -1,200 +1,25 @@
 import fs from 'node:fs';
 import type { Plugin } from 'esbuild';
 import ts from 'typescript';
-import vm from 'node:vm';
 import type { ComponentDefinition, BuildContext } from '../../types.js';
 import {
-  findEnclosingClass,
-  isSignalCall,
   sourceCache,
   logger,
   PLUGIN_NAME,
   FN,
   createLoaderResult,
   extendsComponentQuick,
-  generateComponentHTML,
   createBuildContext,
+  applyEdits,
 } from '../../utils/index.js';
 import { transformDefineComponentSource } from '../reactive-binding-compiler/index.js';
+import { anchorMark } from '../reactive-binding-compiler/template-utils.js';
+import type { CompileOptions } from '../reactive-binding-compiler/index.js';
+import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
 import { ErrorCode, createError } from '../../errors.js';
-
-/** Sentinel distinguishing "evaluation failed" from "evaluated to undefined". */
-const EVAL_FAILED = Symbol('EVAL_FAILED');
-type EvalResult<T = any> = T | typeof EVAL_FAILED;
+import { INTERNAL_RUNTIME_SPECIFIER, RUNTIME_HELPER } from '../../../contracts/index.js';
 
 const NAME = PLUGIN_NAME.COMPONENT;
-
-const createCTFEContext = (classProperties: Map<string, any>) => {
-  const sandbox: Record<string, any> = {
-    JSON,
-    Math,
-    String,
-    Number,
-    Boolean,
-    Array,
-    Object,
-    parseInt,
-    parseFloat,
-    isNaN,
-    isFinite,
-  };
-
-  for (const [key, value] of classProperties) {
-    sandbox[key] = value;
-  }
-
-  return vm.createContext(sandbox);
-};
-
-/**
- * Remove `this.` property accesses from an expression string using AST-aware rewriting.
- * Only replaces `this.` in actual property accesses, not inside string literals.
- */
-const stripThisAccessAST = (code: string): string => {
-  try {
-    const tempSource = ts.createSourceFile('__ctfe_temp.ts', code, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
-    const edits: { start: number; end: number }[] = [];
-
-    const visit = (node: ts.Node): void => {
-      if (ts.isPropertyAccessExpression(node) && node.expression.kind === ts.SyntaxKind.ThisKeyword) {
-        edits.push({
-          start: node.expression.getStart(tempSource),
-          end: node.expression.getEnd() + 1,
-        });
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(tempSource);
-
-    let result = code;
-    for (let i = edits.length - 1; i >= 0; i--) {
-      const edit = edits[i]!;
-      result = result.substring(0, edit.start) + result.substring(edit.end);
-    }
-    return result;
-  } catch {
-    return code;
-  }
-};
-
-const evaluateExpressionCTFE = (
-  node: ts.Node,
-  sourceFile: ts.SourceFile,
-  classProperties: Map<string, any>,
-): EvalResult => {
-  if (ts.isStringLiteral(node)) return node.text;
-  if (ts.isNumericLiteral(node)) return Number(node.text);
-  if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
-  if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
-  if (node.kind === ts.SyntaxKind.NullKeyword) return null;
-  if (node.kind === ts.SyntaxKind.UndefinedKeyword) return undefined;
-
-  if (ts.isPropertyAccessExpression(node) && node.expression.kind === ts.SyntaxKind.ThisKeyword) {
-    const propName = node.name.text;
-    if (classProperties.has(propName)) {
-      return classProperties.get(propName);
-    }
-    return EVAL_FAILED;
-  }
-
-  if (ts.isObjectLiteralExpression(node)) {
-    const obj: Record<string, any> = {};
-    for (const prop of node.properties) {
-      if (ts.isPropertyAssignment(prop) && prop.name) {
-        let key: string;
-        if (ts.isIdentifier(prop.name)) {
-          key = prop.name.text;
-        } else if (ts.isStringLiteral(prop.name)) {
-          key = prop.name.text;
-        } else if (ts.isNumericLiteral(prop.name)) {
-          key = prop.name.text;
-        } else {
-          continue;
-        }
-        const value = evaluateExpressionCTFE(prop.initializer, sourceFile, classProperties);
-        if (value === EVAL_FAILED) {
-          return EVAL_FAILED;
-        }
-        obj[key] = value;
-      } else if (ts.isShorthandPropertyAssignment(prop)) {
-        const key = prop.name.text;
-        if (classProperties.has(key)) {
-          obj[key] = classProperties.get(key);
-        } else {
-          return EVAL_FAILED;
-        }
-      }
-    }
-    return obj;
-  }
-
-  if (ts.isArrayLiteralExpression(node)) {
-    const arr = [];
-    for (const el of node.elements) {
-      if (ts.isSpreadElement(el)) {
-        return EVAL_FAILED;
-      }
-      const value = evaluateExpressionCTFE(el, sourceFile, classProperties);
-      if (value === EVAL_FAILED) {
-        return EVAL_FAILED;
-      }
-      arr.push(value);
-    }
-    return arr;
-  }
-
-  try {
-    const context = createCTFEContext(classProperties);
-    let code = node.getText(sourceFile);
-    code = stripThisAccessAST(code);
-
-    const result = vm.runInContext(`(${code})`, context, {
-      timeout: 50,
-    });
-    return result;
-  } catch {
-    return EVAL_FAILED;
-  }
-};
-
-const extractClassPropertiesCTFE = (
-  classNode: ts.ClassExpression | ts.ClassDeclaration,
-  sourceFile: ts.SourceFile,
-): Map<string, any> => {
-  const resolvedProperties = new Map<string, any>();
-  const unresolvedProperties = new Map<string, ts.Expression>();
-
-  for (const member of classNode.members) {
-    if (ts.isPropertyDeclaration(member) && member.name && ts.isIdentifier(member.name) && member.initializer) {
-      if (ts.isCallExpression(member.initializer) && isSignalCall(member.initializer)) {
-        continue;
-      }
-
-      const propName = member.name.text;
-      unresolvedProperties.set(propName, member.initializer);
-    }
-  }
-
-  let resolved = true;
-  const maxIterations = unresolvedProperties.size + 1;
-  let iterations = 0;
-
-  while (resolved && unresolvedProperties.size > 0 && iterations < maxIterations) {
-    resolved = false;
-    iterations++;
-
-    for (const [propName, initializer] of unresolvedProperties) {
-      const value = evaluateExpressionCTFE(initializer, sourceFile, resolvedProperties);
-      if (value !== EVAL_FAILED) {
-        resolvedProperties.set(propName, value);
-        unresolvedProperties.delete(propName);
-        resolved = true;
-      }
-    }
-  }
-
-  return resolvedProperties;
-};
 
 /** Child component mount point data, passed from CTFE to the binding compiler. */
 export interface ChildMountInfo {
@@ -204,20 +29,15 @@ export interface ChildMountInfo {
   selector: string;
   /** Raw source text of the props argument, e.g. "{ color: myColor }" */
   propsExpression: string;
-  /** Pre-allocated anchor ID from the CTFE counter: "b0", "b1", … */
+  /** Pre-allocated id from the CTFE counter ("b0", "b1", …): the child's placeholder is `<!--b0.-->` */
   anchorId: string;
-  /** Byte offset of the ${Component(…)} interpolation in the template string */
-  templatePosition: number;
 }
 
 interface CTFECallInfo {
   componentName: string;
   propsExpression: string;
-  evaluatedProps?: Record<string, any> | undefined;
   startIndex: number;
   endIndex: number;
-  /** Byte offset inside the template literal text */
-  templatePosition: number;
 }
 
 const findComponentCallsCTFE = (
@@ -232,11 +52,6 @@ const findComponentCallsCTFE = (
       const tag = node.tag;
       if (ts.isIdentifier(tag) && tag.text === 'html') {
         const template = node.template;
-
-        const enclosingClass = findEnclosingClass(node);
-        const classProperties = enclosingClass
-          ? extractClassPropertiesCTFE(enclosingClass, sourceFile)
-          : new Map<string, any>();
 
         if (ts.isTemplateExpression(template)) {
           template.templateSpans.forEach((span) => {
@@ -253,15 +68,6 @@ const findComponentCallsCTFE = (
                   propsExpression = expr.arguments[0].getText(sourceFile);
                 }
 
-                // Try to evaluate props statically (for optimisation hints)
-                let evaluatedProps: Record<string, any> | undefined;
-                if (expr.arguments.length > 0 && expr.arguments[0]) {
-                  const props = evaluateExpressionCTFE(expr.arguments[0]!, sourceFile, classProperties);
-                  if (props !== EVAL_FAILED && typeof props === 'object' && props !== null) {
-                    evaluatedProps = props as Record<string, any>;
-                  }
-                }
-
                 // Compute ${…} range in source file
                 const spanIndex = template.templateSpans.indexOf(span);
                 let dollarBraceStart: number;
@@ -273,18 +79,12 @@ const findComponentCallsCTFE = (
                 }
                 const closingBrace = span.literal.getStart(sourceFile) + 1;
 
-                // Compute the position inside the template literal text.
-                // This is the offset from the template head start to the ${…} start.
-                const templatePosition = dollarBraceStart - template.head.getStart();
-
                 if (dollarBraceStart >= 0 && closingBrace <= source.length) {
                   calls.push({
                     componentName,
                     propsExpression,
-                    evaluatedProps,
                     startIndex: dollarBraceStart,
                     endIndex: closingBrace,
-                    templatePosition,
                   });
                 }
               }
@@ -305,6 +105,9 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
   name: NAME,
   setup(build) {
     const componentDefinitions = new Map<string, ComponentDefinition>();
+
+    // Read per file: a production build plans its selector renames in onStart, before any load
+    const compileOptions = (): CompileOptions => ({ minify: ctx?.minify, selectorMap: ctx?.selectorMap });
 
     build.onStart(async () => {
       componentDefinitions.clear();
@@ -329,47 +132,44 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
 
     // ── Mount-call optimiser (Mode A → mountComponent) ────────────────
     // Rewrites `import { mount } from 'thane'` + `mount({ component: X, target?: T, props?: P })`
-    // into `import { mountComponent } from 'thane'` + `mountComponent(X, T, P)` when there is no
+    // into `import { mountComponent } from 'thane/runtime'` + `mountComponent(X, T, P)` when there is no
     // `router` key, so the generic mount() wrapper, _routerMount hook, and __setRouterMount
     // are all tree-shaken away for non-router apps.
     const rewriteMountToMountComponent = (source: string): string | null => {
       const sf = ts.createSourceFile('__mount.ts', source, ts.ScriptTarget.Latest, true);
 
-      // 1. Find the `mount(...)` call expression
-      let mountCall: ts.CallExpression | null = null;
+      // 1. Only thane's `mount`, imported under its own name, and only when it is called once: the
+      //    rewrite takes `mount` out of the import, so a second call, or a local function of that
+      //    name, would be left without a definition
+      const mountImport = sf.statements.find(
+        (s): s is ts.ImportDeclaration =>
+          ts.isImportDeclaration(s) &&
+          ts.isStringLiteral(s.moduleSpecifier) &&
+          s.moduleSpecifier.text === 'thane' &&
+          !s.importClause?.phaseModifier &&
+          !s.importClause?.name &&
+          !!s.importClause?.namedBindings &&
+          ts.isNamedImports(s.importClause.namedBindings) &&
+          s.importClause.namedBindings.elements.some(
+            (e) => !e.isTypeOnly && !e.propertyName && e.name.text === 'mount',
+          ),
+      );
+      const mountCalls: ts.CallExpression[] = [];
       const findMount = (node: ts.Node): void => {
-        if (mountCall) return;
-        if (
-          ts.isCallExpression(node) &&
-          ts.isIdentifier(node.expression) &&
-          node.expression.text === 'mount' &&
-          node.arguments.length >= 1
-        ) {
-          const arg = node.arguments[0];
-          if (arg && ts.isObjectLiteralExpression(arg)) {
-            // Ensure it has 'component' and does NOT have 'router'
-            let hasComponent = false;
-            let hasRouter = false;
-            for (const prop of arg.properties) {
-              if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
-                if (prop.name.text === 'component') hasComponent = true;
-                if (prop.name.text === 'router') hasRouter = true;
-              }
-            }
-            if (hasComponent && !hasRouter) {
-              mountCall = node;
-            }
-          }
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'mount') {
+          mountCalls.push(node);
         }
         ts.forEachChild(node, findMount);
       };
       findMount(sf);
 
-      if (!mountCall) return null;
-      const mc = mountCall as ts.CallExpression;
+      const mc = mountCalls[0];
+      const objArg = mc?.arguments[0];
+      if (!mountImport || mountCalls.length !== 1 || !mc || !objArg || !ts.isObjectLiteralExpression(objArg)) {
+        return null;
+      }
 
-      // 2. Extract component, target, and props values from the object literal
-      const objArg = mc.arguments[0] as ts.ObjectLiteralExpression;
+      // 2. Extract component, target, and props values from the object literal (no `router` key)
       let componentText: string | null = null;
       let targetText: string | null = null;
       let propsText: string | null = null;
@@ -380,6 +180,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           if (prop.name.text === 'component') componentText = valueText;
           else if (prop.name.text === 'target') targetText = valueText;
           else if (prop.name.text === 'props') propsText = valueText;
+          else if (prop.name.text === 'router') return null;
         }
       }
 
@@ -394,39 +195,48 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
         args.push(propsText);
       }
 
-      // 4. Replace the mount call text
-      const callStart = mc.getStart(sf);
-      const callEnd = mc.getEnd();
-      let result = source.substring(0, callStart) + `mountComponent(${args.join(', ')})` + source.substring(callEnd);
-
-      // 5. Fix the import: replace `mount` with `mountComponent` in the thane import
-      result = result.replace(/import\s*\{([^}]*)\}\s*from\s*['"]thane['"]/, (_match, specifiers: string) => {
-        const specs = specifiers
-          .split(',')
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-        const updated = specs.map((s: string) => (s === 'mount' ? 'mountComponent' : s));
-        return `import { ${updated.join(', ')} } from 'thane'`;
-      });
-
-      return result;
+      // 4. Replace the mount call, and fix the import: `mount` leaves it, and mountComponent comes
+      //    from the compiler's entry, with the other helpers compiled code calls
+      const rest = (mountImport.importClause!.namedBindings as ts.NamedImports).elements
+        .map((e) => e.getText(sf))
+        .filter((s) => s !== 'mount');
+      const runtimeImport = `import { ${RUNTIME_HELPER.MOUNT_COMPONENT} } from '${INTERNAL_RUNTIME_SPECIFIER}'`;
+      return applyEdits(source, [
+        {
+          start: mountImport.getStart(sf),
+          end: mountImport.moduleSpecifier.getEnd(),
+          replacement:
+            rest.length > 0 ? `import { ${rest.join(', ')} } from 'thane';\n${runtimeImport}` : runtimeImport,
+        },
+        {
+          start: mc.getStart(sf),
+          end: mc.getEnd(),
+          replacement: `${RUNTIME_HELPER.MOUNT_COMPONENT}(${args.join(', ')})`,
+        },
+      ]);
     };
 
     /**
-     * Strip tagged template tags (css`...` → `...`, html`...` → `...`) using AST
-     * to avoid false positives from regex matching inside string literals.
+     * Replace tagged templates with plain ones using the AST: html`...` loses its tag, and
+     * css`...` is compiled (its tag goes, and a production build minifies the stylesheet).
      */
-    const stripTemplateTags = (code: string): string => {
-      const sf = ts.createSourceFile('__strip.ts', code, ts.ScriptTarget.Latest, true);
+    const stripTemplateTags = (code: string, filePath: string): string => {
+      const sf = ts.createSourceFile(filePath, code, ts.ScriptTarget.Latest, true);
       // Collect positions to strip in reverse order (end → start)
-      const edits: { start: number; end: number }[] = [];
+      const edits: { start: number; end: number; replacement: string }[] = [];
+      const ownCssTag = declaresOwnCssTag(sf);
       const walk = (node: ts.Node) => {
-        if (ts.isTaggedTemplateExpression(node) && ts.isIdentifier(node.tag)) {
-          const tagName = node.tag.text;
-          if (tagName === 'css' || tagName === 'html') {
-            // Remove the tag identifier — keep only the template literal
-            edits.push({ start: node.tag.getStart(sf), end: node.template.getStart(sf) });
-          }
+        if (!ownCssTag && isCssTaggedTemplate(node)) {
+          edits.push({
+            start: node.getStart(sf),
+            end: node.getEnd(),
+            replacement: compileCssTemplate(node, sf, compileOptions()),
+          });
+          return; // nested css templates are compiled along with this one
+        }
+        if (ts.isTaggedTemplateExpression(node) && ts.isIdentifier(node.tag) && node.tag.text === 'html') {
+          // Remove the tag identifier — keep only the template literal
+          edits.push({ start: node.tag.getStart(sf), end: node.template.getStart(sf), replacement: '' });
         }
         ts.forEachChild(node, walk);
       };
@@ -435,7 +245,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
       let result = code;
       for (let i = edits.length - 1; i >= 0; i--) {
         const edit = edits[i]!;
-        result = result.substring(0, edit.start) + result.substring(edit.end);
+        result = result.substring(0, edit.start) + edit.replacement + result.substring(edit.end);
       }
       return result;
     };
@@ -450,22 +260,21 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
       modifiedSource: string,
       filePath: string,
       childMounts?: ChildMountInfo[],
-      childMountCount?: number,
     ): { contents: string; loader: 'ts' } => {
       let result = modifiedSource;
       if (extendsComponentQuick(source)) {
-        const transformed = transformDefineComponentSource(result, filePath, childMounts, childMountCount);
+        const transformed = transformDefineComponentSource(result, filePath, childMounts, compileOptions());
         if (transformed) {
           result = transformed;
         }
       }
-      result = stripTemplateTags(result);
+      result = stripTemplateTags(result, filePath);
       return createLoaderResult(result);
     };
 
     build.onLoad({ filter: /\.ts$/ }, async (args) => {
       try {
-        if (args.path.includes('scripts') || args.path.includes('node_modules')) {
+        if (args.path.includes('node_modules')) {
           return undefined;
         }
 
@@ -478,12 +287,18 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           const rewritten = rewriteMountToMountComponent(source);
           if (rewritten) {
             logger.info(NAME, `Optimised mount() → mountComponent() in ${args.path}`);
-            return createLoaderResult(rewritten);
+            return createLoaderResult(
+              source.includes(FN.CSS + '`') ? stripTemplateTags(rewritten, args.path) : rewritten,
+            );
           }
-          return undefined;
         }
 
         if (!source.includes(FN.HTML + '`')) {
+          // A module with only css`` templates (shared styles) still needs them compiled:
+          // the tag is a compile-time marker and does not exist at runtime.
+          if (source.includes(FN.CSS + '`')) {
+            return createLoaderResult(stripTemplateTags(source, args.path));
+          }
           return undefined;
         }
 
@@ -499,15 +314,15 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
 
         // Child mount data to pass to the binding compiler
         let childMounts: ChildMountInfo[] | undefined;
-        let childMountCount: number | undefined;
 
         if (hasComponentCalls) {
           const sourceFile = sourceCache.parse(args.path, source);
           const componentCalls = findComponentCallsCTFE(source, sourceFile, componentDefinitions);
 
           if (componentCalls.length > 0) {
-            // CTFE counter — allocates b0, b1, … for child component anchors.
-            // The binding compiler starts its idCounter at this offset.
+            // CTFE counter — allocates b0, b1, … for child component placeholders, comments the
+            // binding compiler turns into the child's host element or anchor (A1-4). It starts its
+            // own ids after these.
             let childIdCounter = 0;
             const mounts: ChildMountInfo[] = [];
 
@@ -517,11 +332,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
               const componentDef = componentDefinitions.get(call.componentName);
               if (componentDef) {
                 const anchorId = `b${childIdCounter++}`;
-                const compiledHTML = generateComponentHTML({
-                  selector: componentDef.selector,
-                  props: {},
-                  anchorId,
-                });
+                const compiledHTML = anchorMark(anchorId, '.');
 
                 modifiedSource =
                   modifiedSource.substring(0, call.startIndex) + compiledHTML + modifiedSource.substring(call.endIndex);
@@ -531,17 +342,15 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
                   selector: componentDef.selector,
                   propsExpression: call.propsExpression,
                   anchorId,
-                  templatePosition: call.templatePosition,
                 });
               }
             }
 
             childMounts = mounts;
-            childMountCount = childIdCounter;
           }
         }
 
-        return buildTransformedResult(source, modifiedSource, args.path, childMounts, childMountCount);
+        return buildTransformedResult(source, modifiedSource, args.path, childMounts);
       } catch (error) {
         const diagnostic = createError(
           `Error processing ${args.path}: ${error instanceof Error ? error.message : error}`,
@@ -549,7 +358,8 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           ErrorCode.PLUGIN_ERROR,
         );
         logger.diagnostic(diagnostic);
-        return undefined;
+        // A component the compiler cannot process must fail the build rather than ship uncompiled
+        return { errors: [{ text: diagnostic.message, location: { file: args.path } }] };
       }
     });
   },

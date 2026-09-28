@@ -9,159 +9,49 @@ import ts from 'typescript';
 import { WHEN_ELSE_REGEX, REPEAT_REGEX, SIGNAL_EXPR_REGEX } from './types.js';
 import { logger } from '../logger.js';
 import { parseArrowFunction } from '../ast-utils.js';
+import { ErrorCode } from '../../errors.js';
 
 /**
  * Shared argument parser for both whenElse and repeat expressions.
  *
- * Parses a comma-separated argument list from a `${directive(` call,
- * handling nested template literals and balanced parentheses.
+ * Parses a comma-separated argument list from a `${directive(` call: strings and template
+ * literals are skipped whole by the expression scanner (H-12), and a comma splits only outside
+ * every bracket.
  *
  * @param text - full text being parsed
  * @param startPos - position right after the opening paren of the directive
  * @returns parsed args and end position, or null if parsing fails
  */
 function parseDirectiveArgs(text: string, startPos: number): { args: string[]; end: number } | null {
-  let pos = startPos;
   let parenDepth = 1;
   let braceDepth = 0;
   let bracketDepth = 0;
-
   const args: string[] = [];
-  let currentArg = '';
-  let inBacktick = false;
-  let templateBraceDepth = 0;
-  let inSingleQuote = false;
-  let inDoubleQuote = false;
-  let escaped = false;
+  let argStart = startPos;
 
-  while (pos < text.length) {
+  for (let pos = startPos; pos < text.length; pos++) {
     const char = text[pos];
-
-    if (inSingleQuote) {
-      currentArg += char;
-      if (escaped) {
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-      } else if (char === "'") {
-        inSingleQuote = false;
-      }
-      pos++;
-      continue;
-    }
-
-    if (inDoubleQuote) {
-      currentArg += char;
-      if (escaped) {
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-      } else if (char === '"') {
-        inDoubleQuote = false;
-      }
-      pos++;
-      continue;
-    }
-
-    if (char === '`' && !inBacktick) {
-      inBacktick = true;
-      templateBraceDepth = 0;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (char === '`' && inBacktick && templateBraceDepth === 0) {
-      inBacktick = false;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (inBacktick && char === '$' && text[pos + 1] === '{') {
-      templateBraceDepth++;
-      currentArg += '${';
-      pos += 2;
-      continue;
-    }
-
-    if (inBacktick && char === '}' && templateBraceDepth > 0) {
-      templateBraceDepth--;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (inBacktick && templateBraceDepth > 0 && char === '{') {
-      templateBraceDepth++;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (inBacktick) {
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (char === "'") {
-      inSingleQuote = true;
-      escaped = false;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (char === '"') {
-      inDoubleQuote = true;
-      escaped = false;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (char === '(') {
+    if (char === "'" || char === '"' || char === '`') {
+      pos = literalEnd(text, pos);
+      if (pos === -1) return null;
+    } else if (char === '(') {
       parenDepth++;
-      currentArg += char;
-    } else if (char === ')') {
-      parenDepth--;
-      if (parenDepth === 0) {
-        const finalArg = currentArg.trim();
-        if (finalArg !== '') {
-          args.push(finalArg);
-        }
-        pos++;
-        if (text[pos] === '}') {
-          pos++;
-        }
-        return { args, end: pos };
-      }
-      currentArg += char;
+    } else if (char === ')' && --parenDepth === 0) {
+      const finalArg = text.slice(argStart, pos).trim();
+      if (finalArg !== '') args.push(finalArg);
+      return { args, end: text[pos + 1] === '}' ? pos + 2 : pos + 1 };
     } else if (char === '{') {
       braceDepth++;
-      currentArg += char;
-    } else if (char === '}') {
-      if (braceDepth > 0) {
-        braceDepth--;
-      }
-      currentArg += char;
+    } else if (char === '}' && braceDepth > 0) {
+      braceDepth--;
     } else if (char === '[') {
       bracketDepth++;
-      currentArg += char;
-    } else if (char === ']') {
-      if (bracketDepth > 0) {
-        bracketDepth--;
-      }
-      currentArg += char;
+    } else if (char === ']' && bracketDepth > 0) {
+      bracketDepth--;
     } else if (char === ',' && parenDepth === 1 && braceDepth === 0 && bracketDepth === 0) {
-      args.push(currentArg.trim());
-      currentArg = '';
-    } else {
-      currentArg += char;
+      args.push(text.slice(argStart, pos).trim());
+      argStart = pos + 1;
     }
-
-    pos++;
   }
 
   return null;
@@ -181,7 +71,7 @@ function extractHtmlTemplateContent(arg: string): string {
   return arg;
 }
 
-function extractSignalsFromExpression(expression: string): string[] {
+export function extractSignalsFromExpression(expression: string): string[] {
   const signals: string[] = [];
   const sourceFile = ts.createSourceFile(
     '__thane_expr.ts',
@@ -215,6 +105,13 @@ function extractSignalsFromExpression(expression: string): string[] {
   return signals;
 }
 
+/** Whether the character at `pos` is escaped: an odd run of backslashes before it (`\${` is text). */
+export function isEscaped(text: string, pos: number): boolean {
+  let i = pos;
+  while (i > 0 && text[i - 1] === '\\') i--;
+  return (pos - i) % 2 === 1;
+}
+
 /** The template with every `${…}` expression removed, nested template literals included. */
 export function stripTemplateExpressions(value: string): string {
   let out = '';
@@ -226,82 +123,130 @@ export function stripTemplateExpressions(value: string): string {
   return out + value.slice(last);
 }
 
+/**
+ * End (exclusive) of the `${…}` that starts at `start`, or -1 when it is not closed. The one
+ * expression scanner (H-12): braces count in code only, so a brace inside a string or a nested
+ * template literal (whose own `${…}` are scanned the same way, at any depth) never ends it.
+ */
+export function templateExpressionEnd(text: string, start: number): number {
+  let depth = 0;
+  for (let i = start + 2; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{') depth++;
+    else if (ch === '}' && depth-- === 0) return i + 1;
+    else if (ch === '"' || ch === "'" || ch === '`') {
+      i = literalEnd(text, i);
+      if (i === -1) return -1;
+    }
+  }
+  return -1;
+}
+
+/** Index of the quote that closes the string or template literal opened at `start`, or -1. */
+function literalEnd(text: string, start: number): number {
+  const quote = text[start];
+  for (let i = start + 1; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '\\') i++;
+    else if (ch === quote) return i;
+    else if (quote === '`' && ch === '$' && text[i + 1] === '{') {
+      i = templateExpressionEnd(text, i) - 1;
+      if (i < 0) return -1;
+    }
+  }
+  return -1;
+}
+
 export function findTemplateExpressions(
   value: string,
 ): Array<{ start: number; end: number; expression: string; full: string }> {
   const results: Array<{ start: number; end: number; expression: string; full: string }> = [];
   let searchPos = 0;
+  let start: number;
 
-  while (searchPos < value.length) {
-    const dollarIdx = value.indexOf('${', searchPos);
-    if (dollarIdx === -1) break;
-
-    let braceDepth = 1;
-    let i = dollarIdx + 2;
-    let inBacktick = false;
-    let templateBraceDepth = 0;
-
-    while (i < value.length && braceDepth > 0) {
-      const ch = value[i];
-
-      if (inBacktick) {
-        if (ch === '`' && templateBraceDepth === 0) {
-          inBacktick = false;
-        } else if (ch === '$' && value[i + 1] === '{') {
-          templateBraceDepth++;
-          i++;
-        } else if (ch === '}' && templateBraceDepth > 0) {
-          templateBraceDepth--;
-        }
-        i++;
-        continue;
-      }
-
-      if (ch === '`') {
-        inBacktick = true;
-        templateBraceDepth = 0;
-      } else if (ch === '{') {
-        braceDepth++;
-      } else if (ch === '}') {
-        braceDepth--;
-      }
-
-      if (braceDepth > 0) i++;
-    }
-
-    if (braceDepth !== 0) {
-      searchPos = dollarIdx + 2;
+  while ((start = value.indexOf('${', searchPos)) !== -1) {
+    const end = isEscaped(value, start) ? -1 : templateExpressionEnd(value, start);
+    if (end === -1) {
+      searchPos = start + 2;
       continue;
     }
-
-    const full = value.substring(dollarIdx, i + 1);
-    const expression = value.substring(dollarIdx + 2, i).trim();
-    results.push({ start: dollarIdx, end: i + 1, expression, full });
-    searchPos = i + 1;
+    const expression = value.substring(start + 2, end - 1).trim();
+    results.push({ start, end, expression, full: value.substring(start, end) });
+    searchPos = end;
   }
 
   return results;
 }
 
-function inferStyleProperty(styleValue: string, expressionStart: number): string | null {
-  let colon = -1;
-  for (let i = expressionStart - 1; i >= 0; i--) {
-    const ch = styleValue[i];
-    if (ch === ';') break;
-    if (ch === ':') {
-      colon = i;
-      break;
-    }
-  }
-  if (colon === -1) return null;
+type TemplateExpressionSpan = { start: number; end: number; expression: string; full: string };
 
-  const declStart = styleValue.lastIndexOf(';', colon) + 1;
-  const prop = styleValue.substring(declStart, colon).trim();
-  if (!/^[\w-]+$/.test(prop)) return null;
-  return prop;
+interface StyleDeclaration {
+  property: string;
+  /** Range of the declaration's value inside the attribute value, surrounding whitespace excluded */
+  valueStart: number;
+  valueEnd: number;
+  /** The `${…}` expressions that sit inside the value */
+  expressions: TemplateExpressionSpan[];
 }
 
-export function parseWhenElseExpression(
+/**
+ * Split an inline style into its declarations. Expressions are masked first, so a `;` or
+ * `:` inside `${a() ? 'x' : 'y'}` never ends a declaration or names a property; `;` inside
+ * parentheses or quotes (`url(data:…;base64,…)`) is ignored the same way.
+ */
+function splitStyleDeclarations(styleValue: string, expressions: TemplateExpressionSpan[]): StyleDeclaration[] {
+  const masked = styleValue.split('');
+  for (const expr of expressions) {
+    for (let i = expr.start; i < expr.end; i++) masked[i] = '';
+  }
+
+  const declarations: StyleDeclaration[] = [];
+  const pushDeclaration = (start: number, end: number): void => {
+    let colon = -1;
+    for (let i = start; i < end; i++) {
+      if (masked[i] === ':') {
+        colon = i;
+        break;
+      }
+    }
+    if (colon === -1) return;
+    const property = masked.slice(start, colon).join('').trim();
+    if (!/^[\w-]+$/.test(property)) return;
+
+    let valueStart = colon + 1;
+    let valueEnd = end;
+    while (valueStart < valueEnd && /\s/.test(styleValue[valueStart]!)) valueStart++;
+    while (valueEnd > valueStart && /\s/.test(styleValue[valueEnd - 1]!)) valueEnd--;
+    declarations.push({
+      property,
+      valueStart,
+      valueEnd,
+      expressions: expressions.filter((e) => e.start >= valueStart && e.end <= valueEnd),
+    });
+  };
+
+  let declStart = 0;
+  let parenDepth = 0;
+  let quote = '';
+  for (let i = 0; i < masked.length; i++) {
+    const ch = masked[i]!;
+    if (quote) {
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '(') parenDepth++;
+    else if (ch === ')' && parenDepth > 0) parenDepth--;
+    else if (ch === ';' && parenDepth === 0) {
+      pushDeclaration(declStart, i);
+      declStart = i + 1;
+    }
+  }
+  pushDeclaration(declStart, masked.length);
+  return declarations;
+}
+
+function parseWhenElseExpression(
   text: string,
   startPos: number,
 ): {
@@ -336,7 +281,7 @@ export function parseWhenElseExpression(
   };
 }
 
-export function parseRepeatExpression(
+function parseRepeatExpression(
   text: string,
   startPos: number,
 ): {
@@ -435,7 +380,7 @@ export function findBindingsInText(
 
   while ((whenElseMatch = whenElseRegex.exec(text)) !== null) {
     const startPos = whenElseMatch.index;
-    const parsed = parseWhenElseExpression(text, startPos);
+    const parsed = isEscaped(text, startPos) ? null : parseWhenElseExpression(text, startPos);
     if (parsed) {
       complexExprPositions.push({ start: startPos, end: parsed.end });
 
@@ -459,7 +404,7 @@ export function findBindingsInText(
 
   while ((repeatMatch = repeatRegex.exec(text)) !== null) {
     const startPos = repeatMatch.index;
-    const parsed = parseRepeatExpression(text, startPos);
+    const parsed = isEscaped(text, startPos) ? null : parseRepeatExpression(text, startPos);
     if (parsed) {
       complexExprPositions.push({ start: startPos, end: parsed.end });
 
@@ -490,7 +435,7 @@ export function findBindingsInText(
   while ((match = signalExprRegex.exec(text)) !== null) {
     const pos = match.index;
     const insideComplex = complexExprPositions.some((cp) => pos >= cp.start && pos < cp.end);
-    if (insideComplex) continue;
+    if (insideComplex || isEscaped(text, pos)) continue;
 
     const signalName = match[1];
     if (!signalName) continue;
@@ -510,88 +455,36 @@ export function findBindingsInText(
   // ── Complex expression text bindings ──
   // Detect ${expr} interpolations that contain signal calls but aren't bare ${sig()}.
   // Examples: ${count() + 1}, ${isActive() ? 'Yes' : 'No'}, ${a() + b()}
+  // A `${` inside a whenElse/repeat/bare-signal range is stepped over, not the whole `${…}` it
+  // opens: a directive's range ends at its `)`, and an expression after that is still reached.
   const allSkipRanges = [...complexExprPositions, ...bareSignalPositions];
   let searchPos = 0;
-  while (searchPos < text.length) {
-    const dollarIdx = text.indexOf('${', searchPos);
-    if (dollarIdx === -1) break;
-
-    // Skip if inside a whenElse/repeat/bare-signal range
-    const isInsideSkipRange = allSkipRanges.some((r) => dollarIdx >= r.start && dollarIdx < r.end);
-    if (isInsideSkipRange) {
+  let dollarIdx: number;
+  while ((dollarIdx = text.indexOf('${', searchPos)) !== -1) {
+    const insideSkipRange = allSkipRanges.some((r) => dollarIdx >= r.start && dollarIdx < r.end);
+    const end = insideSkipRange || isEscaped(text, dollarIdx) ? -1 : templateExpressionEnd(text, dollarIdx);
+    if (end === -1) {
       searchPos = dollarIdx + 2;
       continue;
     }
 
-    // Find the matching closing brace (handle nested braces and template literals)
-    let braceDepth = 1;
-    let i = dollarIdx + 2;
-    let inBacktick = false;
-    let templateBraceDepth = 0;
-
-    while (i < text.length && braceDepth > 0) {
-      const ch = text[i];
-
-      if (inBacktick) {
-        if (ch === '`' && templateBraceDepth === 0) {
-          inBacktick = false;
-        } else if (ch === '$' && text[i + 1] === '{') {
-          templateBraceDepth++;
-          i++;
-        } else if (ch === '}' && templateBraceDepth > 0) {
-          templateBraceDepth--;
-        }
-        i++;
-        continue;
-      }
-
-      if (ch === '`') {
-        inBacktick = true;
-        templateBraceDepth = 0;
-      } else if (ch === '{') {
-        braceDepth++;
-      } else if (ch === '}') {
-        braceDepth--;
-      }
-      if (braceDepth > 0) i++;
-    }
-
-    if (braceDepth !== 0) {
-      searchPos = dollarIdx + 2;
-      continue;
-    }
-
-    const exprContent = text.substring(dollarIdx + 2, i); // inner expression (without ${ and })
-    const fullExpr = text.substring(dollarIdx, i + 1); // ${expr}
-
-    // Check if expression contains signal calls
+    const exprContent = text.substring(dollarIdx + 2, end - 1); // inner expression (without ${ and })
     const signals = extractSignalsFromExpression(exprContent);
-    if (signals.length > 0) {
+    // A non-signal expression (e.g. prop access like product.title) is a static expression binding
+    if (signals.length > 0 || (options?.detectNonSignalBindings && exprContent.trim())) {
       bindings.push({
         element: parent,
         type: 'text',
-        signalName: signals[0]!,
+        signalName: signals[0] ?? '',
         signalNames: signals,
         expressionStart: textStart + dollarIdx,
-        expressionEnd: textStart + i + 1,
-        fullExpression: fullExpr,
-        jsExpression: exprContent,
-      });
-    } else if (options?.detectNonSignalBindings && exprContent.trim()) {
-      // Non-signal expression (e.g. prop access like product.title) — treat as static expression binding
-      bindings.push({
-        element: parent,
-        type: 'text',
-        signalName: '',
-        signalNames: [],
-        expressionStart: textStart + dollarIdx,
-        expressionEnd: textStart + i + 1,
-        fullExpression: fullExpr,
+        expressionEnd: textStart + end,
+        fullExpression: text.substring(dollarIdx, end),
         jsExpression: exprContent,
       });
     }
 
-    searchPos = i + 1;
+    searchPos = end;
   }
 }
 
@@ -600,6 +493,51 @@ export function findBindingsInAttributes(
   bindings: BindingInfo[],
   options?: BindingDetectionOptions,
 ): void {
+  /** A value that is one `${…}`: a bare `${sig()}` binds the signal by name, anything else as an expression. */
+  const pushExpressionBinding = (
+    type: 'attr' | 'style',
+    property: string,
+    expr: TemplateExpressionSpan,
+    offset: number,
+  ): void => {
+    const signals = extractSignalsFromExpression(expr.expression);
+    if (signals.length === 0 && !options?.detectNonSignalBindings) return;
+    const bareSignal = signals.length > 0 ? expr.expression.match(/^\s*(\w+)\(\)\s*$/) : null;
+    bindings.push({
+      element,
+      type,
+      signalName: bareSignal?.[1] ?? signals[0] ?? '',
+      ...(bareSignal ? {} : { signalNames: signals, jsExpression: expr.expression }),
+      property,
+      expressionStart: offset + expr.start,
+      expressionEnd: offset + expr.end,
+      fullExpression: expr.full,
+    });
+  };
+
+  /** A value with static text or several expressions: one binding, written as a template literal. */
+  const pushTemplateLiteralBinding = (
+    type: 'attr' | 'style',
+    property: string,
+    valueText: string,
+    start: number,
+    expressions: TemplateExpressionSpan[],
+  ): void => {
+    const signals = [...new Set(expressions.flatMap((e) => extractSignalsFromExpression(e.expression)))];
+    if (signals.length === 0 && !options?.detectNonSignalBindings) return;
+    bindings.push({
+      element,
+      type,
+      signalName: signals[0] ?? '',
+      signalNames: signals,
+      jsExpression: '`' + valueText + '`',
+      property,
+      expressionStart: start,
+      expressionEnd: start + valueText.length,
+      fullExpression: valueText,
+    });
+  };
+
   if (element.whenDirective) {
     const whenMatch = element.whenDirective.match(/^\$\{when\((.+)\)\}$/);
     if (whenMatch) {
@@ -624,7 +562,7 @@ export function findBindingsInAttributes(
   for (const [name, attr] of element.attributes) {
     if (name.startsWith(':')) {
       throw new Error(
-        `THANE006: attribute "${name}" — the ":" prefix is not a binding syntax. Write ${name.slice(1)}=\${…} instead.`,
+        `${ErrorCode.PREFIXED_ATTRIBUTE}: attribute "${name}" — the ":" prefix is not a binding syntax. Write ${name.slice(1)}=\${…} instead.`,
       );
     }
     if (name.startsWith('@')) {
@@ -656,39 +594,26 @@ export function findBindingsInAttributes(
       /^\s*\$\{[\s\S]*\}\s*$/.test(attr.value) && findTemplateExpressions(attr.value).length === 1;
     if (name === 'style' && !wholeValueIsExpression) {
       const styleExprs = findTemplateExpressions(attr.value);
-      for (const expr of styleExprs) {
-        const signals = extractSignalsFromExpression(expr.expression);
+      for (const declaration of splitStyleDeclarations(attr.value, styleExprs)) {
+        if (declaration.expressions.length === 0) continue;
+        const expr = declaration.expressions[0]!;
+        const valueIsOneExpression =
+          declaration.expressions.length === 1 &&
+          expr.start === declaration.valueStart &&
+          expr.end === declaration.valueEnd;
 
-        const propertyName = inferStyleProperty(attr.value, expr.start);
-        if (!propertyName) continue;
-
-        if (signals.length > 0) {
-          const bareSignal = expr.expression.match(/^\s*(\w+)\(\)\s*$/);
-          const primarySignal = bareSignal?.[1] || signals[0]!;
-
-          bindings.push({
-            element,
-            type: 'style',
-            signalName: primarySignal,
-            ...(bareSignal ? {} : { signalNames: signals, jsExpression: expr.expression }),
-            property: propertyName,
-            expressionStart: attr.valueStart + expr.start,
-            expressionEnd: attr.valueStart + expr.end,
-            fullExpression: expr.full,
-          });
-        } else if (options?.detectNonSignalBindings) {
-          // Non-signal style expression (e.g. prop-derived value)
-          bindings.push({
-            element,
-            type: 'style',
-            signalName: '',
-            signalNames: [],
-            jsExpression: expr.expression,
-            property: propertyName,
-            expressionStart: attr.valueStart + expr.start,
-            expressionEnd: attr.valueStart + expr.end,
-            fullExpression: expr.full,
-          });
+        // `width: ${w()}px` or `margin: ${a()}px ${b()}em` — the static text belongs to the
+        // value, so the whole declaration value is one binding written as a template literal.
+        if (valueIsOneExpression) {
+          pushExpressionBinding('style', declaration.property, expr, attr.valueStart);
+        } else {
+          pushTemplateLiteralBinding(
+            'style',
+            declaration.property,
+            attr.value.substring(declaration.valueStart, declaration.valueEnd),
+            attr.valueStart + declaration.valueStart,
+            declaration.expressions,
+          );
         }
       }
       continue;
@@ -699,53 +624,11 @@ export function findBindingsInAttributes(
     // the whole attribute as a template literal: `class="btn ${kind()}"` writes `btn primary`.
     const staticText = attrExprs.reduce((rest, e) => rest.replace(e.full, ''), attr.value);
     if (attrExprs.length > 1 || (attrExprs.length === 1 && staticText.trim() !== '')) {
-      const signals = [...new Set(attrExprs.flatMap((e) => extractSignalsFromExpression(e.expression)))];
-      if (signals.length > 0 || options?.detectNonSignalBindings) {
-        bindings.push({
-          element,
-          type: 'attr',
-          signalName: signals[0] ?? '',
-          signalNames: signals,
-          jsExpression: '`' + attr.value + '`',
-          property: name,
-          expressionStart: attr.valueStart,
-          expressionEnd: attr.valueStart + attr.value.length,
-          fullExpression: attr.value,
-        });
-      }
+      pushTemplateLiteralBinding('attr', name, attr.value, attr.valueStart, attrExprs);
       continue;
     }
     for (const expr of attrExprs) {
-      const signals = extractSignalsFromExpression(expr.expression);
-
-      if (signals.length > 0) {
-        const bareSignal = expr.expression.match(/^\s*(\w+)\(\)\s*$/);
-        const signalName = bareSignal?.[1] || signals[0]!;
-
-        bindings.push({
-          element,
-          type: 'attr',
-          signalName,
-          ...(bareSignal ? {} : { signalNames: signals, jsExpression: expr.expression }),
-          property: name,
-          expressionStart: attr.valueStart + expr.start,
-          expressionEnd: attr.valueStart + expr.end,
-          fullExpression: expr.full,
-        });
-      } else if (options?.detectNonSignalBindings) {
-        // Non-signal attribute expression (e.g. prop-derived value like product.image)
-        bindings.push({
-          element,
-          type: 'attr',
-          signalName: '',
-          signalNames: [],
-          jsExpression: expr.expression,
-          property: name,
-          expressionStart: attr.valueStart + expr.start,
-          expressionEnd: attr.valueStart + expr.end,
-          fullExpression: expr.full,
-        });
-      }
+      pushExpressionBinding('attr', name, expr, attr.valueStart);
     }
   }
 }

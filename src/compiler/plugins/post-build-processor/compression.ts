@@ -10,30 +10,32 @@ import { consoleColors } from '../../utils/index.js';
 
 const brotliCompressAsync = promisify(brotliCompress);
 
+/** Compress `content` the way both the `.gz`/`.br` files and the dev server's responses are compressed. */
+export const compress = async (
+  content: Uint8Array<ArrayBuffer>,
+  encoding: 'br' | 'gzip',
+  isProd?: boolean,
+): Promise<Uint8Array<ArrayBuffer>> => {
+  // Gzip compression using Bun's native API
+  if (encoding === 'gzip') return Bun.gzipSync(content, { level: 9 });
+
+  // Brotli compression using node:zlib (Bun doesn't have a native brotli API yet)
+  return brotliCompressAsync(content, {
+    params: {
+      [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
+      [zlibConstants.BROTLI_PARAM_QUALITY]: isProd ? 11 : 4,
+      [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
+      [zlibConstants.BROTLI_PARAM_LGBLOCK]: 0,
+      [zlibConstants.BROTLI_PARAM_SIZE_HINT]: content.length,
+    },
+  });
+};
+
 export const gzipDistFiles = async (distDir: string, isProd?: boolean): Promise<void> => {
-  const brotliQuality = isProd ? 11 : 4;
-
   const compressFile = async (filePath: string): Promise<void> => {
-    const gzipPath = filePath + '.gz';
-    const brotliPath = filePath + '.br';
-
     const content = await Bun.file(filePath).bytes();
-
-    // Gzip compression using Bun's native API
-    const gzipped = Bun.gzipSync(content, { level: 9 });
-    await Bun.write(gzipPath, gzipped);
-
-    // Brotli compression using node:zlib (Bun doesn't have a native brotli API yet)
-    const brotlied = await brotliCompressAsync(content, {
-      params: {
-        [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
-        [zlibConstants.BROTLI_PARAM_QUALITY]: brotliQuality,
-        [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
-        [zlibConstants.BROTLI_PARAM_LGBLOCK]: 0,
-        [zlibConstants.BROTLI_PARAM_SIZE_HINT]: content.length,
-      },
-    });
-    await Bun.write(brotliPath, brotlied);
+    await Bun.write(filePath + '.gz', await compress(content, 'gzip', isProd));
+    await Bun.write(filePath + '.br', await compress(content, 'br', isProd));
   };
 
   const processDirectory = async (dir: string): Promise<void> => {

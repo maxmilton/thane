@@ -17,9 +17,12 @@ Add the Thane client types to your `tsconfig.json` so TypeScript recognizes `.cs
 {
   "compilerOptions": {
     "types": ["thane/client"]
-  }
+  },
+  "include": ["src/**/*.ts", ".thane/types/**/*.d.ts"]
 }
 ```
+
+Every `thane` command writes hidden type files to `.thane/types`: the route types that make `navigate()` and `route.params` type-safe, and a reference to the same `.css` declarations. Including that folder lets your editor see them; Thane's own type check always includes it.
 
 ## Project Structure
 
@@ -28,15 +31,18 @@ A minimal Thane app looks like this:
 ```
 my-app/
   index.html
-  main.ts
-  counter.ts
+  src/
+    main.ts
+    counter.ts
   tsconfig.json
   package.json
 ```
 
+`src/main.ts` and `index.html` are where the CLI looks by default; `--entry` and `--html` (or the config file) point elsewhere.
+
 ### `index.html`
 
-The HTML file is the build entry point. The compiler injects the compiled script automatically:
+The page that loads the app. The build writes it to `dist/` with a `<script>` for the compiled entry, so you don't add one yourself:
 
 ```html
 <!DOCTYPE html>
@@ -50,7 +56,7 @@ The HTML file is the build entry point. The compiler injects the compiled script
 </html>
 ```
 
-### `main.ts`
+### `src/main.ts`
 
 The application entry point mounts the root component:
 
@@ -67,7 +73,7 @@ mount({ component: Counter });
 mount({ component: Counter, target: document.getElementById('app')! });
 ```
 
-### `counter.ts`
+### `src/counter.ts`
 
 Define a component using `defineComponent`. The compiler auto-derives the CSS selector from the export name (`Counter` → `counter`):
 
@@ -101,9 +107,9 @@ thane dev
 
 This starts a development server at `http://localhost:4200` with:
 
-- Hot module replacement
+- A rebuild whenever a source file changes (reload the page to load it)
 - Source maps enabled
-- Browser error overlay — compile errors appear directly in the browser
+- Browser errors relayed to the terminal — `console.error`, uncaught errors and unhandled rejections
 - All 12 lint rules active
 
 ## Building for Production
@@ -123,10 +129,10 @@ Output goes to `dist/` by default. Production builds include:
 ## Serving a Production Build
 
 ```bash
-thane serve
+thane serve --prod
 ```
 
-Starts a static file server for the `dist/` directory.
+Builds the app and serves the `dist/` directory, rebuilding on changes.
 
 ## Type Checking
 
@@ -134,7 +140,7 @@ Starts a static file server for the `dist/` directory.
 thane typecheck
 ```
 
-Runs the TypeScript compiler in check-only mode against your project.
+Runs the TypeScript compiler in check-only mode against your project. Type errors fail the command; during `thane dev` and `thane build` they are printed as warnings unless `--strict-type-check` is set.
 
 ## What's Next?
 

@@ -6,19 +6,7 @@
  */
 
 // Types
-export type {
-  ParserState,
-  AttributeInfo,
-  TextNode,
-  HtmlElement,
-  BindingInfo,
-  ParseDiagnostic,
-  ParsedTemplate,
-  HtmlEdit,
-  EventBindingDescriptor,
-} from './types.js';
-
-export { VOID_ELEMENTS, decodeHtmlEntities } from './types.js';
+export type { HtmlElement, BindingInfo, ParsedTemplate } from './types.js';
 
 // Parser core
 export { parseHtmlTemplate } from './parser-core.js';
@@ -26,40 +14,17 @@ export { parseHtmlTemplate } from './parser-core.js';
 // Binding detection
 export type { BindingDetectionOptions } from './binding-detection.js';
 export {
-  parseWhenElseExpression,
-  parseRepeatExpression,
-  findBindingsInText,
-  findBindingsInAttributes,
   findTemplateExpressions,
+  extractSignalsFromExpression,
   stripTemplateExpressions,
 } from './binding-detection.js';
 
 // Utilities
 export {
   walkElements,
-  findElements,
-  findElementsWithAttribute,
   findElementsWithWhenDirective,
   getElementHtml,
-  getElementInnerHtml,
-  getBindingsForElement,
-  isInsideSvg,
   attributeDomProperty,
-  isElementInside,
-  applyHtmlEdits,
-  createIdInjectionEdit,
-  createDataAttrEdit,
-  createWhenDirectiveRemovalEdit,
-  createEventBindingRemovalEdit,
-  createSignalReplacementEdits,
-  extractEventBindings,
-  groupBindingsByElement,
-  isPositionInRanges,
-  findElementsNeedingIds,
-  createIdGenerator,
-  normalizeHtmlWhitespace,
-  injectIdIntoFirstElement,
-  firstElementId,
   escapeTemplateLiteral,
   escapeRawTemplateLiteral,
 } from './html-utils.js';

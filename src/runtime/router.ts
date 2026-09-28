@@ -28,21 +28,14 @@ import { signal } from './signal.js';
 import type { ReadonlySignal, Signal } from './types.js';
 
 // ─────────────────────────────────────────────────────────────
-//  Register pattern — module augmentation for type-safe routes
+//  Route type registry — augmented by generated files
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Augment this interface via `declare module 'thane'` to enable
- * type-safe `navigate()`.
- *
- * ```ts
- * const Routes = defineRoutes({ ... });
- * type Routes = typeof Routes;
- *
- * declare module 'thane' {
- *   interface Register { routes: Routes }
- * }
- * ```
+ * The hidden files that `thane build`, `dev`, `serve` and `types` generate in
+ * `.thane/types` augment these interfaces with the app's route paths (`Register`) and
+ * the route pattern of each page component's selector (`RouteComponentRegister`). That
+ * makes `navigate()`, `RoutePaths` and a page's `ctx.route` type-safe.
  */
 declare global {
   namespace ThaneTypeRegistry {
@@ -50,12 +43,6 @@ declare global {
     interface RouteComponentRegister {}
   }
 }
-
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface Register extends ThaneTypeRegistry.Register {}
-
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface RouteComponentRegister extends ThaneTypeRegistry.RouteComponentRegister {}
 
 // ─────────────────────────────────────────────────────────────
 //  Type-safe route path utilities
@@ -94,8 +81,8 @@ type RegisteredRoutePaths<T extends Record<string, any>> = T extends { readonly 
   ? P
   : RouteKeys<T>;
 
-type EffectiveRegister = ThaneTypeRegistry.Register & Register;
-type EffectiveRouteComponentRegister = ThaneTypeRegistry.RouteComponentRegister & RouteComponentRegister;
+type EffectiveRegister = ThaneTypeRegistry.Register;
+type EffectiveRouteComponentRegister = ThaneTypeRegistry.RouteComponentRegister;
 
 type ExplicitRegisterRoutePaths = EffectiveRegister extends { routePaths: infer P extends string } ? P : never;
 type ExplicitRegisterRouteParamNames = EffectiveRegister extends { routeParamNames: infer P extends string }
@@ -298,9 +285,7 @@ export function defineRoutes<const T extends RoutesConfig>(
     startRouter({ routes: routeMap, notFound }, target, routerConfig);
     return {
       root: target as any,
-      destroy: () => {
-        stopRouter();
-      },
+      destroy: stopRouter,
     };
   });
 
@@ -331,6 +316,10 @@ let _started = false;
 let _popstateHandler: ((event: PopStateEvent) => void) | null = null;
 /** Path and query of the mounted route; a change in either loads the route again */
 let _loadedUrl: string | null = null;
+/** Ticket of the newest route load. A load that finds a newer ticket once its component has arrived stands down. */
+let _navigationId = 0;
+/** True while the next route's component is being fetched: the URL is the new entry's, the page on screen is not */
+let _routePending = false;
 const locationUrl = (): string => window.location.pathname + window.location.search;
 let _scrollHandler: (() => void) | null = null;
 let _previousHistoryScrollRestoration: History['scrollRestoration'] | null = null;
@@ -349,26 +338,23 @@ interface NormalizedScrollRestorationConfig {
   restoreOnBackForward: boolean;
 }
 
-const DEFAULT_SCROLL_RESTORATION: NormalizedScrollRestorationConfig = {
-  enabled: true,
-  behavior: 'auto',
-  left: 0,
-  top: 0,
-  resetOnNavigate: true,
-  restoreOnBackForward: true,
+const normalizeScrollRestoration = (config?: boolean | ScrollRestorationConfig): NormalizedScrollRestorationConfig => {
+  const c: ScrollRestorationConfig = typeof config === 'object' ? config : {};
+  return {
+    enabled: config !== false,
+    behavior: c.behavior ?? 'auto',
+    left: c.left ?? 0,
+    top: c.top ?? 0,
+    resetOnNavigate: c.resetOnNavigate ?? true,
+    restoreOnBackForward: c.restoreOnBackForward ?? true,
+  };
 };
 
-let _scrollConfig: NormalizedScrollRestorationConfig = DEFAULT_SCROLL_RESTORATION;
+let _scrollConfig: NormalizedScrollRestorationConfig = normalizeScrollRestoration();
 
 const SCROLL_STATE_KEY = '__thaneScroll';
 
-const currentPathSignal = _currentPath as ReadonlySignal<string>;
-
-const installCurrentPathGlobal = (): void => {
-  (globalThis as { currentPath?: ReadonlySignal<string> }).currentPath = currentPathSignal;
-};
-
-installCurrentPathGlobal();
+(globalThis as { currentPath?: ReadonlySignal<string> }).currentPath = _currentPath;
 
 const createCurrentRouteContext = (): UntypedRouteContext => ({
   params: { ..._routeParams },
@@ -380,41 +366,18 @@ const createCurrentRouteContext = (): UntypedRouteContext => ({
   state: typeof window !== 'undefined' ? window.history.state : undefined,
 });
 
-__setRouteContextProvider(() => createCurrentRouteContext());
-
-const normalizeScrollRestoration = (config?: boolean | ScrollRestorationConfig): NormalizedScrollRestorationConfig => {
-  if (config === false) {
-    return { ...DEFAULT_SCROLL_RESTORATION, enabled: false };
-  }
-  if (config === true || config === undefined) {
-    return { ...DEFAULT_SCROLL_RESTORATION };
-  }
-
-  return {
-    enabled: true,
-    behavior: config.behavior ?? DEFAULT_SCROLL_RESTORATION.behavior,
-    left: config.left ?? DEFAULT_SCROLL_RESTORATION.left,
-    top: config.top ?? DEFAULT_SCROLL_RESTORATION.top,
-    resetOnNavigate: config.resetOnNavigate ?? DEFAULT_SCROLL_RESTORATION.resetOnNavigate,
-    restoreOnBackForward: config.restoreOnBackForward ?? DEFAULT_SCROLL_RESTORATION.restoreOnBackForward,
-  };
-};
+__setRouteContextProvider(createCurrentRouteContext);
 
 const readScrollPositionFromHistoryState = (state: unknown): { left: number; top: number } | null => {
-  if (!state || typeof state !== 'object' || !(SCROLL_STATE_KEY in state)) return null;
-
-  const candidate = (state as Record<string, unknown>)[SCROLL_STATE_KEY];
-  if (!candidate || typeof candidate !== 'object') return null;
-
-  const left = (candidate as Record<string, unknown>)['left'];
-  const top = (candidate as Record<string, unknown>)['top'];
-  if (typeof left !== 'number' || typeof top !== 'number') return null;
-
-  return { left, top };
+  const s = (state as any)?.[SCROLL_STATE_KEY];
+  return s && typeof s.left === 'number' && typeof s.top === 'number' ? s : null;
 };
 
 const persistCurrentScrollPosition = (): void => {
-  if (!_scrollConfig.enabled || typeof window === 'undefined') return;
+  if (!_scrollConfig.enabled) return;
+  // While the next route loads, the scroll offset belongs to the page still on screen and the
+  // URL to the entry being loaded: writing one into the other would restore a wrong position later.
+  if (_routePending) return;
 
   _scrollPositions.set(window.location.pathname, { left: window.scrollX, top: window.scrollY });
 
@@ -432,7 +395,7 @@ const persistCurrentScrollPosition = (): void => {
 };
 
 const schedulePersistCurrentScrollPosition = (): void => {
-  if (_scrollPersistScheduled || typeof window === 'undefined') return;
+  if (_scrollPersistScheduled) return;
 
   _scrollPersistScheduled = true;
   requestAnimationFrame(() => {
@@ -441,15 +404,16 @@ const schedulePersistCurrentScrollPosition = (): void => {
   });
 };
 
-const applyScrollPosition = (pathname: string): void => {
-  if (!_scrollConfig.enabled || typeof window === 'undefined') return;
-
-  const action = _pendingScrollAction;
-  _pendingScrollAction = 'init';
+const applyScrollPosition = (
+  pathname: string,
+  action: 'init' | 'navigate' | 'pop',
+  popScrollPosition: { left: number; top: number } | null,
+): void => {
+  if (!_scrollConfig.enabled) return;
 
   const saved =
     action === 'pop' && _scrollConfig.restoreOnBackForward
-      ? (_pendingPopScrollPosition ?? _scrollPositions.get(pathname))
+      ? (popScrollPosition ?? _scrollPositions.get(pathname))
       : undefined;
   const target =
     saved ??
@@ -457,23 +421,20 @@ const applyScrollPosition = (pathname: string): void => {
       ? { left: _scrollConfig.left, top: _scrollConfig.top }
       : undefined);
 
-  _pendingPopScrollPosition = null;
-
   if (!target) return;
 
   const apply = () => {
     window.scrollTo({ left: target.left, top: target.top, behavior: _scrollConfig.behavior });
   };
 
-  queueMicrotask(() => {
-    requestAnimationFrame(() => {
-      apply();
-      if (action === 'pop') {
-        requestAnimationFrame(apply);
-        _scrollRestorationTimers = [setTimeout(apply, 100)];
-      }
-    });
-  });
+  // The first write is synchronous: the new page is already in the DOM, so it is painted at its
+  // final position instead of at the previous page's offset for one frame. A restored position
+  // is applied again once content that arrives late (images, data) has had a chance to grow the page.
+  apply();
+  if (action === 'pop') {
+    requestAnimationFrame(apply);
+    _scrollRestorationTimers = [setTimeout(apply, 100)];
+  }
 };
 
 const isEagerRouteComponent = (value: unknown): value is ComponentHTMLSelector<any> => {
@@ -558,30 +519,66 @@ export const matchRoute = (pathname: string, routes: RoutesMap, notFound?: Route
 const loadRoute = async (): Promise<void> => {
   if (!_config || !_target) return;
 
+  const target = _target;
   const pathname = window.location.pathname;
   const url = locationUrl();
 
-  // Skip when this path and query are already mounted (guards against a redundant popstate).
-  // A change in the query alone mounts the route again, so `route.searchParams` is current;
-  // a change in the hash alone does not.
-  if (url === _loadedUrl && _currentHandle) return;
+  // How this load was triggered belongs to this load alone: a navigation that supersedes it,
+  // or one started while it mounts, must not inherit its scroll action or saved position.
+  const scrollAction = _pendingScrollAction;
+  const popScrollPosition = _pendingPopScrollPosition;
+  _pendingScrollAction = 'init';
+  _pendingPopScrollPosition = null;
 
-  // Tear down current route
-  if (_currentHandle) {
-    unmount(_currentHandle);
-    _target.innerHTML = '';
-    _currentHandle = null;
-  }
+  // Every load takes a ticket, also one that turns out to have nothing to do: taking it is
+  // what cancels a load that is still waiting for its component.
+  const navigationId = ++_navigationId;
 
   _currentPath(pathname);
-  _loadedUrl = url;
+
+  // Skip when this path and query are already mounted: a redundant popstate, a change in the
+  // hash alone, or the user returning to the page on screen while another one was loading
+  // (that load is now cancelled and the page keeps its state). A change in the query alone
+  // mounts the route again, so `route.searchParams` is current.
+  if (url === _loadedUrl && _currentHandle) {
+    _routePending = false;
+    return;
+  }
 
   const match = matchRoute(pathname, _config.routes, _config.notFound);
+
+  // Fetch the next page while the current one stays on screen. Tearing the current page down
+  // before this await left the outlet empty for as long as the chunk took to arrive, and for
+  // one painted frame even when it was already cached: the document collapsed to the shell,
+  // the footer jumped to the top and the page flashed.
+  let component: ComponentHTMLSelector<any> | undefined;
+  if (match) {
+    _routePending = true;
+    try {
+      component = await resolveRouteComponent(match.route);
+    } catch (error) {
+      console.error('[thane-router] Failed to load route:', error);
+    }
+    // Superseded by a newer navigation, or the router was stopped (or restarted) meanwhile:
+    // the outlet and the pending flag are no longer this load's to touch.
+    if (navigationId !== _navigationId || _target !== target) return;
+    _routePending = false;
+  }
+
+  // From here to the scroll write everything happens in one task, so the browser paints the
+  // previous page and then the next one, never the gap between them.
+  if (_currentHandle) {
+    const previous = _currentHandle;
+    _currentHandle = null;
+    unmount(previous);
+  }
+  target.innerHTML = '';
+  _loadedUrl = url;
+
   if (!match) {
     _currentRoutePattern = pathname;
-    _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
+    _currentRouteTitle = document.title;
     _routeParams = {};
-    _target.innerHTML = '';
     return;
   }
 
@@ -592,20 +589,21 @@ const loadRoute = async (): Promise<void> => {
   if (match.route.title) {
     document.title = match.route.title;
   }
-  _currentRouteTitle = match.route.title ?? (typeof document !== 'undefined' ? document.title : '');
+  _currentRouteTitle = match.route.title ?? document.title;
+
+  // The component failed to load (reported above): the outlet stays empty
+  if (!component) return;
 
   try {
-    const component = await resolveRouteComponent(match.route);
-
-    // Guard: the user may have navigated away while we were loading
-    if (locationUrl() !== _loadedUrl) return;
-
-    if (component) {
-      _currentHandle = mountComponent(component, _target, undefined, { route: createCurrentRouteContext() });
-      applyScrollPosition(pathname);
-    }
+    _currentHandle = mountComponent(component, target, undefined, { route: createCurrentRouteContext() });
   } catch (error) {
     console.error('[thane-router] Failed to load route:', error);
+    return;
+  }
+
+  // A page that navigates while it mounts (a redirect) has started a newer load, which owns the scroll
+  if (navigationId === _navigationId) {
+    applyScrollPosition(pathname, scrollAction, popScrollPosition);
   }
 };
 
@@ -635,7 +633,6 @@ export function navigateBack(): void {
   window.history.back();
 }
 
-/**
 // ─────────────────────────────────────────────────────────────
 //  Router lifecycle — called internally by mount()
 // ─────────────────────────────────────────────────────────────
@@ -662,22 +659,21 @@ export function startRouter(
   _config = config;
   _target = target;
   _scrollConfig = normalizeScrollRestoration(routerConfig?.scrollRestoration);
-  _pendingPopScrollPosition =
-    typeof window !== 'undefined' ? readScrollPositionFromHistoryState(window.history.state) : null;
+  _pendingPopScrollPosition = readScrollPositionFromHistoryState(window.history.state);
   _pendingScrollAction = _pendingPopScrollPosition ? 'pop' : 'init';
 
   // Expose navigation helpers globally (like when, whenElse, repeat)
   const g = globalThis as any;
-  g.currentPath = currentPathSignal;
+  g.currentPath = _currentPath;
   g.navigate = navigate;
   g.navigateBack = navigateBack;
 
-  if (_scrollConfig.enabled && typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+  if (_scrollConfig.enabled && 'scrollRestoration' in window.history) {
     _previousHistoryScrollRestoration = window.history.scrollRestoration;
     window.history.scrollRestoration = 'manual';
   }
 
-  if (_scrollConfig.enabled && typeof window !== 'undefined') {
+  if (_scrollConfig.enabled) {
     persistCurrentScrollPosition();
     _scrollHandler = () => {
       if (_scrollRestorationTimers.length > 0) {
@@ -708,6 +704,10 @@ export function startRouter(
 export function stopRouter(): void {
   if (!_started) return;
 
+  // A load still waiting for its component stands down when it resumes
+  _navigationId++;
+  _routePending = false;
+
   if (_currentHandle) {
     unmount(_currentHandle);
     _currentHandle = null;
@@ -735,24 +735,20 @@ export function stopRouter(): void {
   _config = null;
   _target = null;
   _loadedUrl = null;
-  _currentPath(typeof window !== 'undefined' ? window.location.pathname : '');
-  _currentRoutePattern = typeof window !== 'undefined' ? window.location.pathname : '';
-  _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
+  _currentPath(window.location.pathname);
+  _currentRoutePattern = window.location.pathname;
+  _currentRouteTitle = document.title;
   _routeParams = {};
   _started = false;
   _pendingPopScrollPosition = null;
   for (const id of _scrollRestorationTimers) clearTimeout(id);
   _scrollRestorationTimers = [];
   _scrollPositions = new Map<string, { left: number; top: number }>();
-  _scrollConfig = DEFAULT_SCROLL_RESTORATION;
+  _scrollConfig = normalizeScrollRestoration();
   _pendingScrollAction = 'init';
   _scrollPersistScheduled = false;
 
-  if (
-    _previousHistoryScrollRestoration !== null &&
-    typeof window !== 'undefined' &&
-    'scrollRestoration' in window.history
-  ) {
+  if (_previousHistoryScrollRestoration !== null && 'scrollRestoration' in window.history) {
     window.history.scrollRestoration = _previousHistoryScrollRestoration;
     _previousHistoryScrollRestoration = null;
   }

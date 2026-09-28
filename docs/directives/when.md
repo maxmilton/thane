@@ -1,6 +1,6 @@
 # when — Conditional Rendering
 
-`when()` shows or hides a DOM element based on a boolean condition. When the condition becomes false, the element is replaced with a `<template>` placeholder and all nested bindings are disposed. When it becomes true again, the content is re-cloned and bindings re-initialized.
+`when()` shows or hides a DOM element based on a boolean condition. When the condition becomes false, the element is removed and all nested bindings are disposed. When it becomes true again, the content is re-cloned and bindings re-initialized.
 
 ## Syntax
 
@@ -27,7 +27,9 @@ export const Toggle = defineComponent(() => {
 });
 ```
 
-When `show()` is `false`, the `<p>` element is removed from the DOM and replaced with an invisible `<template>` placeholder. When `show()` becomes `true`, the content is cloned back.
+When `show()` is `false`, the `<p>` element is removed from the DOM; two empty comments mark where it goes. When `show()` becomes `true`, the content is cloned back between them.
+
+`when()` applies to the one element that carries it. To show or hide several elements, or text, wrap them in an element, or use [`whenElse()`](when-else.md), whose branches may hold any number of nodes.
 
 ## Expressions
 
@@ -43,13 +45,15 @@ template: html`
 
 ## How It Works
 
-1. At **build time**, the compiler detects `${when(...)}` and assigns the element an internal ID.
+1. At **build time**, the compiler detects `${when(...)}`, compiles the element as its own template, and puts two empty comments (anchors) in its place.
 2. At **runtime**, the binding code subscribes to the signals read inside the condition.
 3. When the condition changes:
-   - **Show:** The compiler-generated template is cloned and inserted (replacing the placeholder). Nested bindings are initialized.
-   - **Hide:** The element is replaced with a `<template>` placeholder. All nested subscriptions are disposed to prevent memory leaks and stale effects.
+   - **Show:** The compiler-generated template is cloned and inserted between the anchors. Nested bindings are initialized.
+   - **Hide:** Everything between the anchors is removed. All nested subscriptions are disposed to prevent memory leaks and stale effects.
 
-The compiler pre-renders the element into the static template when the condition is true for the signals' initial values. If the condition cannot be evaluated at build time — for example it reads a plain local variable instead of a signal — the element starts as a placeholder and the runtime decides at mount.
+The compiler pre-renders the element between the anchors in the static template when the condition is true for the signals' initial values. If the condition cannot be evaluated at build time — for example it reads a plain local variable instead of a signal — the element starts hidden and the runtime decides at mount.
+
+`when()` cannot be placed on the root element of a `repeat()` row (THANE008): filter the list instead, or put the `when()` on an element inside the row.
 
 ## Lifecycle Integration
 

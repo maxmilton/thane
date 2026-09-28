@@ -12,8 +12,8 @@
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
-import { ErrorCode, createError } from '../../../errors.js';
-import { FN } from '../../../utils/constants.js';
+import { ErrorCode } from '../../../errors.js';
+import { createReporter, findReturnObjects, type Report } from './lint-utils.js';
 
 /** Canonical property order. Properties not in this list are ignored. */
 const CANONICAL_ORDER = ['template', 'styles', 'onMount', 'onDestroy'] as const;
@@ -21,53 +21,9 @@ const CANONICAL_ORDER = ['template', 'styles', 'onMount', 'onDestroy'] as const;
 const orderIndex = new Map<string, number>(CANONICAL_ORDER.map((name, i) => [name, i]));
 
 /**
- * Walk the AST to find all object-literal return values inside
- * defineComponent() calls (either direct return or arrow shorthand).
- */
-const findReturnObjects = (node: ts.Node, results: ts.ObjectLiteralExpression[]): void => {
-  if (ts.isCallExpression(node)) {
-    const callee = node.expression;
-    if (ts.isIdentifier(callee) && callee.text === FN.DEFINE_COMPONENT) {
-      // Find the setup function argument (last function-like arg)
-      for (const arg of node.arguments) {
-        if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) {
-          collectReturns(arg.body, results);
-        }
-      }
-      return; // Don't recurse further into defineComponent args
-    }
-  }
-  ts.forEachChild(node, (child) => findReturnObjects(child, results));
-};
-
-const collectReturns = (body: ts.Node, results: ts.ObjectLiteralExpression[]): void => {
-  // Arrow with expression body: () => ({ template, ... })
-  // Unwrap ParenthesizedExpression — TS parses `() => ({})` as Paren(ObjLiteral)
-  let expr: ts.Node = body;
-  while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
-  if (ts.isObjectLiteralExpression(expr)) {
-    results.push(expr);
-    return;
-  }
-  // Block body — look for return statements
-  if (ts.isBlock(body)) {
-    for (const stmt of body.statements) {
-      if (ts.isReturnStatement(stmt) && stmt.expression && ts.isObjectLiteralExpression(stmt.expression)) {
-        results.push(stmt.expression);
-      }
-    }
-  }
-};
-
-/**
  * Check a single return object for out-of-order properties.
  */
-const checkPropertyOrder = (
-  obj: ts.ObjectLiteralExpression,
-  sourceFile: ts.SourceFile,
-  filePath: string,
-): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
+const checkPropertyOrder = (obj: ts.ObjectLiteralExpression, report: Report): void => {
   let lastIdx = -1;
   let lastName = '';
 
@@ -82,34 +38,21 @@ const checkPropertyOrder = (
     if (idx === undefined) continue; // not a lifecycle property — skip
 
     if (idx < lastIdx) {
-      const { line, character } = sourceFile.getLineAndCharacterOfPosition(prop.getStart());
-
       // Build the "expected order" hint
       const orderHint = CANONICAL_ORDER.join(' → ');
 
-      diagnostics.push(
-        createError(
-          `'${name}' must be declared before '${lastName}' (required order: ${orderHint})`,
-          { file: filePath, line: line + 1, column: character + 1 },
-          ErrorCode.COMPONENT_PROPERTY_ORDER,
-        ),
-      );
+      report(prop, `'${name}' must be declared before '${lastName}' (required order: ${orderHint})`);
     }
 
     lastIdx = idx;
     lastName = name;
   }
-
-  return diagnostics;
 };
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
-  const returnObjects: ts.ObjectLiteralExpression[] = [];
-  findReturnObjects(sourceFile, returnObjects);
-
-  const diagnostics: Diagnostic[] = [];
-  for (const obj of returnObjects) {
-    diagnostics.push(...checkPropertyOrder(obj, sourceFile, filePath));
+  const { diagnostics, report } = createReporter(sourceFile, filePath, ErrorCode.COMPONENT_PROPERTY_ORDER, 'error');
+  for (const obj of findReturnObjects(sourceFile)) {
+    checkPropertyOrder(obj, report);
   }
 
   return diagnostics;

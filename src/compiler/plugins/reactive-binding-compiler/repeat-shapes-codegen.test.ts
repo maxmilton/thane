@@ -47,7 +47,7 @@ describe('Every repeat() list uses the keyed row path', () => {
 
   test('rows with no bindings are cloned from a static template', async () => {
     const js = await buildAndReadJs(app('<ul>${repeat(rows(), (_item) => html`<li class="dot">-</li>`)}</ul>'));
-    expect(js).toMatch(/__tpl_b\d+ = _T\(`<li class="dot">-<\/li>`\)/);
+    expect(js).toMatch(/__tpl_b\d+ = __T\(`<li class="dot">-<\/li>`\)/);
     expect(js).toMatch(/createKeyedReconciler\(/);
     expect(js).not.toMatch(/_w?ri_b\d+ = /);
   });
@@ -67,7 +67,7 @@ describe('Every repeat() list uses the keyed row path', () => {
         '${whenElse(show(), html`<ul>${repeat(rows(), (item) => html`<li @click=${() => pick(item.id)}>${item.label}</li>`, html`<li>none</li>`, (item) => item.id)}</ul>`, html`<p>off</p>`)}',
       ),
     );
-    expect(js).toMatch(/__tpl_b\d+ = _T\(`<li><\/li>`\)/);
+    expect(js).toMatch(/__tpl_b\d+ = __T\(`<li><\/li>`\)/);
     expect(js).toMatch(/createKeyedReconciler\(/);
     // the branch initializer owns the list's subscriptions and returns their teardown
     expect(js).toMatch(/const _rsubs_b\d+ = \[\]/);
@@ -80,7 +80,7 @@ describe('Every repeat() list uses the keyed row path', () => {
         '<ul ${when(show())}>${repeat(rows(), (item) => html`<li>${item.label}</li>`, null, (item) => item.id)}</ul>',
       ),
     );
-    expect(js).toMatch(/__tpl_b\d+ = _T\(`<li><\/li>`\)/);
+    expect(js).toMatch(/__tpl_b\d+ = __T\(`<li><\/li>`\)/);
     expect(js).toMatch(/const _rsubs_b\d+ = \[\]/);
     expect(js).not.toMatch(/_w?ri_b\d+ = /);
   });

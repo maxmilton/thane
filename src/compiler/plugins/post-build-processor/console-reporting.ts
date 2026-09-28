@@ -4,60 +4,65 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { consoleColors } from '../../utils/index.js';
+import { ansi, consoleColors } from '../../utils/index.js';
+
+/** A file's size, and with `useGzip` the sizes of its `.gz` and `.br` copies when they exist. */
+export interface FileSizes {
+  fileName: string;
+  sizeInBytes: number;
+  gzip?: number | undefined;
+  brotli?: number | undefined;
+}
 
 const getSizeColor = (sizeInBytes: number, maxSize: number): string => {
   const ratio = sizeInBytes / maxSize;
-  if (ratio < 0.33) return '\x1b[32m'; // green
-  if (ratio < 0.66) return '\x1b[33m'; // yellow
-  if (ratio < 0.85) return '\x1b[38;5;208m'; // orange
-  return '\x1b[31m'; // red
+  if (ratio < 0.33) return ansi.green;
+  if (ratio < 0.66) return ansi.yellow;
+  if (ratio < 0.85) return ansi.orange;
+  return ansi.red;
 };
 
-export const printAllFileSizes = async (
+const statIfExists = async (filePath: string): Promise<number | undefined> =>
+  fs.existsSync(filePath) ? (await fs.promises.stat(filePath)).size : undefined;
+
+/** Stat each file's compressed copies once, for both the per-file lines and the totals. */
+export const collectFileSizes = async (
   fileSizeLog: { fileName: string; sizeInBytes: number }[],
   distDir: string,
   useGzip?: boolean,
-): Promise<void> => {
-  const maxSize = Math.max(...fileSizeLog.map((f) => f.sizeInBytes));
-  const cyanColor = '\x1b[36m';
-  const { reset } = consoleColors;
-
+): Promise<FileSizes[]> => {
+  const sizes: FileSizes[] = [];
   for (const { fileName, sizeInBytes } of fileSizeLog) {
+    const filePath = path.join(distDir, fileName);
+    sizes.push({
+      fileName,
+      sizeInBytes,
+      gzip: useGzip ? await statIfExists(filePath + '.gz') : undefined,
+      brotli: useGzip ? await statIfExists(filePath + '.br') : undefined,
+    });
+  }
+  return sizes;
+};
+
+export const printAllFileSizes = (sizes: FileSizes[]): void => {
+  const maxSize = Math.max(...sizes.map((f) => f.sizeInBytes));
+  const { reset } = ansi;
+
+  for (const { fileName, sizeInBytes, gzip, brotli } of sizes) {
     const sizeInKilobytes = sizeInBytes / 1024;
     const sizeColor = getSizeColor(sizeInBytes, maxSize);
     let sizeInfo = `${sizeColor}Size: ${sizeInKilobytes.toFixed(2)} KB${reset}`;
-    if (useGzip) {
-      const gzipPath = path.join(distDir, fileName + '.gz');
-      const brotliPath = path.join(distDir, fileName + '.br');
-      const greenColor = '\x1b[32m';
-
-      if (fs.existsSync(gzipPath)) {
-        const gzipStats = await fs.promises.stat(gzipPath);
-        const gzipSizeKB = gzipStats.size / 1024;
-        sizeInfo += ` ${greenColor}(gzip: ${gzipSizeKB.toFixed(2)} KB`;
-
-        if (fs.existsSync(brotliPath)) {
-          const brotliStats = await fs.promises.stat(brotliPath);
-          const brotliSizeKB = brotliStats.size / 1024;
-          sizeInfo += `, br: ${brotliSizeKB.toFixed(2)} KB)`;
-        } else {
-          sizeInfo += `)`;
-        }
-        sizeInfo += reset;
-      }
+    if (gzip !== undefined) {
+      sizeInfo += ` ${ansi.green}(gzip: ${(gzip / 1024).toFixed(2)} KB`;
+      sizeInfo += brotli !== undefined ? `, br: ${(brotli / 1024).toFixed(2)} KB)` : `)`;
+      sizeInfo += reset;
     }
 
-    console.info(`${cyanColor}${fileName}${reset}  ${sizeInfo}`);
+    console.info(`${ansi.cyan}${fileName}${reset}  ${sizeInfo}`);
   }
 };
 
-export const printTotalSizes = async (
-  totalBundleSizeInBytes: number,
-  fileSizeLog: { fileName: string; sizeInBytes: number }[],
-  distDir: string,
-  useGzip?: boolean,
-): Promise<void> => {
+export const printTotalSizes = (totalBundleSizeInBytes: number, sizes: FileSizes[], useGzip?: boolean): void => {
   const totalSizeInKilobytes = totalBundleSizeInBytes / 1024;
   console.info(
     consoleColors.green,
@@ -65,22 +70,8 @@ export const printTotalSizes = async (
   );
 
   if (useGzip) {
-    let totalGzippedSize = 0;
-    let totalBrotliSize = 0;
-    for (const { fileName } of fileSizeLog) {
-      const gzipPath = path.join(distDir, fileName + '.gz');
-      const brotliPath = path.join(distDir, fileName + '.br');
-
-      if (fs.existsSync(gzipPath)) {
-        const stats = await fs.promises.stat(gzipPath);
-        totalGzippedSize += stats.size;
-      }
-
-      if (fs.existsSync(brotliPath)) {
-        const stats = await fs.promises.stat(brotliPath);
-        totalBrotliSize += stats.size;
-      }
-    }
+    const totalGzippedSize = sizes.reduce((total, f) => total + (f.gzip ?? 0), 0);
+    const totalBrotliSize = sizes.reduce((total, f) => total + (f.brotli ?? 0), 0);
     const totalGzippedKB = totalGzippedSize / 1024;
     const totalBrotliKB = totalBrotliSize / 1024;
     console.info(

@@ -15,6 +15,9 @@
   "include": [
     "contract-app/**/*.ts",
     "router-app/**/*.ts",
+    "cart-app/**/*.ts",
+    "hardening-app/**/*.ts",
+    "browser-error-app/**/*.ts",
     "tests/**/*.ts",
     "playwright.config.ts",
     "server.ts",

@@ -71,33 +71,31 @@ export const getContentType = (url: string): string => {
 };
 
 /**
- * Create a shared BuildContext by scanning the project root for component files.
- * Both ComponentPrecompiler and HTMLBootstrapInjector use this to avoid
- * duplicate filesystem scans.
+ * Create a shared BuildContext by scanning the working directory, and the project root when it lies
+ * outside it, for component files.
  */
-export const createBuildContext = async (): Promise<BuildContext> => {
+export const createBuildContext = async (projectRoot?: string): Promise<BuildContext> => {
   const workspaceRoot = process.cwd();
-  const searchDirs = [workspaceRoot];
   const tsFilter = (name: string) => name.endsWith('.ts') && !name.endsWith('.d.ts');
 
-  const tsFiles: string[] = [];
   const componentsByName = new Map<string, ComponentDefinition>();
   const componentsBySelector = new Map<string, ComponentDefinition>();
 
   sourceCache.clear();
 
-  for (const dir of searchDirs) {
-    const files = await collectFilesRecursively(dir, tsFilter);
-    tsFiles.push(...files);
-
-    for (const filePath of files) {
-      const cached = await sourceCache.get(filePath);
-      if (cached) {
-        const definitions = extractComponentDefinitions(cached.sourceFile, filePath);
-        for (const def of definitions) {
-          componentsByName.set(def.name, def);
-          componentsBySelector.set(def.selector, def);
-        }
+  const tsFiles = await collectFilesRecursively(workspaceRoot, tsFilter);
+  const toProject = projectRoot ? path.relative(workspaceRoot, projectRoot) : '';
+  if (toProject === '..' || toProject.startsWith('..' + path.sep) || path.isAbsolute(toProject)) {
+    const seen = new Set(tsFiles);
+    tsFiles.push(...(await collectFilesRecursively(projectRoot!, tsFilter)).filter((file) => !seen.has(file)));
+  }
+  for (const filePath of tsFiles) {
+    const cached = await sourceCache.get(filePath);
+    if (cached) {
+      const definitions = extractComponentDefinitions(cached.sourceFile, filePath);
+      for (const def of definitions) {
+        componentsByName.set(def.name, def);
+        componentsBySelector.set(def.selector, def);
       }
     }
   }

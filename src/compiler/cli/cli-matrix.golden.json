@@ -1,0 +1,967 @@
+{
+  "no config file": {
+    "baseline": { "command": "build", "gzip": false, "logLevel": "normal", "prod": false, "serve": false },
+    "rows": {
+      "--app cli-app": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown command 'cli-app'. Run 'thane --help' to see available commands."
+        ]
+      },
+      "--app": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--app --prod": {
+        "prod": true,
+        "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."]
+      },
+      "--app ''": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--entry ./cli/main.ts": { "entry": "./cli/main.ts" },
+      "--entry": {},
+      "--entry --prod": { "prod": true },
+      "--entry ''": { "entry": "" },
+      "--out ./cli-dist": { "outDir": "./cli-dist" },
+      "--out": {},
+      "--out --prod": { "prod": true },
+      "--out ''": { "outDir": "" },
+      "--assets ./cli-assets": { "assetsDir": "./cli-assets" },
+      "--assets": {},
+      "--assets --prod": { "prod": true },
+      "--assets ''": { "assetsDir": "" },
+      "--html ./cli/index.html": { "html": "./cli/index.html" },
+      "--html": {},
+      "--html --prod": { "prod": true },
+      "--html ''": { "html": "" },
+      "--config ./alt.config.json": {
+        "prod": true,
+        "configPath": "<cwd>/alt.config.json",
+        "entry": "<cwd>/alt/main.ts",
+        "outDir": "<cwd>/alt-dist",
+        "port": 7000
+      },
+      "--config": {},
+      "--config --prod": { "prod": true },
+      "--config ''": { "configPath": "" },
+      "--port 3001": { "port": 3001 },
+      "--port": { "port": 4200 },
+      "--port --prod": { "prod": true, "port": 4200 },
+      "--port ''": { "port": 4200 },
+      "--host cli-host": { "host": "cli-host" },
+      "--host": { "host": "0.0.0.0" },
+      "--host --prod": { "prod": true, "host": "0.0.0.0" },
+      "--host ''": { "host": "0.0.0.0" },
+      "--base /cli/": { "base": "/cli/" },
+      "--base": { "base": "/" },
+      "--base --prod": { "prod": true, "base": "/" },
+      "--base ''": { "base": "/" },
+      "--target es2020, chrome100,,": { "target": ["es2020", "chrome100"] },
+      "--target": { "target": [] },
+      "--target --prod": { "prod": true, "target": [] },
+      "--target ''": { "target": [] },
+      "--env-prefix CLI_": { "envPrefix": "CLI_" },
+      "--env-prefix": { "envPrefix": "THANE_" },
+      "--env-prefix --prod": { "prod": true, "envPrefix": "THANE_" },
+      "--env-prefix ''": { "envPrefix": "THANE_" },
+      "--legal-comments eof": { "legalComments": "eof" },
+      "--legal-comments": { "legalComments": "none" },
+      "--legal-comments --prod": { "prod": true, "legalComments": "none" },
+      "--legal-comments ''": { "legalComments": "none" },
+      "--port 1 --port 2": { "port": 2 },
+      "--entry ./a.ts --entry ./b.ts": { "entry": "./b.ts" },
+      "--target es2020 --target es2022": { "target": ["es2022"] },
+      "--config ./missing.json": { "configPath": "./missing.json" },
+      "--port abc": { "(error)": "Invalid --port value 'abc': expected a number, e.g. --port 4200." },
+      "--port 0": { "port": 0 },
+      "--host true": { "host": "true" },
+      "--legal-comments bogus": { "legalComments": "bogus" },
+      "--prod": { "prod": true },
+      "--prod stray": {
+        "prod": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-p": { "prod": true },
+      "-p stray": {
+        "prod": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--gzip": { "gzip": true },
+      "--gzip stray": {
+        "gzip": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--drop-console": { "dropConsole": true },
+      "--drop-console stray": {
+        "dropConsole": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-drop-console": { "dropConsole": false },
+      "--no-drop-console stray": {
+        "dropConsole": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--drop-debugger": { "dropDebugger": true },
+      "--drop-debugger stray": {
+        "dropDebugger": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-drop-debugger": { "dropDebugger": false },
+      "--no-drop-debugger stray": {
+        "dropDebugger": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--sourcemap": { "sourcemap": true },
+      "--sourcemap stray": {
+        "sourcemap": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-sourcemap": { "sourcemap": false },
+      "--no-sourcemap stray": {
+        "sourcemap": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--strict-type-check": { "strictTypeCheck": true },
+      "--strict-type-check stray": {
+        "strictTypeCheck": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--open": { "open": true },
+      "--open stray": {
+        "open": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-open": { "open": false },
+      "--no-open stray": {
+        "open": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--hash-file-names": { "hashFileNames": true },
+      "--hash-file-names stray": {
+        "hashFileNames": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-hash-file-names": { "hashFileNames": false },
+      "--no-hash-file-names stray": {
+        "hashFileNames": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--empty-out-dir": { "emptyOutDir": true },
+      "--empty-out-dir stray": {
+        "emptyOutDir": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-empty-out-dir": { "emptyOutDir": false },
+      "--no-empty-out-dir stray": {
+        "emptyOutDir": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--splitting": { "splitting": true },
+      "--splitting stray": {
+        "splitting": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-splitting": { "splitting": false },
+      "--no-splitting stray": {
+        "splitting": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--analyze": { "analyze": true },
+      "--analyze stray": {
+        "analyze": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-analyze": { "analyze": false },
+      "--no-analyze stray": {
+        "analyze": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--verbose": { "logLevel": "verbose" },
+      "--verbose stray": {
+        "logLevel": "verbose",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-V": { "logLevel": "verbose" },
+      "-V stray": {
+        "logLevel": "verbose",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--quiet": { "logLevel": "silent" },
+      "--quiet stray": {
+        "logLevel": "silent",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-q": { "logLevel": "silent" },
+      "-q stray": {
+        "logLevel": "silent",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--help": { "exitRequested": "help" },
+      "--help stray": {
+        "exitRequested": "help",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-h": { "exitRequested": "help" },
+      "-h stray": {
+        "exitRequested": "help",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--version": { "exitRequested": "version" },
+      "--version stray": {
+        "exitRequested": "version",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-v": { "exitRequested": "version" },
+      "-v stray": {
+        "exitRequested": "version",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--prod --prod": { "prod": true },
+      "--drop-console --no-drop-console": { "dropConsole": false },
+      "--no-drop-console --drop-console": { "dropConsole": true },
+      "--drop-debugger --no-drop-debugger": { "dropDebugger": false },
+      "--no-drop-debugger --drop-debugger": { "dropDebugger": true },
+      "--sourcemap --no-sourcemap": { "sourcemap": false },
+      "--no-sourcemap --sourcemap": { "sourcemap": true },
+      "--open --no-open": { "open": false },
+      "--no-open --open": { "open": true },
+      "--hash-file-names --no-hash-file-names": { "hashFileNames": false },
+      "--no-hash-file-names --hash-file-names": { "hashFileNames": true },
+      "--empty-out-dir --no-empty-out-dir": { "emptyOutDir": false },
+      "--no-empty-out-dir --empty-out-dir": { "emptyOutDir": true },
+      "--splitting --no-splitting": { "splitting": false },
+      "--no-splitting --splitting": { "splitting": true },
+      "--analyze --no-analyze": { "analyze": false },
+      "--no-analyze --analyze": { "analyze": true },
+      "--verbose --quiet": { "logLevel": "silent" },
+      "--quiet --verbose": { "logLevel": "verbose" },
+      "-V -q": { "logLevel": "silent" },
+      "-q -V": { "logLevel": "verbose" },
+      "dev": { "command": "dev", "serve": true },
+      "serve": { "command": "serve", "serve": true },
+      "types": { "command": "types" },
+      "typecheck": { "command": "typecheck" },
+      "dev --prod": { "command": "dev", "serve": true },
+      "serve --prod": { "command": "serve", "prod": true, "serve": true },
+      "build dev": {},
+      "--entry dev": { "entry": "dev" },
+      "--prod serve": { "command": "serve", "prod": true, "serve": true },
+      "--port 1 dev": { "command": "dev", "serve": true, "port": 1 },
+      "stray": { "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."] },
+      "--nope": { "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."] },
+      "-x": { "(warnings)": ["Warning: Unknown flag '-x'. Run 'thane --help' to see available options."] },
+      "-P": { "(warnings)": ["Warning: Unknown flag '-P'. Run 'thane --help' to see available options."] },
+      "--nope value": {
+        "(warnings)": [
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options.",
+          "Warning: Unknown command 'value'. Run 'thane --help' to see available commands."
+        ]
+      },
+      "-xyz": {},
+      "---x": { "(warnings)": ["Warning: Unknown flag '---x'. Run 'thane --help' to see available options."] },
+      "--app --nope": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."
+        ]
+      },
+      "--port --port --nope": {
+        "port": 4200,
+        "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."]
+      },
+      "--entry --app --zzz": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--zzz'. Run 'thane --help' to see available options."
+        ]
+      },
+      "--prod --nope --gzip": {
+        "gzip": true,
+        "prod": true,
+        "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."]
+      }
+    }
+  },
+  "thane.config.json": {
+    "baseline": {
+      "analyze": true,
+      "assetsDir": "<cwd>/cfg-assets",
+      "base": "/cfg-build/",
+      "command": "build",
+      "configPath": "<cwd>/thane.config.json",
+      "define": { "__CFG__": "\"1\"" },
+      "dropConsole": true,
+      "dropDebugger": true,
+      "emptyOutDir": true,
+      "entry": "<cwd>/cfg/main.ts",
+      "envPrefix": "CFG_",
+      "gzip": true,
+      "hashFileNames": true,
+      "host": "cfg-host",
+      "html": "<cwd>/cfg/index.html",
+      "legalComments": "linked",
+      "logLevel": "normal",
+      "open": true,
+      "outDir": "<cwd>/cfg-dist",
+      "port": 5000,
+      "prod": true,
+      "serve": false,
+      "sourcemap": true,
+      "splitting": true,
+      "strictTypeCheck": true,
+      "target": ["es2021"]
+    },
+    "rows": {
+      "--app cli-app": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown command 'cli-app'. Run 'thane --help' to see available commands."
+        ]
+      },
+      "--app": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--app --prod": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--app ''": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--entry ./cli/main.ts": { "entry": "./cli/main.ts" },
+      "--entry": {},
+      "--entry --prod": {},
+      "--entry ''": {},
+      "--out ./cli-dist": { "outDir": "./cli-dist" },
+      "--out": {},
+      "--out --prod": {},
+      "--out ''": {},
+      "--assets ./cli-assets": { "assetsDir": "./cli-assets" },
+      "--assets": {},
+      "--assets --prod": {},
+      "--assets ''": {},
+      "--html ./cli/index.html": { "html": "./cli/index.html" },
+      "--html": {},
+      "--html --prod": {},
+      "--html ''": {},
+      "--config ./alt.config.json": {
+        "analyze": "<absent>",
+        "assetsDir": "<absent>",
+        "base": "<absent>",
+        "configPath": "<cwd>/alt.config.json",
+        "define": "<absent>",
+        "dropConsole": "<absent>",
+        "dropDebugger": "<absent>",
+        "emptyOutDir": "<absent>",
+        "entry": "<cwd>/alt/main.ts",
+        "envPrefix": "<absent>",
+        "gzip": false,
+        "hashFileNames": "<absent>",
+        "host": "<absent>",
+        "html": "<absent>",
+        "legalComments": "<absent>",
+        "open": "<absent>",
+        "outDir": "<cwd>/alt-dist",
+        "port": 7000,
+        "sourcemap": "<absent>",
+        "splitting": "<absent>",
+        "strictTypeCheck": "<absent>",
+        "target": "<absent>"
+      },
+      "--config": {},
+      "--config --prod": {},
+      "--config ''": {},
+      "--port 3001": { "port": 3001 },
+      "--port": { "port": 4200 },
+      "--port --prod": { "port": 4200 },
+      "--port ''": { "port": 4200 },
+      "--host cli-host": { "host": "cli-host" },
+      "--host": { "host": "0.0.0.0" },
+      "--host --prod": { "host": "0.0.0.0" },
+      "--host ''": { "host": "0.0.0.0" },
+      "--base /cli/": { "base": "/cli/" },
+      "--base": { "base": "/" },
+      "--base --prod": { "base": "/" },
+      "--base ''": { "base": "/" },
+      "--target es2020, chrome100,,": { "target": ["es2020", "chrome100"] },
+      "--target": { "target": [] },
+      "--target --prod": { "target": [] },
+      "--target ''": { "target": [] },
+      "--env-prefix CLI_": { "envPrefix": "CLI_" },
+      "--env-prefix": { "envPrefix": "THANE_" },
+      "--env-prefix --prod": { "envPrefix": "THANE_" },
+      "--env-prefix ''": { "envPrefix": "THANE_" },
+      "--legal-comments eof": { "legalComments": "eof" },
+      "--legal-comments": { "legalComments": "none" },
+      "--legal-comments --prod": { "legalComments": "none" },
+      "--legal-comments ''": { "legalComments": "none" },
+      "--port 1 --port 2": { "port": 2 },
+      "--entry ./a.ts --entry ./b.ts": { "entry": "./b.ts" },
+      "--target es2020 --target es2022": { "target": ["es2022"] },
+      "--config ./missing.json": {
+        "analyze": "<absent>",
+        "assetsDir": "<absent>",
+        "base": "<absent>",
+        "configPath": "./missing.json",
+        "define": "<absent>",
+        "dropConsole": "<absent>",
+        "dropDebugger": "<absent>",
+        "emptyOutDir": "<absent>",
+        "entry": "<absent>",
+        "envPrefix": "<absent>",
+        "gzip": false,
+        "hashFileNames": "<absent>",
+        "host": "<absent>",
+        "html": "<absent>",
+        "legalComments": "<absent>",
+        "open": "<absent>",
+        "outDir": "<absent>",
+        "port": "<absent>",
+        "prod": false,
+        "sourcemap": "<absent>",
+        "splitting": "<absent>",
+        "strictTypeCheck": "<absent>",
+        "target": "<absent>"
+      },
+      "--port abc": { "(error)": "Invalid --port value 'abc': expected a number, e.g. --port 4200." },
+      "--port 0": { "port": 0 },
+      "--host true": { "host": "true" },
+      "--legal-comments bogus": { "legalComments": "bogus" },
+      "--prod": {},
+      "--prod stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-p": {},
+      "-p stray": { "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."] },
+      "--gzip": {},
+      "--gzip stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--drop-console": {},
+      "--drop-console stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-drop-console": { "dropConsole": false },
+      "--no-drop-console stray": {
+        "dropConsole": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--drop-debugger": {},
+      "--drop-debugger stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-drop-debugger": { "dropDebugger": false },
+      "--no-drop-debugger stray": {
+        "dropDebugger": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--sourcemap": {},
+      "--sourcemap stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-sourcemap": { "sourcemap": false },
+      "--no-sourcemap stray": {
+        "sourcemap": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--strict-type-check": {},
+      "--strict-type-check stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--open": {},
+      "--open stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-open": { "open": false },
+      "--no-open stray": {
+        "open": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--hash-file-names": {},
+      "--hash-file-names stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-hash-file-names": { "hashFileNames": false },
+      "--no-hash-file-names stray": {
+        "hashFileNames": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--empty-out-dir": {},
+      "--empty-out-dir stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-empty-out-dir": { "emptyOutDir": false },
+      "--no-empty-out-dir stray": {
+        "emptyOutDir": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--splitting": {},
+      "--splitting stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-splitting": { "splitting": false },
+      "--no-splitting stray": {
+        "splitting": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--analyze": {},
+      "--analyze stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-analyze": { "analyze": false },
+      "--no-analyze stray": {
+        "analyze": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--verbose": { "logLevel": "verbose" },
+      "--verbose stray": {
+        "logLevel": "verbose",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-V": { "logLevel": "verbose" },
+      "-V stray": {
+        "logLevel": "verbose",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--quiet": { "logLevel": "silent" },
+      "--quiet stray": {
+        "logLevel": "silent",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-q": { "logLevel": "silent" },
+      "-q stray": {
+        "logLevel": "silent",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--help": { "exitRequested": "help" },
+      "--help stray": {
+        "exitRequested": "help",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-h": { "exitRequested": "help" },
+      "-h stray": {
+        "exitRequested": "help",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--version": { "exitRequested": "version" },
+      "--version stray": {
+        "exitRequested": "version",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-v": { "exitRequested": "version" },
+      "-v stray": {
+        "exitRequested": "version",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--prod --prod": {},
+      "--drop-console --no-drop-console": { "dropConsole": false },
+      "--no-drop-console --drop-console": { "dropConsole": false },
+      "--drop-debugger --no-drop-debugger": { "dropDebugger": false },
+      "--no-drop-debugger --drop-debugger": { "dropDebugger": false },
+      "--sourcemap --no-sourcemap": { "sourcemap": false },
+      "--no-sourcemap --sourcemap": { "sourcemap": false },
+      "--open --no-open": { "open": false },
+      "--no-open --open": { "open": false },
+      "--hash-file-names --no-hash-file-names": { "hashFileNames": false },
+      "--no-hash-file-names --hash-file-names": { "hashFileNames": false },
+      "--empty-out-dir --no-empty-out-dir": { "emptyOutDir": false },
+      "--no-empty-out-dir --empty-out-dir": { "emptyOutDir": false },
+      "--splitting --no-splitting": { "splitting": false },
+      "--no-splitting --splitting": { "splitting": false },
+      "--analyze --no-analyze": { "analyze": false },
+      "--no-analyze --analyze": { "analyze": false },
+      "--verbose --quiet": { "logLevel": "silent" },
+      "--quiet --verbose": { "logLevel": "silent" },
+      "-V -q": { "logLevel": "silent" },
+      "-q -V": { "logLevel": "silent" },
+      "dev": {
+        "base": "/cfg/",
+        "command": "dev",
+        "entry": "<cwd>/cfg/dev.ts",
+        "port": 5001,
+        "prod": false,
+        "serve": true
+      },
+      "serve": { "base": "/cfg/", "command": "serve", "host": true, "serve": true },
+      "types": { "base": "/cfg/", "command": "types" },
+      "typecheck": { "base": "/cfg/", "command": "typecheck" },
+      "dev --prod": {
+        "base": "/cfg/",
+        "command": "dev",
+        "entry": "<cwd>/cfg/dev.ts",
+        "port": 5001,
+        "prod": false,
+        "serve": true
+      },
+      "serve --prod": { "base": "/cfg/", "command": "serve", "host": true, "serve": true },
+      "build dev": {},
+      "--entry dev": { "entry": "dev" },
+      "--prod serve": { "base": "/cfg/", "command": "serve", "host": true, "serve": true },
+      "--port 1 dev": {
+        "base": "/cfg/",
+        "command": "dev",
+        "entry": "<cwd>/cfg/dev.ts",
+        "port": 1,
+        "prod": false,
+        "serve": true
+      },
+      "stray": { "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."] },
+      "--nope": { "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."] },
+      "-x": { "(warnings)": ["Warning: Unknown flag '-x'. Run 'thane --help' to see available options."] },
+      "-P": { "(warnings)": ["Warning: Unknown flag '-P'. Run 'thane --help' to see available options."] },
+      "--nope value": {
+        "(warnings)": [
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options.",
+          "Warning: Unknown command 'value'. Run 'thane --help' to see available commands."
+        ]
+      },
+      "-xyz": {},
+      "---x": { "(warnings)": ["Warning: Unknown flag '---x'. Run 'thane --help' to see available options."] },
+      "--app --nope": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."
+        ]
+      },
+      "--port --port --nope": {
+        "port": 4200,
+        "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."]
+      },
+      "--entry --app --zzz": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--zzz'. Run 'thane --help' to see available options."
+        ]
+      },
+      "--prod --nope --gzip": {
+        "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."]
+      }
+    }
+  },
+  "thane.config.jsonc": {
+    "baseline": {
+      "analyze": false,
+      "assetsDir": "<cwd>/cfg2-assets",
+      "base": "/cfg2/",
+      "command": "build",
+      "configPath": "<cwd>/thane.config.jsonc",
+      "define": {},
+      "dropConsole": false,
+      "dropDebugger": false,
+      "emptyOutDir": false,
+      "entry": "<cwd>/cfg2/main.ts",
+      "envPrefix": "CFG2_",
+      "gzip": false,
+      "hashFileNames": false,
+      "host": "cfg2-host",
+      "html": "<cwd>/cfg2/index.html",
+      "legalComments": "external",
+      "logLevel": "normal",
+      "open": false,
+      "outDir": "<cwd>/cfg2-dist",
+      "port": 6000,
+      "prod": false,
+      "serve": false,
+      "sourcemap": true,
+      "splitting": false,
+      "strictTypeCheck": false,
+      "target": ["es2019", "firefox100"]
+    },
+    "rows": {
+      "--app cli-app": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown command 'cli-app'. Run 'thane --help' to see available commands."
+        ]
+      },
+      "--app": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--app --prod": {
+        "prod": true,
+        "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."]
+      },
+      "--app ''": { "(warnings)": ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."] },
+      "--entry ./cli/main.ts": { "entry": "./cli/main.ts" },
+      "--entry": {},
+      "--entry --prod": { "prod": true },
+      "--entry ''": {},
+      "--out ./cli-dist": { "outDir": "./cli-dist" },
+      "--out": {},
+      "--out --prod": { "prod": true },
+      "--out ''": {},
+      "--assets ./cli-assets": { "assetsDir": "./cli-assets" },
+      "--assets": {},
+      "--assets --prod": { "prod": true },
+      "--assets ''": {},
+      "--html ./cli/index.html": { "html": "./cli/index.html" },
+      "--html": {},
+      "--html --prod": { "prod": true },
+      "--html ''": {},
+      "--config ./alt.config.json": {
+        "analyze": "<absent>",
+        "assetsDir": "<absent>",
+        "base": "<absent>",
+        "configPath": "<cwd>/alt.config.json",
+        "define": "<absent>",
+        "dropConsole": "<absent>",
+        "dropDebugger": "<absent>",
+        "emptyOutDir": "<absent>",
+        "entry": "<cwd>/alt/main.ts",
+        "envPrefix": "<absent>",
+        "hashFileNames": "<absent>",
+        "host": "<absent>",
+        "html": "<absent>",
+        "legalComments": "<absent>",
+        "open": "<absent>",
+        "outDir": "<cwd>/alt-dist",
+        "port": 7000,
+        "prod": true,
+        "sourcemap": "<absent>",
+        "splitting": "<absent>",
+        "strictTypeCheck": "<absent>",
+        "target": "<absent>"
+      },
+      "--config": {},
+      "--config --prod": { "prod": true },
+      "--config ''": {},
+      "--port 3001": { "port": 3001 },
+      "--port": { "port": 4200 },
+      "--port --prod": { "port": 4200, "prod": true },
+      "--port ''": { "port": 4200 },
+      "--host cli-host": { "host": "cli-host" },
+      "--host": { "host": "0.0.0.0" },
+      "--host --prod": { "host": "0.0.0.0", "prod": true },
+      "--host ''": { "host": "0.0.0.0" },
+      "--base /cli/": { "base": "/cli/" },
+      "--base": { "base": "/" },
+      "--base --prod": { "base": "/", "prod": true },
+      "--base ''": { "base": "/" },
+      "--target es2020, chrome100,,": { "target": ["es2020", "chrome100"] },
+      "--target": { "target": [] },
+      "--target --prod": { "prod": true, "target": [] },
+      "--target ''": { "target": [] },
+      "--env-prefix CLI_": { "envPrefix": "CLI_" },
+      "--env-prefix": { "envPrefix": "THANE_" },
+      "--env-prefix --prod": { "envPrefix": "THANE_", "prod": true },
+      "--env-prefix ''": { "envPrefix": "THANE_" },
+      "--legal-comments eof": { "legalComments": "eof" },
+      "--legal-comments": { "legalComments": "none" },
+      "--legal-comments --prod": { "legalComments": "none", "prod": true },
+      "--legal-comments ''": { "legalComments": "none" },
+      "--port 1 --port 2": { "port": 2 },
+      "--entry ./a.ts --entry ./b.ts": { "entry": "./b.ts" },
+      "--target es2020 --target es2022": { "target": ["es2022"] },
+      "--config ./missing.json": {
+        "analyze": "<absent>",
+        "assetsDir": "<absent>",
+        "base": "<absent>",
+        "configPath": "./missing.json",
+        "define": "<absent>",
+        "dropConsole": "<absent>",
+        "dropDebugger": "<absent>",
+        "emptyOutDir": "<absent>",
+        "entry": "<absent>",
+        "envPrefix": "<absent>",
+        "hashFileNames": "<absent>",
+        "host": "<absent>",
+        "html": "<absent>",
+        "legalComments": "<absent>",
+        "open": "<absent>",
+        "outDir": "<absent>",
+        "port": "<absent>",
+        "sourcemap": "<absent>",
+        "splitting": "<absent>",
+        "strictTypeCheck": "<absent>",
+        "target": "<absent>"
+      },
+      "--port abc": { "(error)": "Invalid --port value 'abc': expected a number, e.g. --port 4200." },
+      "--port 0": { "port": 0 },
+      "--host true": { "host": "true" },
+      "--legal-comments bogus": { "legalComments": "bogus" },
+      "--prod": { "prod": true },
+      "--prod stray": {
+        "prod": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-p": { "prod": true },
+      "-p stray": {
+        "prod": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--gzip": { "gzip": true },
+      "--gzip stray": {
+        "gzip": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--drop-console": { "dropConsole": true },
+      "--drop-console stray": {
+        "dropConsole": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-drop-console": {},
+      "--no-drop-console stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--drop-debugger": { "dropDebugger": true },
+      "--drop-debugger stray": {
+        "dropDebugger": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-drop-debugger": {},
+      "--no-drop-debugger stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--sourcemap": {},
+      "--sourcemap stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-sourcemap": { "sourcemap": false },
+      "--no-sourcemap stray": {
+        "sourcemap": false,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--strict-type-check": { "strictTypeCheck": true },
+      "--strict-type-check stray": {
+        "strictTypeCheck": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--open": { "open": true },
+      "--open stray": {
+        "open": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-open": {},
+      "--no-open stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--hash-file-names": { "hashFileNames": true },
+      "--hash-file-names stray": {
+        "hashFileNames": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-hash-file-names": {},
+      "--no-hash-file-names stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--empty-out-dir": { "emptyOutDir": true },
+      "--empty-out-dir stray": {
+        "emptyOutDir": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-empty-out-dir": {},
+      "--no-empty-out-dir stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--splitting": { "splitting": true },
+      "--splitting stray": {
+        "splitting": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-splitting": {},
+      "--no-splitting stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--analyze": { "analyze": true },
+      "--analyze stray": {
+        "analyze": true,
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--no-analyze": {},
+      "--no-analyze stray": {
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--verbose": { "logLevel": "verbose" },
+      "--verbose stray": {
+        "logLevel": "verbose",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-V": { "logLevel": "verbose" },
+      "-V stray": {
+        "logLevel": "verbose",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--quiet": { "logLevel": "silent" },
+      "--quiet stray": {
+        "logLevel": "silent",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-q": { "logLevel": "silent" },
+      "-q stray": {
+        "logLevel": "silent",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--help": { "exitRequested": "help" },
+      "--help stray": {
+        "exitRequested": "help",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-h": { "exitRequested": "help" },
+      "-h stray": {
+        "exitRequested": "help",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--version": { "exitRequested": "version" },
+      "--version stray": {
+        "exitRequested": "version",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "-v": { "exitRequested": "version" },
+      "-v stray": {
+        "exitRequested": "version",
+        "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."]
+      },
+      "--prod --prod": { "prod": true },
+      "--drop-console --no-drop-console": {},
+      "--no-drop-console --drop-console": {},
+      "--drop-debugger --no-drop-debugger": {},
+      "--no-drop-debugger --drop-debugger": {},
+      "--sourcemap --no-sourcemap": { "sourcemap": false },
+      "--no-sourcemap --sourcemap": { "sourcemap": false },
+      "--open --no-open": {},
+      "--no-open --open": {},
+      "--hash-file-names --no-hash-file-names": {},
+      "--no-hash-file-names --hash-file-names": {},
+      "--empty-out-dir --no-empty-out-dir": {},
+      "--no-empty-out-dir --empty-out-dir": {},
+      "--splitting --no-splitting": {},
+      "--no-splitting --splitting": {},
+      "--analyze --no-analyze": {},
+      "--no-analyze --analyze": {},
+      "--verbose --quiet": { "logLevel": "silent" },
+      "--quiet --verbose": { "logLevel": "silent" },
+      "-V -q": { "logLevel": "silent" },
+      "-q -V": { "logLevel": "silent" },
+      "dev": { "command": "dev", "serve": true, "sourcemap": false },
+      "serve": { "command": "serve", "port": 6001, "serve": true, "sourcemap": false },
+      "types": { "command": "types", "sourcemap": false },
+      "typecheck": { "command": "typecheck", "sourcemap": false },
+      "dev --prod": { "command": "dev", "serve": true, "sourcemap": false },
+      "serve --prod": { "command": "serve", "port": 6001, "prod": true, "serve": true, "sourcemap": false },
+      "build dev": {},
+      "--entry dev": { "entry": "dev" },
+      "--prod serve": { "command": "serve", "port": 6001, "prod": true, "serve": true, "sourcemap": false },
+      "--port 1 dev": { "command": "dev", "port": 1, "serve": true, "sourcemap": false },
+      "stray": { "(warnings)": ["Warning: Unknown command 'stray'. Run 'thane --help' to see available commands."] },
+      "--nope": { "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."] },
+      "-x": { "(warnings)": ["Warning: Unknown flag '-x'. Run 'thane --help' to see available options."] },
+      "-P": { "(warnings)": ["Warning: Unknown flag '-P'. Run 'thane --help' to see available options."] },
+      "--nope value": {
+        "(warnings)": [
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options.",
+          "Warning: Unknown command 'value'. Run 'thane --help' to see available commands."
+        ]
+      },
+      "-xyz": {},
+      "---x": { "(warnings)": ["Warning: Unknown flag '---x'. Run 'thane --help' to see available options."] },
+      "--app --nope": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."
+        ]
+      },
+      "--port --port --nope": {
+        "port": 4200,
+        "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."]
+      },
+      "--entry --app --zzz": {
+        "(warnings)": [
+          "Warning: Unknown flag '--app'. Run 'thane --help' to see available options.",
+          "Warning: Unknown flag '--zzz'. Run 'thane --help' to see available options."
+        ]
+      },
+      "--prod --nope --gzip": {
+        "gzip": true,
+        "prod": true,
+        "(warnings)": ["Warning: Unknown flag '--nope'. Run 'thane --help' to see available options."]
+      }
+    }
+  }
+}

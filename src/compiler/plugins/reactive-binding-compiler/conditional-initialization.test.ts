@@ -12,7 +12,8 @@ describe('conditional initialization', () => {
 
     expect(processedContent).not.toContain('data-testid="else-branch"');
     expect(processedContent).not.toContain('data-testid="then-branch"');
-    expect(processedContent.match(/<template id="b\d+"><\/template>/g)?.length).toBe(2);
+    // Three anchors with nothing between them: the runtime picks the branch at mount
+    expect(processedContent).toMatch(/^<!--(b\d+)\(--><!--\1\|--><!--\1\)-->$/);
   });
 
   test('signal conditions without a known compile-time initializer defer initial branch selection', () => {
@@ -22,7 +23,7 @@ describe('conditional initialization', () => {
 
     expect(processedContent).not.toContain('data-testid="else-branch"');
     expect(processedContent).not.toContain('data-testid="then-branch"');
-    expect(processedContent.match(/<template id="b\d+"><\/template>/g)?.length).toBe(2);
+    expect(processedContent).toMatch(/^<!--(b\d+)\(--><!--\1\|--><!--\1\)-->$/);
   });
 
   test('constant whenElse expressions still pre-render the chosen branch', () => {
@@ -32,7 +33,8 @@ describe('conditional initialization', () => {
 
     expect(processedContent).toContain('data-testid="then-branch"');
     expect(processedContent).not.toContain('data-testid="else-branch">else</p>');
-    expect(processedContent.match(/<template id="b\d+"><\/template>/g)?.length).toBe(1);
+    // The then branch between the first two anchors, nothing between the last two
+    expect(processedContent).toMatch(/^<!--(b\d+)\(--><p data-testid="then-branch">then<\/p><!--\1\|--><!--\1\)-->$/);
   });
 
   test('template literal expressions with nested object literals are parsed intact', () => {
@@ -63,7 +65,7 @@ describe('conditional initialization', () => {
     expect(result.conditionals[0]?.nestedBindings).toHaveLength(1);
   });
 
-  test('statically pre-rendered nested whenElse branches carry their branch id for runtime lookup', () => {
+  test('a statically pre-rendered nested whenElse branch sits between its first two anchors', () => {
     const inits = new Map<string, string | number | boolean>([['flag', true]]);
     const template = '<div>${whenElse(flag(), html`<p>nested-then</p>`, html`<p>nested-else</p>`)}</div>';
 
@@ -72,10 +74,11 @@ describe('conditional initialization', () => {
     expect(result.whenElseBlocks).toHaveLength(1);
     const we = result.whenElseBlocks[0]!;
     expect(we.initialValue).toBe(true);
-    // Pre-rendered then branch must be findable by the runtime IF_EXPR binding
-    expect(result.processedContent).toContain(`<p id="${we.thenId}">nested-then</p>`);
-    // Deferred else branch stays a placeholder
-    expect(result.processedContent).toContain(`<template id="${we.elseId}"></template>`);
+    // The pre-rendered then branch is what the runtime finds between the first two anchors, and the
+    // deferred else branch leaves nothing between the last two
+    expect(result.processedContent).toBe(
+      `<div><!--${we.thenId}(--><p>nested-then</p><!--${we.thenId}|--><!--${we.thenId})--></div>`,
+    );
   });
 
   test('whenElse nested inside a whenElse branch is collected once and does not corrupt adjacent content', () => {

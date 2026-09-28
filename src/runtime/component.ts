@@ -43,8 +43,11 @@ export type ComponentReturnType = {
 
 /** @internal */
 interface InternalComponentResult extends ComponentReturnType {
-  /** Compiler-injected binding initializer (short name for bundle size) */
-  __b?: (ctx: ComponentContext) => (() => void) | void;
+  /**
+   * Compiler-injected binding initializer (short name for bundle size). It receives the elements
+   * of the template it binds, in document order, taken from the clone before it is inserted.
+   */
+  __b?: (ctx: ComponentContext, elements: NodeListOf<Element>) => (() => void) | void;
 }
 
 /** Setup function signature for defineComponent. */
@@ -60,13 +63,19 @@ interface ComponentInstance {
 /** @internal */
 interface ComponentRef {
   __f: (target: HTMLElement, props?: any, extras?: { route?: UntypedRouteContext | undefined }) => ComponentInstance;
-  [templateName: string]: unknown;
 }
 
 /** @internal */
 interface SetupWithSelector<P = {}, S extends string = string> extends SetupFunction<P, S> {
   __selector: string;
 }
+
+/** @internal — A `<template>` holding `html`: every compiled template (component, list row, empty list) is one. */
+export const __T = (html: string): HTMLTemplateElement => {
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  return t;
+};
 
 let _getRouteContext: (() => UntypedRouteContext) | undefined;
 
@@ -79,33 +88,23 @@ export function __setRouteContextProvider(provider: () => UntypedRouteContext): 
 // Style Management
 // ============================================================================
 
+const skipString = (s: string, i: number): number => {
+  const q = s[i];
+  while (++i < s.length && !(s[i] === q && s[i - 1] !== '\\'));
+  return i;
+};
+
 function splitSelectorList(selectorList: string): string[] {
   const parts: string[] = [];
   let start = 0;
   let parenDepth = 0;
   let bracketDepth = 0;
-  let inSingle = false;
-  let inDouble = false;
 
   for (let i = 0; i < selectorList.length; i++) {
     const ch = selectorList[i];
-    const prev = i > 0 ? selectorList[i - 1] : '';
 
-    if (inSingle) {
-      if (ch === "'" && prev !== '\\') inSingle = false;
-      continue;
-    }
-    if (inDouble) {
-      if (ch === '"' && prev !== '\\') inDouble = false;
-      continue;
-    }
-
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-    if (ch === '"') {
-      inDouble = true;
+    if (ch === "'" || ch === '"') {
+      i = skipString(selectorList, i);
       continue;
     }
 
@@ -133,7 +132,7 @@ function scopeSingleSelector(selector: string, hostSelector: string): string {
   }
 
   if (trimmed.startsWith(':host(')) {
-    const end = trimmed.indexOf(')');
+    const end = findMatchingBrace(trimmed, ':host'.length);
     if (end !== -1) {
       const hostSuffix = trimmed.slice(':host('.length, end).trim();
       const rest = trimmed.slice(end + 1);
@@ -147,35 +146,22 @@ function scopeSingleSelector(selector: string, hostSelector: string): string {
   return `${hostSelector} ${trimmed}`;
 }
 
+// The `}` or `)` that closes the `{` or `(` at openIndex, outside strings; -1 if none
 function findMatchingBrace(source: string, openIndex: number): number {
+  const open = source[openIndex];
+  const close = open === '(' ? ')' : '}';
   let depth = 0;
-  let inSingle = false;
-  let inDouble = false;
 
   for (let i = openIndex; i < source.length; i++) {
     const ch = source[i];
-    const prev = i > 0 ? source[i - 1] : '';
 
-    if (inSingle) {
-      if (ch === "'" && prev !== '\\') inSingle = false;
-      continue;
-    }
-    if (inDouble) {
-      if (ch === '"' && prev !== '\\') inDouble = false;
+    if (ch === "'" || ch === '"') {
+      i = skipString(source, i);
       continue;
     }
 
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-    if (ch === '"') {
-      inDouble = true;
-      continue;
-    }
-
-    if (ch === '{') depth++;
-    if (ch === '}') {
+    if (ch === open) depth++;
+    if (ch === close) {
       depth--;
       if (depth === 0) return i;
     }
@@ -184,7 +170,7 @@ function findMatchingBrace(source: string, openIndex: number): number {
   return -1;
 }
 
-function scopeCssRules(cssText: string, hostSelector: string): string {
+export function scopeCssRules(cssText: string, hostSelector: string): string {
   let out = '';
   let cursor = 0;
 
@@ -212,13 +198,7 @@ function scopeCssRules(cssText: string, hostSelector: string): string {
     }
 
     if (preludeTrimmed.startsWith('@')) {
-      if (
-        preludeTrimmed.startsWith('@media') ||
-        preludeTrimmed.startsWith('@supports') ||
-        preludeTrimmed.startsWith('@layer') ||
-        preludeTrimmed.startsWith('@container') ||
-        preludeTrimmed.startsWith('@document')
-      ) {
+      if (/^@(media|supports|layer|container|document)/.test(preludeTrimmed)) {
         out += `${prelude}{${scopeCssRules(body, hostSelector)}}`;
       } else {
         out += `${prelude}{${body}}`;
@@ -298,8 +278,6 @@ export function defineComponent<P extends ComponentProps = {}, const S extends s
 export function defineComponent<P extends ComponentProps = {}>(
   selectorOrSetup: string | SetupFunction<P, any>,
   maybeSetup?: SetupFunction<P, any> | any,
-  __compiledTemplate?: HTMLTemplateElement,
-  ...extraStaticTemplates: any[]
 ): ComponentHTMLSelector<P> {
   let selector: string;
   let setup: SetupFunction<P, any>;
@@ -316,16 +294,6 @@ export function defineComponent<P extends ComponentProps = {}>(
         'defineComponent: could not resolve selector. ' +
           'Either pass an explicit selector string or ensure the compiler auto-derives it from the export name.',
       );
-    }
-  }
-
-  // Collect extra static templates (for repeat optimizations)
-  const staticTemplatesMap = new Map<string, HTMLTemplateElement>();
-  for (let i = 0; i < extraStaticTemplates.length; i += 2) {
-    const name = extraStaticTemplates[i];
-    const tpl = extraStaticTemplates[i + 1];
-    if (typeof name === 'string' && tpl) {
-      staticTemplatesMap.set(name, tpl);
     }
   }
 
@@ -358,17 +326,14 @@ export function defineComponent<P extends ComponentProps = {}>(
     }
 
     // Apply template
-    if (__compiledTemplate) {
-      // Use pre-compiled static template (injected by the compiler)
-      root.appendChild(__compiledTemplate.content.cloneNode(true));
-    } else if (result.template) {
+    if (result.template) {
       root.innerHTML = result.template;
     }
 
     // Initialize reactive bindings (injected by the compiler into the return object)
     let bindingsCleanup: (() => void) | void | undefined;
     if (result.__b) {
-      bindingsCleanup = result.__b(ctx);
+      bindingsCleanup = result.__b(ctx, root.querySelectorAll('*'));
     }
 
     // Lifecycle: onMount
@@ -387,14 +352,11 @@ export function defineComponent<P extends ComponentProps = {}>(
     return instance;
   };
 
-  // Return a ref object compatible with mount() and repeat template lookups.
+  // Return a ref object compatible with mount().
   // The cast is necessary: ComponentRef is the runtime shape, but the public
   // type includes the (props: P) => string call-signature that the compiler
   // generates at compile time — there is no way to satisfy it at runtime.
   const ref: ComponentRef = { __f: factory };
-  for (const [name, tpl] of staticTemplatesMap) {
-    ref[name] = tpl;
-  }
   return ref as unknown as ComponentHTMLSelector<P>;
 }
 
@@ -416,7 +378,6 @@ export function __registerComponent(
   selector: string,
   setup: SetupFunction,
   compiledTemplate: HTMLTemplateElement,
-  ...extraStaticTemplates: any[]
 ): any {
   let stylesRegistered = false;
 
@@ -440,8 +401,11 @@ export function __registerComponent(
       stylesRegistered = true;
     }
 
-    root.appendChild(compiledTemplate.content.cloneNode(true));
-    const bindingsCleanup = result.__b ? result.__b(ctx) : undefined;
+    // The template's elements are listed before the clone is inserted: the target may hold other nodes
+    const clone = compiledTemplate.content.cloneNode(true) as DocumentFragment;
+    const elements = clone.querySelectorAll('*');
+    root.append(clone);
+    const bindingsCleanup = result.__b?.(ctx, elements);
     if (result.onMount) result.onMount();
 
     const instance: ComponentInstance = { root };
@@ -454,22 +418,17 @@ export function __registerComponent(
     return instance;
   };
 
-  const ref: ComponentRef = { __f: factory };
-  for (let i = 0; i < extraStaticTemplates.length; i += 2) {
-    ref[extraStaticTemplates[i]] = extraStaticTemplates[i + 1];
-  }
-  return ref;
+  return { __f: factory };
 }
 
 /**
- * Lean component registration — no styles, no lifecycle hooks, no extra templates.
+ * Lean component registration — no styles, no lifecycle hooks.
  *
  * The compiler emits this variant when `stripDeadPropertiesAndDetectFeatures`
  * confirms the component has no `styles` property and no non-empty lifecycle
  * hooks.  Because the lean function never references `_onStyles`, esbuild
  * can tree-shake the entire styles subsystem when no component in the app
- * uses it.  The extra-templates for-loop is omitted because the generated
- * binding code captures repeat templates directly via closure.
+ * uses it.
  *
  * @internal — emitted by the compiler; not part of the public API.
  */
@@ -491,8 +450,11 @@ export function __registerComponentLean(
       route: (extras?.route ?? _getRouteContext?.()) as RouteContextForSelector<any>,
     };
     const result = setup(ctx) as InternalComponentResult;
-    root.appendChild(compiledTemplate.content.cloneNode(true));
-    const bindingsCleanup = result.__b ? result.__b(ctx) : undefined;
+    // The template's elements are listed before the clone is inserted: the target may hold other nodes
+    const clone = compiledTemplate.content.cloneNode(true) as DocumentFragment;
+    const elements = clone.querySelectorAll('*');
+    root.append(clone);
+    const bindingsCleanup = result.__b?.(ctx, elements);
     const instance: ComponentInstance = { root };
     if (bindingsCleanup) instance.__bindingsCleanup = bindingsCleanup;
     return instance;
@@ -552,7 +514,7 @@ export function mountComponent(
   // store the factory as __f on the ref.
   const factory:
     | ((t: HTMLElement, p?: Record<string, any>, e?: { route?: UntypedRouteContext | undefined }) => ComponentInstance)
-    | undefined = (component as unknown as ComponentRef).__f;
+    | undefined = (component as unknown as ComponentRef | undefined)?.__f;
   if (!factory) {
     throw new Error('Invalid mount component');
   }

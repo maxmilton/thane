@@ -142,7 +142,8 @@ export const Timer = defineComponent(() => {
 **Important:** `onDestroy` fires when:
 
 - `mount().destroy()` is called
-- A `when()` directive hides the component
+- A `when()` or `whenElse()` directive hides the component
+- The `repeat()` row that holds it is removed, or the list itself goes away with its branch or component
 - The router navigates away from the route containing the component
 - A parent component is destroyed (destruction propagates to children)
 
@@ -217,6 +218,29 @@ These two `Counter` instances maintain their own signal values.
 ## One Component Per File
 
 The compiler enforces one `defineComponent` per file (lint rule THANE407). This ensures each component gets a unique selector and avoids ambiguity in the compilation pipeline.
+
+## One Return Object
+
+A setup function returns one object (lint rule THANE412). The compiler builds one static template per component, so a setup cannot choose between templates with early returns. Choose inside the template instead:
+
+```typescript
+// ❌ BAD — two return objects
+export const Profile = defineComponent(() => {
+  const user = signal<User | null>(null);
+  if (!user()) return { template: html`<p>Loading…</p>` };
+  return { template: html`<p>${user()!.name}</p>` };
+});
+
+// ✅ GOOD — one return object; whenElse() picks the branch
+export const Profile = defineComponent(() => {
+  const user = signal<User | null>(null);
+  return {
+    template: html`${whenElse(user() === null, html`<p>Loading…</p>`, html`<p>${user()?.name}</p>`)}`,
+  };
+});
+```
+
+Returns inside nested functions, such as event handlers and helpers defined in the setup, are not affected.
 
 ## Expression-Body Syntax
 

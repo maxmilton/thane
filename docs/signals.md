@@ -1,6 +1,6 @@
 # Signals
 
-Signals are the core reactive primitive in Thane. A signal holds a value and notifies subscribers when it changes. The runtime uses push-based notification with automatic batching for glitch-free updates.
+Signals are the core reactive primitive in Thane. A signal holds a value and notifies subscribers when it changes. The runtime uses push-based notification: a write notifies its subscribers synchronously, and a write made while subscribers are running is notified after they finish.
 
 ## Creating a Signal
 
@@ -56,6 +56,23 @@ unsubscribe();
 
 `.subscribe()` returns an unsubscribe function. Calling it removes the listener immediately.
 
+### Writes Inside Subscribers
+
+A subscriber (or effect) may write other signals. The new value is stored at once, so a read sees it, but its notification waits until every subscriber of the signal being notified has run. The waiting signals are then notified one after the other, each one's own follow-up writes being notified before the next signal's subscribers run. A signal set several times in one such cascade is notified once, with its last value.
+
+```typescript
+const a = signal(0);
+const b = signal(0);
+
+a.subscribe((v) => b(v * 10), true); // writes b while a is notifying
+a.subscribe((v) => console.log('a2 sees b =', b()), true);
+b.subscribe((v) => console.log('b is now', v), true);
+
+a(1);
+// "a2 sees b = 10"  (b already holds its new value)
+// "b is now 10"     (b's subscribers run after a's)
+```
+
 ---
 
 ## Computed Signals
@@ -78,9 +95,29 @@ fullName(); // 'Jane Doe'
 Computed signals:
 
 - **Pull-on-read** — re-evaluation only happens when you read the value after a dependency changed. If nobody reads, no work is done.
-- **Dirty-marking** — prevents diamond dependency glitches. Dependencies mark the computed as dirty; actual re-evaluation is deferred until the next read.
+- **Dirty-marking** — a dependency that notifies marks the computed dirty; re-evaluation is deferred until the next read. A computed over two computeds that share a source (a diamond) notifies its own subscribers once, with the final value.
 - **Differential tracking** — if a re-evaluation reads different signals than before, subscriptions are updated automatically. New deps are added, old deps are removed.
 - **Subscribe** — computeds expose `.subscribe()` just like regular signals.
+
+A computed is only marked dirty when its dependency notifies it, so while that notification is still waiting, a read returns the previous value. That happens in two places:
+
+- **Inside a `batch()` function.** The batch holds every notification back until it ends, so a computed read inside the function is stale; read it after `batch()` returns.
+- **While subscribers run.** A subscriber that writes a signal and then reads a computed over it sees the old value, because the signal is notified only after the current subscribers finish. The same holds for a computed built on other computeds, read in a subscriber of their source.
+
+```typescript
+import { signal, computed, batch } from 'thane';
+
+const price = signal(10);
+const doubled = computed(() => price() * 2);
+
+batch(() => {
+  price(20);
+  doubled(); // 20 — the previous value
+});
+doubled(); // 40
+```
+
+Where the new value is needed at once, read the source signals directly.
 
 ### Disposing a Computed
 
@@ -134,11 +171,12 @@ import { signal, batch } from 'thane';
 const first = signal('John');
 const last = signal('Doe');
 
-// Without batch: subscribers fire twice (once per signal write)
+// Without batch: each write notifies at once, so a subscriber of `first`
+// sees the old `last` value
 first('Jane');
 last('Smith');
 
-// With batch: subscribers fire once after both values are set
+// With batch: both values are set before anything is notified
 batch(() => {
   first('Jane');
   last('Smith');
@@ -148,9 +186,10 @@ batch(() => {
 Key behaviors:
 
 - Signal values are updated **immediately** inside the batch — reads see the new value right away.
-- Notifications are **deferred** until the outermost batch ends.
+- Notifications are **deferred** until the outermost batch ends. Each changed signal is then notified **once**, with its final value, in the order the signals were first set. An effect that reads several of them runs once per changed signal, and sees the final values every time; a `computed` over several of them notifies once.
 - Batches **nest** — only the outermost batch triggers notifications.
-- Cascading updates (signals set during notification) are auto-batched and flushed iteratively, up to a **maximum depth of 100** to catch circular dependencies.
+- A `batch()` called inside a subscriber notifies its signals, and any signal the cascade set before it, before it returns. The follow-up writes their subscribers make wait, like any write inside a subscriber, until the outer notification has finished.
+- A `computed` read inside the batch function returns its previous value (see [Computed Signals](#computed-signals)).
 
 ---
 
@@ -180,15 +219,15 @@ display(); // still 'Count: 5' — label wasn't tracked
 
 ---
 
-## Circular Dependency Detection
+## Circular Dependencies
 
-If cascading signal updates form a cycle, Thane detects it after 100 iterations and throws:
+Thane does not detect cycles. When subscribers keep setting each other's signals, each round of the cascade runs one level deeper on the call stack, so a cycle that never settles ends in a stack overflow:
 
 ```
-Error: Circular signal dependency
+RangeError: Maximum call stack size exceeded
 ```
 
-This typically indicates signals subscribing to and setting each other in an infinite loop.
+After that the runtime's bookkeeping can be left broken, so that later writes are never notified: treat a cycle as a bug to fix, not an error to catch. A cascade that settles, such as two signals that set each other until a limit is reached, runs to the end; a very long one can still overflow the stack.
 
 ---
 

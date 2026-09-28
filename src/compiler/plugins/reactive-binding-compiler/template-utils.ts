@@ -5,18 +5,23 @@
  * eliminate ~300 lines of near-identical conditional/whenElse/edit logic.
  */
 
+import ts from 'typescript';
 import type { Range } from '../../types.js';
+import { ErrorCode } from '../../errors.js';
+import { createSourceFile } from '../../utils/ast-utils.js';
 import type { ConditionalBlock, WhenElseBlock, RepeatBlock, BindingInfo, EventBinding } from './types.js';
 import {
   findElementsWithWhenDirective,
   walkElements,
   getElementHtml,
-  injectIdIntoFirstElement,
-  firstElementId,
+  escapeRawTemplateLiteral,
   type HtmlElement,
   type ParsedTemplate,
+  type BindingInfo as ParsedBindingInfo,
 } from '../../utils/html-parser/index.js';
+import { outsideVerbatim } from '../minification/template-minifier.js';
 import { safeEvaluateCondition } from './template-processing.js';
+import type { processItemTemplate } from './repeat-analysis.js';
 
 // ============================================================================
 // Shared types
@@ -30,6 +35,28 @@ export interface IdState {
   /** Map from HtmlElement → assigned binding ID */
   elementIdMap: Map<HtmlElement, string>;
 }
+
+/**
+ * The attribute that marks a bound element while its template is compiled (A1-2): the element's
+ * position in the emitted template is computed from it, and the emitted HTML carries none. It is
+ * never the developer's `id`, which stays on its element and is not used to find it.
+ */
+export const BOUND_MARK = 'data-thane-ref';
+
+/**
+ * The comment that marks an anchor while its template is compiled: a `when()` sits between `(` and
+ * `)`, a `whenElse()` has `(` then-branch `|` else-branch `)` (A1-3), and `.` is a single anchor, the
+ * end of a list or the place of a child component (A1-4), each with the directive's id. A text
+ * binding's marker is the id alone (`<!--b3-->`, the text node after it is the binding's). The
+ * emitted HTML carries the same comments without data (`<!---->`).
+ */
+export const anchorMark = (id: string, kind: '(' | '|' | ')' | '.'): string => `<!--${id}${kind}-->`;
+
+/** A template without its bound-element marks. */
+export const stripBoundMarks = (html: string): string => html.replace(/ data-thane-ref="[^"]*"/g, '');
+
+/** A template without its compile-time marks: the HTML that is emitted, which holds no id (A1-4). */
+export const stripMarks = (html: string): string => stripBoundMarks(html).replace(/<!--[ib]\d+[(|).]?-->/g, '<!---->');
 
 export interface TemplateEdit {
   start: number;
@@ -47,14 +74,11 @@ export interface SubTemplateResult {
   conditionals: ConditionalBlock[];
   whenElseBlocks: WhenElseBlock[];
   repeatBlocks: RepeatBlock[];
-  eventBindings?: EventBinding[];
+  eventBindings: EventBinding[];
   nextId: number;
 }
 
-/**
- * Processes a directive sub-template. `parentId` is the id the sub-template's
- * root element must carry so the runtime can locate it.
- */
+/** Processes a directive sub-template; `parentId` is the directive's (or branch's) id. */
 export type SubTemplateProcessor = (template: string, parentId: string) => SubTemplateResult;
 
 // ============================================================================
@@ -155,9 +179,8 @@ export const collectConditionalBlocks = (
     const signalNames = [
       ...new Set([...(whenBinding.signalNames || [whenBinding.signalName]), ...(rewritten?.extraSignals ?? [])]),
     ].filter((s) => s !== '');
-    // Reuse user-defined ID if the element already has one, otherwise generate a compiler ID
-    const existingId = condEl.attributes.get('id');
-    const conditionalId = existingId ? existingId.value : `b${state.idCounter++}`;
+    // The directive's id is the compiler's: a developer's id stays on the element (A1-3)
+    const conditionalId = `b${state.idCounter++}`;
     state.elementIdMap.set(condEl, conditionalId);
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
     const base = {
@@ -177,12 +200,12 @@ export const collectConditionalBlocks = (
     state.idCounter = processed.nextId;
     conditionals.push({
       ...base,
-      templateContent: injectIdIntoFirstElement(processed.processedContent, conditionalId),
+      templateContent: processed.processedContent,
       nestedBindings: processed.bindings,
       nestedConditionals: processed.conditionals,
       nestedWhenElse: processed.whenElseBlocks,
       nestedRepeats: processed.repeatBlocks,
-      nestedEventBindings: processed.eventBindings ?? [],
+      nestedEventBindings: processed.eventBindings,
     });
     bindings.push(...processed.bindings);
   }
@@ -216,9 +239,9 @@ export const collectWhenElseBlocks = (
     const signalNames = [
       ...new Set([...(binding.signalNames || [binding.signalName]), ...(rewritten?.extraSignals ?? [])]),
     ].filter((s) => s !== '');
-    // A branch root's own id is the branch id: nothing is injected and the id survives
-    const thenId = firstElementId(binding.thenTemplate) ?? `b${state.idCounter++}`;
-    const elseId = firstElementId(binding.elseTemplate) ?? `b${state.idCounter++}`;
+    // The branches' ids are the compiler's; a branch's root keeps any id of its own (A1-3)
+    const thenId = `b${state.idCounter++}`;
+    const elseId = `b${state.idCounter++}`;
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
 
     const thenProcessed = processSubTemplate(binding.thenTemplate, thenId);
@@ -241,8 +264,8 @@ export const collectWhenElseBlocks = (
       elseBindings: elseProcessed.bindings,
       thenRepeats: thenProcessed.repeatBlocks,
       elseRepeats: elseProcessed.repeatBlocks,
-      thenEventBindings: thenProcessed.eventBindings ?? [],
-      elseEventBindings: elseProcessed.eventBindings ?? [],
+      thenEventBindings: thenProcessed.eventBindings,
+      elseEventBindings: elseProcessed.eventBindings,
       thenConditionals: thenProcessed.conditionals,
       elseConditionals: elseProcessed.conditionals,
       thenWhenElse: thenProcessed.whenElseBlocks,
@@ -254,18 +277,86 @@ export const collectWhenElseBlocks = (
 };
 
 // ============================================================================
-// buildRangeOverlapChecker
+// toRepeatBlock
 // ============================================================================
 
-// Re-export Range from shared compiler types for backward compatibility
-export type { Range } from '../../types.js';
+/** A repeat()'s empty template with its whitespace collapsed (outside verbatim elements). */
+export const collapseEmptyTemplate = (template: string): string =>
+  outsideVerbatim(template, (t) => t.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim());
+
+const _componentRowRe = /^\s*([A-Za-z_$][\w$]*)\((.*)\)\s*$/s;
+
+/**
+ * A row that is a component call (`(item) => Card({ item })`): the component and its props as
+ * written. Read from the row template before processing, which treats every `${…}` in it as row
+ * markup (H-44).
+ */
+const componentRowOf = (rowTemplate: string): RepeatBlock['componentRow'] => {
+  const match = _componentRowRe.exec(rowTemplate.trim());
+  return match ? { componentName: match[1]!, propsExpression: match[2]?.trim() || '{}' } : undefined;
+};
+
+/**
+ * A repeat()'s empty template, its third argument, collapsed. A function there is a key function
+ * written third, which would become the empty template's markup and leave the list keyed by index:
+ * it is a build error (H-54).
+ */
+const emptyTemplateOf = (binding: ParsedBindingInfo): string | undefined => {
+  if (!binding.emptyTemplate) return undefined;
+  const [statement] = createSourceFile('__repeat.ts', binding.fullExpression.replace(/^\$\{|\}$/g, '')).statements;
+  const call = statement && ts.isExpressionStatement(statement) ? statement.expression : undefined;
+  const third = call && ts.isCallExpression(call) ? call.arguments[2] : undefined;
+  if (third && (ts.isArrowFunction(third) || ts.isFunctionExpression(third))) {
+    throw new Error(
+      `${ErrorCode.REPEAT_EMPTY_TEMPLATE_FUNCTION}: the third argument of repeat() is the empty template, shown while the list is empty, not a key function. Pass the key function fourth: repeat(items, row, null, ${third.getText()}).`,
+    );
+  }
+  return collapseEmptyTemplate(binding.emptyTemplate);
+};
+
+/**
+ * The RepeatBlock for a parsed repeat() binding whose row template has been processed. The
+ * caller allocates the id, processes the row template and passes the (possibly rewritten) items
+ * expression and its signal names.
+ */
+export const toRepeatBlock = (
+  binding: ParsedBindingInfo,
+  id: string,
+  processed: ReturnType<typeof processItemTemplate>,
+  itemsExpression: string,
+  signalNames: string[],
+): RepeatBlock => ({
+  id,
+  signalName: signalNames[0] || '',
+  signalNames,
+  itemsExpression,
+  itemVar: binding.itemVar!,
+  indexVar: binding.indexVar,
+  itemTemplate: processed.processedContent,
+  componentRow: componentRowOf(binding.itemTemplate!),
+  emptyTemplate: emptyTemplateOf(binding),
+  trackByFn: binding.trackByFn,
+  startIndex: binding.expressionStart,
+  endIndex: binding.expressionEnd,
+  itemBindings: processed.bindings,
+  itemEvents: processed.events,
+  signalBindings: processed.signalBindings,
+  nestedConditionals: processed.nestedConditionals,
+  nestedWhenElse: processed.nestedWhenElse,
+  nestedRepeats: processed.nestedRepeats,
+  rowSignalVars: processed.rowSignalVars,
+});
+
+// ============================================================================
+// buildRangeOverlapChecker
+// ============================================================================
 
 /**
  * Build a fast predicate for checking whether a position falls inside any of
  * the given structural ranges (conditionals, whenElse, repeats).
  */
-export const buildRangeOverlapChecker = (ranges: Range[]): ((start: number, end?: number) => boolean) => {
-  return (start: number, _end?: number) => {
+export const buildRangeOverlapChecker = (ranges: Range[]): ((start: number) => boolean) => {
+  return (start: number) => {
     for (const r of ranges) {
       if (start >= r.start && start < r.end) return true;
     }
@@ -288,58 +379,54 @@ export const applyTemplateEdits = (source: string, edits: TemplateEdit[]): strin
   for (const edit of edits) {
     result = result.substring(0, edit.start) + edit.replacement + result.substring(edit.end);
   }
-  return result
-    .replace(/\s+/g, ' ')
-    .replace(/>\s+<(?![!-])/g, '><')
-    .replace(/(<!--[ib]\d+-->)(<!---->)/g, '$1 $2')
-    .replace(/\s+>/g, '>')
-    .trim();
+  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style> (H-03).
+  // Between a tag and an anchor comment it goes as it does between two tags: anchors stand where
+  // `<template>` placeholders stood before A1, and a list's container must hold only its rows and
+  // its anchor for a clear to empty it at once (H-05). A text marker keeps the whitespace before it,
+  // which is text, and so does a binding's boundary (`<!---->`) before an element or an anchor (H-53);
+  // before its parent's end tag it goes.
+  return outsideVerbatim(result, (html) =>
+    html
+      .replace(/\s+/g, ' ')
+      .replace(/(?<!<!----)>\s+<(?![!-])|>\s+<(?=\/)/g, '><')
+      .replace(/(?<!<!----)>\s+(?=<!--[ib]\d+[(|).]-->)/g, '>')
+      .replace(/(<!--[ib]\d+-->)(<!---->)/g, '$1 $2')
+      .replace(/\s+>/g, '>')
+      .trim(),
+  );
 };
 
 /**
- * Build standard edits from conditionals: replace with rendered content or hidden template.
- * A condition that could not be resolved at compile time (initialValue undefined)
- * is deferred: the runtime evaluates it at mount and shows the content if needed.
+ * Build standard edits from conditionals: the content between the directive's two anchors,
+ * pre-rendered when the condition is true at compile time, otherwise nothing between them. A
+ * condition that could not be resolved at compile time (initialValue undefined) is deferred: the
+ * runtime evaluates it at mount and shows the content if needed.
  */
 export const buildConditionalEdits = (conditionals: ConditionalBlock[]): TemplateEdit[] => {
   return conditionals.map((cond) => ({
     start: cond.startIndex,
     end: cond.endIndex,
-    replacement: cond.initialValue === true ? cond.templateContent : `<template id="${cond.id}"></template>`,
+    replacement:
+      anchorMark(cond.id, '(') + (cond.initialValue === true ? cond.templateContent : '') + anchorMark(cond.id, ')'),
   }));
 };
 
 /**
- * Build standard edits from whenElse blocks.
- * @param injectIds If true, injects IDs into the first element of then/else templates (used by generateProcessedHtml and sub-template)
+ * Build standard edits from whenElse blocks: three anchors, the then-branch between the first two
+ * and the else-branch between the last two, the branch the compile-time value selects pre-rendered.
+ * An unresolved condition (initialValue undefined) pre-renders neither; the runtime decides at mount.
  */
-export const buildWhenElseEdits = (
-  whenElseBlocks: WhenElseBlock[],
-  injectIds: boolean,
-  injectIdFn?: (html: string, id: string) => string,
-): TemplateEdit[] => {
-  return whenElseBlocks.map((we) => {
-    // initialValue === true  → pre-render then, defer else
-    // initialValue === false → pre-render else, defer then
-    // initialValue === undefined (not statically resolvable) → defer both; runtime evaluates at mount
-    const thenReplacement =
-      we.initialValue === true
-        ? injectIds && injectIdFn
-          ? injectIdFn(we.thenTemplate, we.thenId)
-          : we.thenTemplate
-        : `<template id="${we.thenId}"></template>`;
-    const elseReplacement =
-      we.initialValue === false
-        ? injectIds && injectIdFn
-          ? injectIdFn(we.elseTemplate, we.elseId)
-          : we.elseTemplate
-        : `<template id="${we.elseId}"></template>`;
-    return {
-      start: we.startIndex,
-      end: we.endIndex,
-      replacement: thenReplacement + elseReplacement,
-    };
-  });
+export const buildWhenElseEdits = (whenElseBlocks: WhenElseBlock[]): TemplateEdit[] => {
+  return whenElseBlocks.map((we) => ({
+    start: we.startIndex,
+    end: we.endIndex,
+    replacement:
+      anchorMark(we.thenId, '(') +
+      (we.initialValue === true ? we.thenTemplate : '') +
+      anchorMark(we.thenId, '|') +
+      (we.initialValue === false ? we.elseTemplate : '') +
+      anchorMark(we.thenId, ')'),
+  }));
 };
 
 /**
@@ -360,35 +447,25 @@ export const stripPropertyBoundAttributes = (
     const id = b.id ?? b.elementId;
     if (!id) continue;
     const attr = `\\s${esc(b.property)}(?:="[^"]*"|='[^']*'|(?=[\\s/>]))`;
-    out = out.replace(new RegExp(`(<[^>]*\\bid="${esc(id)}"[^>]*?)${attr}`), '$1');
-    out = out.replace(new RegExp(`(<[^>]*?)${attr}([^>]*\\bid="${esc(id)}")`), '$1$2');
+    const mark = `\\b${BOUND_MARK}="${esc(id)}"`;
+    out = out.replace(new RegExp(`(<[^>]*${mark}[^>]*?)${attr}`), '$1');
+    out = out.replace(new RegExp(`(<[^>]*?)${attr}([^>]*${mark})`), '$1$2');
   }
   return out;
 };
 
-/**
- * Build edits to inject element IDs into non-conditional elements that have bindings.
- * Elements whose user-supplied id was reused as the binding id are left untouched.
- */
-export const buildElementIdEdits = (
-  elementIdMap: Map<HtmlElement, string>,
-  allRanges: Range[],
-  _opts?: {
-    eventBindings?: EventBinding[];
-    itemEvents?: Array<{ eventId: string; eventName: string; modifiers: string[] }>;
-  },
-): TemplateEdit[] => {
+/** Build edits that mark each bound element outside the directive ranges with its binding id (BOUND_MARK). */
+export const buildBoundMarkEdits = (elementIdMap: Map<HtmlElement, string>, allRanges: Range[]): TemplateEdit[] => {
   const isInsideRange = buildRangeOverlapChecker(allRanges);
   const edits: TemplateEdit[] = [];
 
   for (const [element, id] of elementIdMap) {
     if (isInsideRange(element.tagStart)) continue;
-    if (element.attributes.get('id')?.value === id) continue;
 
     edits.push({
       start: element.tagNameEnd,
       end: element.tagNameEnd,
-      replacement: ` id="${id}"`,
+      replacement: ` ${BOUND_MARK}="${id}"`,
     });
   }
 
@@ -400,7 +477,6 @@ export const buildElementIdEdits = (
  * Also handles expression text bindings like ${count() + 1}.
  */
 export const buildSignalReplacementEdits = (
-  _templateContent: string,
   signalInitializers: Map<string, string | number | boolean>,
   allRanges: Range[],
   textBindingSpans?: Map<number, { spanId: string; exprEnd: number; signalName: string }>,
@@ -449,7 +525,7 @@ export const buildSignalReplacementEdits = (
       if (expressionPositions.has(exprStart)) continue;
 
       const value = signalInitializers.get(signalName);
-      const valueStr = value !== undefined ? String(value) : '';
+      const valueStr = value !== undefined ? escapeRawTemplateLiteral(String(value)) : '';
 
       edits.push({
         start: exprStart,

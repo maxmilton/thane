@@ -16,7 +16,7 @@ import {
 } from './file-copy.js';
 import { gzipDistFiles } from './compression.js';
 import { DevServer } from './dev-server.js';
-import { printAllFileSizes, printTotalSizes } from './console-reporting.js';
+import { collectFileSizes, printAllFileSizes, printTotalSizes } from './console-reporting.js';
 import { minifySelectorsInHTML } from '../minification/minification.js';
 import { minifyHTML } from '../minification/template-minifier.js';
 
@@ -75,41 +75,33 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     });
   };
 
+  /** The output index.html: relay script (dev server), entry scripts, selector renames, minified in prod. */
+  const renderIndexHtml = async (hashedFileNames: Record<string, string | undefined>): Promise<string> => {
+    let data = await fs.promises.readFile(config.inputHTMLFilePath, 'utf8');
+    if (config.serve && !config.isProd) {
+      data = DevServer.injectBrowserRelayScript(data);
+    }
+    data = injectEntryScripts(data, hashedFileNames);
+    if (config.buildContext) {
+      data = minifySelectorsInHTML(data, config.buildContext);
+    }
+    return config.isProd ? minifyHTML(data) : data;
+  };
+
   /**
    * Re-process the HTML template and notify live reload clients.
    * Used by file watchers when index.html or assets change.
    */
   const reprocessAndReloadHTML = async (): Promise<void> => {
-    const { inputHTMLFilePath, outputHTMLFilePath } = config;
-    let data = await fs.promises.readFile(inputHTMLFilePath, 'utf8');
-    if (config.serve && !config.isProd) {
-      data = DevServer.injectBrowserRelayScript(data);
-    }
-    data = injectEntryScripts(data, cachedHashedFileNames);
-    let updatedData = data;
-    if (config.buildContext) {
-      updatedData = minifySelectorsInHTML(updatedData, config.buildContext);
-    }
-    await fs.promises.writeFile(outputHTMLFilePath, updatedData, 'utf8');
+    await fs.promises.writeFile(config.outputHTMLFilePath, await renderIndexHtml(cachedHashedFileNames), 'utf8');
     devServer.notifyLiveReloadClients();
   };
 
   const copyIndexHTMLIntoDistAndStartServer = async (
     hashedFileNames: Record<string, string | undefined>,
   ): Promise<void> => {
-    const { inputHTMLFilePath, outputHTMLFilePath, isProd, serve, useGzip, distDir } = config;
-    let data = await fs.promises.readFile(inputHTMLFilePath, 'utf8');
-    if (serve && !isProd) {
-      data = DevServer.injectBrowserRelayScript(data);
-    }
-    data = injectEntryScripts(data, hashedFileNames);
-    let updatedData = data;
-    if (config.buildContext) {
-      updatedData = minifySelectorsInHTML(updatedData, config.buildContext);
-    }
-    if (isProd) {
-      updatedData = minifyHTML(updatedData);
-    }
+    const { outputHTMLFilePath, isProd, serve, useGzip, distDir } = config;
+    const updatedData = await renderIndexHtml(hashedFileNames);
 
     await fs.promises.writeFile(outputHTMLFilePath, updatedData, 'utf8');
 
@@ -120,8 +112,9 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     if (useGzip) {
       await gzipDistFiles(distDir, isProd);
     }
-    await printAllFileSizes(fileSizeLog, distDir, useGzip);
-    await printTotalSizes(totalBundleSizeInBytes, fileSizeLog, distDir, useGzip);
+    const sizes = await collectFileSizes(fileSizeLog, distDir, useGzip);
+    printAllFileSizes(sizes);
+    printTotalSizes(totalBundleSizeInBytes, sizes, useGzip);
 
     fileSizeLog.length = 0;
 
@@ -136,8 +129,9 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     const { distDir } = config;
     const outputs = metafile.outputs;
 
-    // Normalize configured entry points for matching against metafile entryPoint paths
-    const configuredEntries = new Set(config.entryPoints.map((ep) => path.normalize(ep)));
+    // Entry points arrive relative from a CLI flag and absolute from a config file, while the
+    // metafile always reports them relative to the working directory: compare resolved paths.
+    const configuredEntries = new Set(config.entryPoints.map((ep) => path.resolve(ep)));
 
     // Build a map of configured entry basenames → hashed output filenames.
     // Only includes scripts the user explicitly specified via --entry (not code-split chunks).
@@ -155,7 +149,7 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
 
       totalBundleSizeInBytes += sizeInBytes;
       fileSizeLog.push({ fileName, sizeInBytes });
-      if (info.entryPoint && configuredEntries.has(path.normalize(info.entryPoint))) {
+      if (info.entryPoint && configuredEntries.has(path.resolve(info.entryPoint))) {
         const entryBasename = path.basename(info.entryPoint, path.extname(info.entryPoint));
         hashedFileNames[entryBasename] = fileName;
       }

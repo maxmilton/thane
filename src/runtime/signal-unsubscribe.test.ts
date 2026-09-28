@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { signal, computed } from './signal.js';
+import { signal, computed, effect } from './signal.js';
 
 /** The subscriber array behind a signal (internal, for asserting on compaction). */
 const slots = (sig: unknown): unknown[] => (sig as { _s: unknown[] })._s;
@@ -162,5 +162,66 @@ describe('computed unsubscribe — constant time, order preserving', () => {
     expect(seen).toEqual(['a', 'c']);
     base(2);
     expect(seen).toEqual(['a', 'c', 'a', 'c']);
+  });
+});
+
+describe('dispose during its own run keeps no subscription (RT-3)', () => {
+  const live = (sig: unknown): number => slots(sig).filter((cb) => cb != null).length;
+
+  test('an effect with two dependencies that disposes itself keeps neither subscription', () => {
+    const a = signal(0);
+    const b = signal(0);
+    let runs = 0;
+    let stop: () => void = () => {};
+    stop = effect(() => {
+      runs++;
+      if (a() + b() > 0) stop();
+    });
+    expect([live(a), live(b)]).toEqual([1, 1]);
+
+    b(1); // this run disposes the effect
+    expect([live(a), live(b)]).toEqual([0, 0]);
+    a(1);
+    b(2);
+    expect(runs).toBe(2);
+  });
+
+  test('an effect that disposes itself and then throws: the error is re-thrown, no subscription stays', () => {
+    const source = signal(0);
+    let stop: () => void = () => {};
+    stop = effect(() => {
+      if (source() > 0) {
+        stop();
+        throw new Error('after dispose');
+      }
+    });
+    const original = globalThis.queueMicrotask;
+    const queued: Array<() => void> = [];
+    globalThis.queueMicrotask = (cb: () => void) => void queued.push(cb);
+    try {
+      source(1);
+    } finally {
+      globalThis.queueMicrotask = original;
+    }
+    expect(queued.length).toBe(1);
+    expect(() => queued[0]!()).toThrow('after dispose');
+    expect(live(source)).toBe(0);
+  });
+
+  test('a computed disposed by its derivation during a read returns that value and keeps no subscription', () => {
+    const source = signal(0);
+    let derived: ReturnType<typeof computed<number>> | undefined;
+    derived = computed(() => {
+      const value = source() * 10;
+      if (value > 0) derived?.dispose();
+      return value;
+    });
+    expect(live(source)).toBe(1);
+    source(2); // no subscribers: only marks it dirty
+    expect(derived()).toBe(20); // this evaluation disposes it
+    expect(live(source)).toBe(0);
+    source(3);
+    expect(derived()).toBe(20);
+    expect(live(source)).toBe(0);
   });
 });

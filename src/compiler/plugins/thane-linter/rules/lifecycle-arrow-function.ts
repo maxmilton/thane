@@ -18,47 +18,11 @@
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
-import { ErrorCode, createError } from '../../../errors.js';
-import { FN } from '../../../utils/constants.js';
+import { ErrorCode } from '../../../errors.js';
+import { createReporter, findReturnObjects, type Report } from './lint-utils.js';
 
 /** Properties that must be arrow functions. */
 const LIFECYCLE_PROPS = new Set(['onMount', 'onDestroy']);
-
-// ============================================================================
-// AST helpers (shared pattern with component-property-order)
-// ============================================================================
-
-const findReturnObjects = (node: ts.Node, results: ts.ObjectLiteralExpression[]): void => {
-  if (ts.isCallExpression(node)) {
-    const callee = node.expression;
-    if (ts.isIdentifier(callee) && callee.text === FN.DEFINE_COMPONENT) {
-      for (const arg of node.arguments) {
-        if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) {
-          collectReturns(arg.body, results);
-        }
-      }
-      return;
-    }
-  }
-  ts.forEachChild(node, (child) => findReturnObjects(child, results));
-};
-
-const collectReturns = (body: ts.Node, results: ts.ObjectLiteralExpression[]): void => {
-  // Unwrap ParenthesizedExpression — TS parses `() => ({})` as Paren(ObjLiteral)
-  let expr: ts.Node = body;
-  while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
-  if (ts.isObjectLiteralExpression(expr)) {
-    results.push(expr);
-    return;
-  }
-  if (ts.isBlock(body)) {
-    for (const stmt of body.statements) {
-      if (ts.isReturnStatement(stmt) && stmt.expression && ts.isObjectLiteralExpression(stmt.expression)) {
-        results.push(stmt.expression);
-      }
-    }
-  }
-};
 
 // ============================================================================
 // Rule check
@@ -69,13 +33,7 @@ const collectReturns = (body: ts.Node, results: ts.ObjectLiteralExpression[]): v
  * the value must be an arrow function — not a method declaration (shorthand)
  * and not a regular `function()` expression.
  */
-const checkArrowFunctions = (
-  obj: ts.ObjectLiteralExpression,
-  sourceFile: ts.SourceFile,
-  filePath: string,
-): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
-
+const checkArrowFunctions = (obj: ts.ObjectLiteralExpression, report: Report): void => {
   for (const prop of obj.properties) {
     // Get the property name regardless of node type
     const name = prop.name && ts.isIdentifier(prop.name) ? prop.name.text : null;
@@ -83,14 +41,7 @@ const checkArrowFunctions = (
 
     // ── Method declaration shorthand: onMount() { ... } ──────────────
     if (ts.isMethodDeclaration(prop)) {
-      const { line, character } = sourceFile.getLineAndCharacterOfPosition(prop.getStart());
-      diagnostics.push(
-        createError(
-          `'${name}' must be an arrow function, not a method shorthand (use '${name}: () => { ... }')`,
-          { file: filePath, line: line + 1, column: character + 1 },
-          ErrorCode.LIFECYCLE_ARROW_FUNCTION,
-        ),
-      );
+      report(prop, `'${name}' must be an arrow function, not a method shorthand (use '${name}: () => { ... }')`);
       continue;
     }
 
@@ -100,14 +51,7 @@ const checkArrowFunctions = (
 
       // Regular function expression: onMount: function() { ... }
       if (ts.isFunctionExpression(init)) {
-        const { line, character } = sourceFile.getLineAndCharacterOfPosition(prop.getStart());
-        diagnostics.push(
-          createError(
-            `'${name}' must be an arrow function, not a function expression (use '${name}: () => { ... }')`,
-            { file: filePath, line: line + 1, column: character + 1 },
-            ErrorCode.LIFECYCLE_ARROW_FUNCTION,
-          ),
-        );
+        report(prop, `'${name}' must be an arrow function, not a function expression (use '${name}: () => { ... }')`);
         continue;
       }
 
@@ -117,27 +61,15 @@ const checkArrowFunctions = (
       }
 
       // Anything else (identifier reference, call expression, etc.) — also flag
-      const { line, character } = sourceFile.getLineAndCharacterOfPosition(prop.getStart());
-      diagnostics.push(
-        createError(
-          `'${name}' must be an inline arrow function (use '${name}: () => { ... }')`,
-          { file: filePath, line: line + 1, column: character + 1 },
-          ErrorCode.LIFECYCLE_ARROW_FUNCTION,
-        ),
-      );
+      report(prop, `'${name}' must be an inline arrow function (use '${name}: () => { ... }')`);
     }
   }
-
-  return diagnostics;
 };
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
-  const returnObjects: ts.ObjectLiteralExpression[] = [];
-  findReturnObjects(sourceFile, returnObjects);
-
-  const diagnostics: Diagnostic[] = [];
-  for (const obj of returnObjects) {
-    diagnostics.push(...checkArrowFunctions(obj, sourceFile, filePath));
+  const { diagnostics, report } = createReporter(sourceFile, filePath, ErrorCode.LIFECYCLE_ARROW_FUNCTION, 'error');
+  for (const obj of findReturnObjects(sourceFile)) {
+    checkArrowFunctions(obj, report);
   }
 
   return diagnostics;

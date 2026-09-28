@@ -25,11 +25,17 @@
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
-import { ErrorCode, createWarning } from '../../../errors.js';
+import { ErrorCode } from '../../../errors.js';
 import { FN } from '../../../utils/constants.js';
+import { createReporter, isTaggedWith } from './lint-utils.js';
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
+  const { diagnostics, report } = createReporter(
+    sourceFile,
+    filePath,
+    ErrorCode.NO_CROSS_FILE_HTML_TEMPLATE,
+    'warning',
+  );
 
   // Collect all imported identifiers
   const importedNames = new Set<string>();
@@ -58,7 +64,7 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
 
   // Walk html tagged template expressions and check interpolations
   const visit = (node: ts.Node) => {
-    if (ts.isTaggedTemplateExpression(node) && ts.isIdentifier(node.tag) && node.tag.text === FN.HTML) {
+    if (isTaggedWith(node, [FN.HTML])) {
       const template = node.template;
       if (ts.isTemplateExpression(template)) {
         for (const span of template.templateSpans) {
@@ -70,15 +76,11 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
 
             // Check if this identifier is used inside a template literal that's
             // the value of the `template` property in a defineComponent return
-            const { line, character } = sourceFile.getLineAndCharacterOfPosition(span.expression.getStart());
-            diagnostics.push(
-              createWarning(
-                `Imported variable '${importName}' is used inside an html\`\` template. ` +
-                  'The compiler cannot resolve imported template variables at compile time. ' +
-                  'Define the template fragment in the same file as a const variable instead.',
-                { file: filePath, line: line + 1, column: character + 1 },
-                ErrorCode.NO_CROSS_FILE_HTML_TEMPLATE,
-              ),
+            report(
+              span.expression,
+              `Imported variable '${importName}' is used inside an html\`\` template. ` +
+                'The compiler cannot resolve imported template variables at compile time. ' +
+                'Define the template fragment in the same file as a const variable instead.',
             );
           }
         }

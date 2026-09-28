@@ -123,8 +123,8 @@ test.describe('2. Client-Side Navigation', () => {
     await expect(page.getByTestId('about-page')).toBeVisible();
     await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBeLessThan(50);
 
-    // The router resets the scroll position on the next frame after the route mounts; scroll
-    // inside the poll so a late reset cannot leave the page at the top before the check.
+    // The router resets the scroll position as it mounts the route; scroll inside the poll so
+    // the check does not depend on when that happened.
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -360,5 +360,139 @@ test.describe('8. Code Splitting', () => {
 
     // A new JS file should have been fetched for the about page chunk
     expect(jsRequests.length).toBeGreaterThan(beforeAbout);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+//  10. Route Swap
+// ─────────────────────────────────────────────────────────────
+
+test.describe('10. Route Swap', () => {
+  /** Hold back the lazy chunk of a page, as a slow network would. */
+  const delayChunk = async (page: any, name: string, ms: number) => {
+    await page.route(new RegExp(`/${name}-[^/]*\\.js$`), async (route: any) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      await route.continue();
+    });
+  };
+
+  /** Record, for every painted frame, which page is in the outlet and where the window is scrolled. */
+  const recordFrames = async (page: any) => {
+    await page.evaluate(() => {
+      const frames: Array<{ page: string | null; scrollY: number }> = [];
+      (window as any).__frames = frames;
+      const tick = () => {
+        const outlet = document.getElementById('router-outlet');
+        const current = outlet?.querySelector('[data-testid$="-page"]')?.getAttribute('data-testid') ?? null;
+        frames.push({ page: current, scrollY: Math.round(window.scrollY) });
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  };
+  const readFrames = (page: any): Promise<Array<{ page: string | null; scrollY: number }>> =>
+    page.evaluate(() => (window as any).__frames);
+
+  test('the current page stays on screen until a lazy page has loaded', async ({ page }) => {
+    await delayChunk(page, 'about', 500);
+    await goto(page, '/');
+    await page.evaluate(() => window.scrollTo(0, 1200));
+    await recordFrames(page);
+
+    await page.evaluate(`window.navigate('/about')`);
+    // the URL and currentPath change at once; the page follows when its chunk arrives
+    await expect(page.getByTestId('current-path')).toHaveText('/about');
+    await expect(page.getByTestId('home-page')).toBeVisible();
+    await expect(page.getByTestId('about-page')).toBeVisible();
+
+    const frames = await readFrames(page);
+    expect(frames.length).toBeGreaterThan(10);
+    // never a frame with an empty outlet
+    expect(frames.filter((frame) => frame.page === null)).toEqual([]);
+    // and the new page is never painted at the previous page's scroll offset
+    expect(frames.filter((frame) => frame.page === 'about-page' && frame.scrollY > 0)).toEqual([]);
+  });
+
+  test('a page that is already loaded replaces the current one without an empty frame', async ({ page }) => {
+    await goto(page, '/');
+    await page.getByTestId('nav-about').click();
+    await expect(page.getByTestId('about-page')).toBeVisible();
+    await recordFrames(page);
+
+    await page.getByTestId('nav-home').click();
+    await expect(page.getByTestId('home-page')).toBeVisible();
+    await page.getByTestId('nav-about').click();
+    await expect(page.getByTestId('about-page')).toBeVisible();
+
+    const frames = await readFrames(page);
+    expect(frames.filter((frame) => frame.page === null)).toEqual([]);
+  });
+
+  test('a navigation that is overtaken by a newer one never mounts', async ({ page }) => {
+    await delayChunk(page, 'about', 700);
+    await goto(page, '/');
+
+    await page.getByTestId('nav-about').click();
+    await page.getByTestId('nav-user').click();
+    await expect(page.getByTestId('user-page')).toBeVisible();
+
+    // let the overtaken chunk arrive
+    await page.waitForTimeout(1000);
+    await expect(page.getByTestId('user-page')).toBeVisible();
+    await expect(page.getByTestId('about-page')).toHaveCount(0);
+    await expect(page.locator('#router-outlet [data-testid$="-page"]')).toHaveCount(1);
+    await expect(page).toHaveURL(/\/users\/42$/);
+    await expect(page).toHaveTitle('User');
+  });
+
+  test('returning to the page on screen while another loads cancels the load and keeps the page', async ({ page }) => {
+    await delayChunk(page, 'about', 700);
+    await goto(page, '/');
+    await page.getByTestId('home-increment').click();
+    await expect(page.getByTestId('home-local-count')).toHaveText('1');
+
+    await page.getByTestId('nav-about').click();
+    await expect(page.getByTestId('current-path')).toHaveText('/about');
+    await page.goBack();
+    await expect(page.getByTestId('current-path')).toHaveText('/');
+
+    await page.waitForTimeout(1000);
+    await expect(page.getByTestId('about-page')).toHaveCount(0);
+    // the same instance: its local state survived
+    await expect(page.getByTestId('home-local-count')).toHaveText('1');
+    await expect(page).toHaveTitle('Home');
+  });
+
+  test('scrolling while the next page loads does not become that page’s saved position', async ({ page }) => {
+    await delayChunk(page, 'about', 600);
+    await goto(page, '/');
+
+    await page.evaluate(`window.navigate('/about')`);
+    await page.evaluate(() => window.scrollTo(0, 800));
+    await expect(page.getByTestId('about-page')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(0);
+
+    await page.getByTestId('nav-user').click();
+    await expect(page.getByTestId('user-page')).toBeVisible();
+    await page.goBack();
+    await expect(page.getByTestId('about-page')).toBeVisible();
+    await page.waitForTimeout(250);
+    expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
+  });
+
+  test('a page whose chunk fails to load leaves the outlet empty and the router usable', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', (message: any) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    await page.route(/\/about-[^/]*\.js$/, (route: any) => route.abort());
+    await goto(page, '/');
+
+    await page.getByTestId('nav-about').click();
+    await expect.poll(() => errors.some((text) => text.includes('[thane-router] Failed to load route'))).toBe(true);
+    await expect(page.locator('#router-outlet [data-testid$="-page"]')).toHaveCount(0);
+
+    await page.getByTestId('nav-user').click();
+    await expect(page.getByTestId('user-page')).toBeVisible();
   });
 });

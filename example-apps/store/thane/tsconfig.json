@@ -5,7 +5,8 @@
     "moduleResolution": "Bundler",
     "paths": {
       "thane": ["../../../src/runtime/index.ts"],
-      "thane/router": ["../../../src/runtime/router.ts"]
+      "thane/runtime": ["../../../src/runtime/internal.ts"],
+      "thane/router": ["../../../src/runtime/router-exports.ts"]
     },
     "skipLibCheck": true,
     "strict": true,

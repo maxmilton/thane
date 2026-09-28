@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import path from 'node:path';
-import type { Plugin } from 'esbuild';
+import type { OnStartResult, Plugin } from 'esbuild';
 import { syncProjectTypes } from '../router-typegen/router-typegen.js';
 import { collectFilesRecursively, logger, PLUGIN_NAME } from '../../utils/index.js';
 import { ErrorCode, createError } from '../../errors.js';
@@ -17,11 +17,13 @@ export async function runProjectTypeCheck(options?: {
   strict?: boolean;
   projectRoot?: string | undefined;
 }): Promise<void> {
-  const strict = options?.strict ?? true;
   const projectRoot = path.resolve(options?.projectRoot ?? process.cwd());
-
   await syncProjectTypes(projectRoot);
+  await checkProject(options?.strict ?? true, projectRoot);
+}
 
+/** The type check itself, once the generated types are in place. */
+async function checkProject(strict: boolean, projectRoot: string): Promise<void> {
   const configPath = path.join(projectRoot, 'tsconfig.json');
   if (!ts.sys.fileExists(configPath)) {
     if (strict) {
@@ -49,13 +51,11 @@ export async function runProjectTypeCheck(options?: {
   );
   const rootNames = Array.from(new Set([...parsedConfig.fileNames, ...generatedTypeFiles]));
 
-  const diagnostics = await new Promise<readonly ts.Diagnostic[]>((resolve) => {
-    const program = ts.createProgram({
-      rootNames,
-      options: { ...parsedConfig.options, noEmit: true },
-    });
-    resolve(ts.getPreEmitDiagnostics(program));
+  const program = ts.createProgram({
+    rootNames,
+    options: { ...parsedConfig.options, noEmit: true },
   });
+  const diagnostics = ts.getPreEmitDiagnostics(program);
 
   if (diagnostics.length === 0) {
     return;
@@ -83,25 +83,32 @@ export async function runProjectTypeCheck(options?: {
 }
 
 export const TSCTypeCheckerPlugin = (options?: { strict?: boolean; projectRoot?: string | undefined }): Plugin => {
-  let isRunning = false;
   const strict = options?.strict ?? true;
-  const projectRoot = options?.projectRoot;
 
-  /** Run TypeScript type-checking asynchronously so esbuild is not blocked. */
-  const runTypeCheck = async (): Promise<void> => {
-    if (isRunning) return;
-    isRunning = true;
-
+  /** Runs in onStart: esbuild waits for it, and never overlaps two builds of one context. */
+  const runTypeCheck = async (): Promise<OnStartResult | undefined> => {
+    const projectRoot = path.resolve(options?.projectRoot ?? process.cwd());
+    // The build's only type sync, before the check reads its files. A sync that fails still fails
+    // the build, reported under the sync's name as when it was a plugin of its own.
+    let generatedCount: number;
     try {
-      await runProjectTypeCheck({ strict, projectRoot });
-      isRunning = false;
+      generatedCount = await syncProjectTypes(projectRoot);
     } catch (error) {
-      isRunning = false;
+      const text = error instanceof Error ? error.message : String(error);
+      return { errors: [{ text, pluginName: PLUGIN_NAME.TYPES_SYNC }] };
+    }
+    if (generatedCount > 0) {
+      logger.info(PLUGIN_NAME.TYPES_SYNC, `Generated hidden type file(s) for ${generatedCount} route table(s)`);
+    }
+    try {
+      await checkProject(strict, projectRoot);
+    } catch (error) {
       if (strict && error instanceof Error && error.message.includes('type check failed')) {
         throw error;
       }
       logger.error(NAME, 'Type check error', error);
     }
+    return undefined;
   };
 
   return {

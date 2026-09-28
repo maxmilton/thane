@@ -30,8 +30,8 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
 
-const componentTemplate = (js: string): string => js.match(/__tpl = _T\(`([^`]*)`\)/)?.[1] ?? '';
-const rowTemplate = (js: string): string => js.match(/__tpl_b\d+ = _T\(`([^`]*)`\)/)?.[1] ?? '';
+const componentTemplate = (js: string): string => js.match(/__tpl = __T\(`([^`]*)`\)/)?.[1] ?? '';
+const rowTemplate = (js: string): string => js.match(/__tpl_b\d+ = __T\(`([^`]*)`\)/)?.[1] ?? '';
 
 describe('One attribute grammar', () => {
   test('static text around an expression is kept, at component level', async () => {
@@ -40,13 +40,24 @@ describe('One attribute grammar', () => {
     // both signals drive the one binding
     expect(js).toMatch(/kind\.subscribe\(/);
     expect(js).toMatch(/size\.subscribe\(/);
-    expect(componentTemplate(js)).toMatch(/<p id="b\d+" class="">x<\/p>/);
+    expect(componentTemplate(js)).toMatch(/<p class="">x<\/p>/);
   });
 
   test('style=${expr} writes cssText; style="prop: ${expr}" binds the property', async () => {
     const js = await buildAndReadJs(componentApp('<p style=${css()}>x</p><i style="color: ${kind()}">y</i>'));
     expect(js).toMatch(/\.style\.cssText = css\(\)/);
     expect(js).toMatch(/\.style\.color = kind\(\)/);
+  });
+
+  test('static text next to a style expression stays part of the value it belongs to', async () => {
+    const js = await buildAndReadJs(
+      componentApp('<i style="width: ${size()}px; margin: ${kind()}px ${size()}em; color: ${kind()}">y</i>'),
+    );
+    expect(js).toContain('`${size()}px`');
+    expect(js).toContain('`${kind()}px ${size()}em`');
+    // a value that is only the expression keeps the plain write
+    expect(js).toMatch(/\.style\.color = kind\(\)/);
+    expect(js).not.toMatch(/\.style\.width = size\(\)/);
   });
 
   test('inside rows a mixed class and a style with static text are one binding each', async () => {

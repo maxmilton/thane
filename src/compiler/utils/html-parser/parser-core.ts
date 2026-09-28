@@ -4,7 +4,13 @@
 
 import type { ParserState, HtmlElement, BindingInfo, ParseDiagnostic, ParsedTemplate } from './types.js';
 import { VOID_ELEMENTS } from './types.js';
-import { findBindingsInText, findBindingsInAttributes, type BindingDetectionOptions } from './binding-detection.js';
+import {
+  findBindingsInText,
+  findBindingsInAttributes,
+  isEscaped,
+  templateExpressionEnd,
+  type BindingDetectionOptions,
+} from './binding-detection.js';
 import { PARSER_STATE } from '../../../contracts/index.js';
 
 /**
@@ -50,11 +56,6 @@ function createEmptyElement(tagName: string, tagStart: number, tagNameEnd: numbe
   };
 }
 
-/** Narrow a mutable builder into the HtmlElement discriminated union. */
-function finalizeElement(el: MutableHtmlElement): HtmlElement {
-  return el as HtmlElement;
-}
-
 export function parseHtmlTemplate(html: string, options?: BindingDetectionOptions): ParsedTemplate {
   const roots: HtmlElement[] = [];
   const bindings: BindingInfo[] = [];
@@ -79,10 +80,6 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
 
   let commentBuffer = '';
 
-  let exprBraceDepth = 0;
-  let inTemplateBacktick = false;
-  let templateBraceDepth = 0;
-
   const flushText = () => {
     if (textContent.trim()) {
       const parent = elementStack[elementStack.length - 1];
@@ -94,7 +91,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
         });
         findBindingsInText(textContent, textStart, parent, bindings, options);
       } else {
-        const virtualRoot = finalizeElement({
+        const virtualRoot: HtmlElement = {
           tagName: '__root__',
           tagStart: 0,
           tagNameEnd: 0,
@@ -107,7 +104,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
           isSelfClosing: false,
           isVoid: false,
           textContent: [],
-        });
+        };
         findBindingsInText(textContent, textStart, virtualRoot, bindings, options);
       }
     }
@@ -115,7 +112,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
   };
 
   const pushElement = (mutable: MutableHtmlElement): HtmlElement => {
-    const element = finalizeElement(mutable);
+    const element = mutable as HtmlElement;
     const parent = elementStack[elementStack.length - 1];
     if (parent) {
       parent.children.push(element);
@@ -158,80 +155,44 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
     });
   };
 
+  /** Record the attribute; a duplicate is ignored, as browsers keep the first (H-46). */
+  const setAttribute = (value: string, end: number, valueStart: number, valueEnd: number) => {
+    if (currentElement!.attributes.has(attrName)) {
+      const message = `Duplicate attribute "${attrName}" on <${currentElement!.tagName}>: the first one is kept`;
+      diagnostics.push({ message, position: attrStart, severity: 'warning' });
+      return;
+    }
+    currentElement!.attributes.set(attrName, { name: attrName, value, start: attrStart, end, valueStart, valueEnd });
+  };
+
+  /** Close the open tag at `end` (just past its `>`), push the element and go back to text. */
+  const finishOpenTag = (end: number, selfClosing: boolean) => {
+    const element = currentElement!;
+    if (selfClosing) element.isSelfClosing = true;
+    element.openTagEnd = end;
+    if (selfClosing || element.isVoid) {
+      element.closeTagStart = end;
+      element.closeTagEnd = end;
+    }
+    findBindingsInAttributes(pushElement(element), bindings, options);
+    currentElement = null;
+    state = PARSER_STATE.TEXT;
+    textContent = '';
+    textStart = end;
+  };
+
   while (pos < html.length) {
     const char = html[pos]!;
     const nextChar = html[pos + 1];
 
     switch (state) {
       case PARSER_STATE.TEXT:
-        if (char === '$' && nextChar === '{' && !inTemplateBacktick) {
-          if (textContent === '') {
-            textStart = pos;
-          }
-          textContent += '${';
-          pos += 2;
-          exprBraceDepth = 1;
-          continue;
-        }
-
-        if (exprBraceDepth > 0) {
-          if (textContent === '') {
-            textStart = pos;
-          }
-
-          if (inTemplateBacktick) {
-            if (char === '$' && nextChar === '{') {
-              templateBraceDepth++;
-              textContent += '${';
-              pos += 2;
-              continue;
-            }
-            if (char === '}' && templateBraceDepth > 0) {
-              templateBraceDepth--;
-              textContent += char;
-              pos++;
-              continue;
-            }
-            if (char === '{' && templateBraceDepth > 0) {
-              templateBraceDepth++;
-              textContent += char;
-              pos++;
-              continue;
-            }
-            if (char === '`' && templateBraceDepth === 0) {
-              inTemplateBacktick = false;
-              textContent += char;
-              pos++;
-              continue;
-            }
-            textContent += char;
-            pos++;
-            continue;
-          }
-
-          if (char === '`') {
-            inTemplateBacktick = true;
-            templateBraceDepth = 0;
-            textContent += char;
-            pos++;
-            continue;
-          }
-          if (char === '{') {
-            exprBraceDepth++;
-            textContent += char;
-            pos++;
-            continue;
-          }
-          if (char === '}') {
-            exprBraceDepth--;
-            textContent += char;
-            pos++;
-            if (exprBraceDepth === 0) {
-            }
-            continue;
-          }
-          textContent += char;
-          pos++;
+        if (char === '$' && nextChar === '{' && !isEscaped(html, pos)) {
+          // An expression is text up to its closing brace, whatever it holds; unclosed, to the end
+          const end = templateExpressionEnd(html, pos);
+          if (textContent === '') textStart = pos;
+          textContent += html.slice(pos, end === -1 ? html.length : end);
+          pos = end === -1 ? html.length : end;
           continue;
         }
 
@@ -265,6 +226,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
         } else {
           state = PARSER_STATE.TEXT;
           textContent += '<' + char;
+          textStart = tagStart;
         }
         break;
 
@@ -276,84 +238,28 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
           currentElement = createEmptyElement(tagName, tagStart, pos);
         } else if (char === '>') {
           currentElement = createEmptyElement(tagName, tagStart, pos);
-          currentElement.openTagEnd = pos + 1;
-          if (currentElement.isVoid) {
-            currentElement.closeTagStart = pos + 1;
-            currentElement.closeTagEnd = pos + 1;
-          }
-          const finalized1 = pushElement(currentElement);
-          findBindingsInAttributes(finalized1, bindings, options);
-          currentElement = null;
-          state = PARSER_STATE.TEXT;
-          textContent = '';
-          textStart = pos + 1;
+          finishOpenTag(pos + 1, false);
         } else if (char === '/' && nextChar === '>') {
           currentElement = createEmptyElement(tagName, tagStart, pos);
-          currentElement.isSelfClosing = true;
-          currentElement.openTagEnd = pos + 2;
-          currentElement.closeTagStart = pos + 2;
-          currentElement.closeTagEnd = pos + 2;
-          const finalized2 = pushElement(currentElement);
-          findBindingsInAttributes(finalized2, bindings, options);
-          currentElement = null;
-          state = PARSER_STATE.TEXT;
+          finishOpenTag(pos + 2, true);
           pos++;
-          textContent = '';
-          textStart = pos + 1;
         }
         break;
 
       case PARSER_STATE.TAG_SPACE:
         if (char === '>') {
-          currentElement!.openTagEnd = pos + 1;
-          if (currentElement!.isVoid) {
-            currentElement!.closeTagStart = pos + 1;
-            currentElement!.closeTagEnd = pos + 1;
-          }
-          const finalized3 = pushElement(currentElement!);
-          findBindingsInAttributes(finalized3, bindings, options);
-          currentElement = null;
-          state = PARSER_STATE.TEXT;
-          textContent = '';
-          textStart = pos + 1;
+          finishOpenTag(pos + 1, false);
         } else if (char === '/' && nextChar === '>') {
-          currentElement!.isSelfClosing = true;
-          currentElement!.openTagEnd = pos + 2;
-          currentElement!.closeTagStart = pos + 2;
-          currentElement!.closeTagEnd = pos + 2;
-          const finalized4 = pushElement(currentElement!);
-          findBindingsInAttributes(finalized4, bindings, options);
-          currentElement = null;
-          state = PARSER_STATE.TEXT;
+          finishOpenTag(pos + 2, true);
           pos++;
-          textContent = '';
-          textStart = pos + 1;
         } else if (char === '$' && html.substring(pos, pos + 7) === '${when(') {
-          const directiveStart = pos;
-          let braceDepth = 0;
-          let i = pos;
-          while (i < html.length) {
-            if (html[i] === '$' && html[i + 1] === '{') {
-              braceDepth++;
-              i += 2;
-              continue;
-            }
-            if (html[i] === '{') braceDepth++;
-            else if (html[i] === '}') {
-              braceDepth--;
-              if (braceDepth === 0) {
-                const directiveEnd = i + 1;
-                const directive = html.substring(directiveStart, directiveEnd);
-                currentElement!.whenDirective = directive;
-                currentElement!.whenDirectiveStart = directiveStart;
-                currentElement!.whenDirectiveEnd = directiveEnd;
-                pos = directiveEnd - 1;
-                break;
-              }
-            }
-            i++;
+          const directiveEnd = templateExpressionEnd(html, pos);
+          if (directiveEnd !== -1) {
+            currentElement!.whenDirective = html.substring(pos, directiveEnd);
+            currentElement!.whenDirectiveStart = pos;
+            currentElement!.whenDirectiveEnd = directiveEnd;
+            pos = directiveEnd - 1;
           }
-          state = PARSER_STATE.TAG_SPACE;
         } else if (/[a-zA-Z_:@]/.test(char)) {
           state = PARSER_STATE.ATTR_NAME;
           attrName = char;
@@ -375,36 +281,12 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
             pos = lookAhead - 1;
             state = PARSER_STATE.ATTR_NAME;
           } else {
-            currentElement!.attributes.set(attrName, {
-              name: attrName,
-              value: '',
-              start: attrStart,
-              end: pos,
-              valueStart: pos,
-              valueEnd: pos,
-            });
+            setAttribute('', pos, pos, pos);
             state = PARSER_STATE.TAG_SPACE;
           }
         } else if (char === '>') {
-          currentElement!.attributes.set(attrName, {
-            name: attrName,
-            value: '',
-            start: attrStart,
-            end: pos,
-            valueStart: pos,
-            valueEnd: pos,
-          });
-          currentElement!.openTagEnd = pos + 1;
-          if (currentElement!.isVoid) {
-            currentElement!.closeTagStart = pos + 1;
-            currentElement!.closeTagEnd = pos + 1;
-          }
-          const finalized5 = pushElement(currentElement!);
-          findBindingsInAttributes(finalized5, bindings, options);
-          currentElement = null;
-          state = PARSER_STATE.TEXT;
-          textContent = '';
-          textStart = pos + 1;
+          setAttribute('', pos, pos, pos);
+          finishOpenTag(pos + 1, false);
         }
         break;
 
@@ -415,35 +297,11 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
           attrValueStart = pos + 1;
           state = PARSER_STATE.ATTR_VALUE_Q;
         } else if (char === '$' && nextChar === '{') {
-          attrValueStart = pos;
-          let braceDepth = 0;
-          let i = pos;
-          while (i < html.length) {
-            if (html[i] === '$' && html[i + 1] === '{') {
-              braceDepth++;
-              i += 2;
-              continue;
-            }
-            if (html[i] === '{') {
-              braceDepth++;
-            } else if (html[i] === '}') {
-              braceDepth--;
-              if (braceDepth === 0) {
-                attrValue = html.substring(attrValueStart, i + 1);
-                currentElement!.attributes.set(attrName, {
-                  name: attrName,
-                  value: attrValue,
-                  start: attrStart,
-                  end: i + 1,
-                  valueStart: attrValueStart,
-                  valueEnd: i + 1,
-                });
-                pos = i;
-                state = PARSER_STATE.TAG_SPACE;
-                break;
-              }
-            }
-            i++;
+          const valueEnd = templateExpressionEnd(html, pos);
+          if (valueEnd !== -1) {
+            setAttribute(html.substring(pos, valueEnd), valueEnd, pos, valueEnd);
+            pos = valueEnd - 1;
+            state = PARSER_STATE.TAG_SPACE;
           }
         } else if (char !== ' ' && char !== '\t' && char !== '\n' && char !== '\r') {
           attrValue = char;
@@ -454,14 +312,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
 
       case PARSER_STATE.ATTR_VALUE_Q:
         if (char === quoteChar) {
-          currentElement!.attributes.set(attrName, {
-            name: attrName,
-            value: attrValue,
-            start: attrStart,
-            end: pos + 1,
-            valueStart: attrValueStart,
-            valueEnd: pos,
-          });
+          setAttribute(attrValue, pos + 1, attrValueStart, pos);
           state = PARSER_STATE.TAG_SPACE;
         } else {
           attrValue += char;
@@ -470,42 +321,18 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
 
       case PARSER_STATE.ATTR_VALUE_UQ:
         if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
-          currentElement!.attributes.set(attrName, {
-            name: attrName,
-            value: attrValue,
-            start: attrStart,
-            end: pos,
-            valueStart: attrValueStart,
-            valueEnd: pos,
-          });
+          setAttribute(attrValue, pos, attrValueStart, pos);
           state = PARSER_STATE.TAG_SPACE;
         } else if (char === '>') {
-          currentElement!.attributes.set(attrName, {
-            name: attrName,
-            value: attrValue,
-            start: attrStart,
-            end: pos,
-            valueStart: attrValueStart,
-            valueEnd: pos,
-          });
-          currentElement!.openTagEnd = pos + 1;
-          if (currentElement!.isVoid) {
-            currentElement!.closeTagStart = pos + 1;
-            currentElement!.closeTagEnd = pos + 1;
-          }
-          const finalized6 = pushElement(currentElement!);
-          findBindingsInAttributes(finalized6, bindings, options);
-          currentElement = null;
-          state = PARSER_STATE.TEXT;
-          textContent = '';
-          textStart = pos + 1;
+          setAttribute(attrValue, pos, attrValueStart, pos);
+          finishOpenTag(pos + 1, false);
         } else {
           attrValue += char;
         }
         break;
 
       case PARSER_STATE.TAG_CLOSE:
-        if (/[\w-]/.test(char)) {
+        if (/[\w\-:]/.test(char)) {
           tagName += char;
         } else if (char === '>') {
           flushText();
@@ -513,7 +340,6 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
           state = PARSER_STATE.TEXT;
           textContent = '';
           textStart = pos + 1;
-        } else if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
         }
         break;
 

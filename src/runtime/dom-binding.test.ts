@@ -1,171 +1,109 @@
 import { describe, expect, test } from 'bun:test';
-import { __bindIfExpr } from './internal.js';
-import { signal } from './signal.js';
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-class FakeElement {
-  tagName: string;
-  id = '';
-  parentNode: FakeElement | null = null;
-  children: FakeElement[] = [];
-
-  constructor(tagName: string) {
-    this.tagName = tagName.toUpperCase();
-  }
-
-  appendChild(child: FakeElement): FakeElement {
-    child.parentNode = this;
-    this.children.push(child);
-    return child;
-  }
-
-  remove(): void {
-    if (!this.parentNode) return;
-    const idx = this.parentNode.children.indexOf(this);
-    if (idx >= 0) this.parentNode.children.splice(idx, 1);
-    this.parentNode = null;
-  }
-
-  replaceWith(next: FakeElement): void {
-    if (!this.parentNode) return;
-    const idx = this.parentNode.children.indexOf(this);
-    if (idx >= 0) {
-      next.parentNode = this.parentNode;
-      this.parentNode.children[idx] = next;
-      this.parentNode = null;
+// These tests run in a child process: dom-binding.ts caches its parsing <template> in module state,
+// which bun shares between test files, so each script gets a runtime of its own. The fake DOM has
+// nodes with siblings, fragments, insertBefore and remove; a <template>'s innerHTML is a
+// space-separated list of node names (`#text` a text node).
+const run = (body: string): unknown => {
+  const internalUrl = pathToFileURL(join(dirname(import.meta.path), 'internal.ts')).href;
+  const signalUrl = pathToFileURL(join(dirname(import.meta.path), 'signal.ts')).href;
+  const script = `
+    class Node_ {
+      constructor(name) { this.name = name; this.parentNode = null; this.childNodes = []; }
+      get nextSibling() { const l = this.parentNode?.childNodes; return l?.[l.indexOf(this) + 1] ?? null; }
+      appendChild(c) { c.parentNode = this; this.childNodes.push(c); return c; }
+      insertBefore(n, ref) {
+        const nodes = n.name === '#fragment' ? [...n.childNodes] : [n];
+        for (const c of nodes) { this.childNodes.splice(ref ? this.childNodes.indexOf(ref) : this.childNodes.length, 0, c); c.parentNode = this; }
+        if (n.name === '#fragment') n.childNodes = [];
+        return n;
+      }
+      remove() { if (!this.parentNode) return; const l = this.parentNode.childNodes; l.splice(l.indexOf(this), 1); this.parentNode = null; }
     }
-  }
-
-  querySelector(selector: string): FakeElement | null {
-    if (!selector.startsWith('#')) return null;
-    const wantedId = selector.slice(1);
-    return this.findById(wantedId);
-  }
-
-  protected findById(wantedId: string): FakeElement | null {
-    if (this.id === wantedId) return this;
-    for (const child of this.children) {
-      const found = child.findById(wantedId);
-      if (found) return found;
-    }
-    return null;
-  }
-
-  cloneDeep(): FakeElement {
-    const clone = new FakeElement(this.tagName);
-    clone.id = this.id;
-    for (const child of this.children) {
-      clone.appendChild(child.cloneDeep());
-    }
-    return clone;
-  }
-}
-
-class FakeDocumentFragment {
-  firstElementChild: FakeElement | null;
-
-  constructor(firstElementChild: FakeElement | null) {
-    this.firstElementChild = firstElementChild;
-  }
-
-  cloneNode(): FakeDocumentFragment {
-    return new FakeDocumentFragment(this.firstElementChild ? this.firstElementChild.cloneDeep() : null);
-  }
-}
-
-class FakeTemplateElement extends FakeElement {
-  private _innerHTML = '';
-  content = new FakeDocumentFragment(null);
-
-  constructor() {
-    super('template');
-  }
-
-  set innerHTML(value: string) {
-    this._innerHTML = value;
-    this.content = new FakeDocumentFragment(parseSingleRootElement(value));
-  }
-
-  get innerHTML(): string {
-    return this._innerHTML;
-  }
-}
-
-const parseSingleRootElement = (html: string): FakeElement => {
-  const trimmed = html.trim();
-  const match = /^<([a-zA-Z0-9-]+)([^>]*)>/.exec(trimmed);
-  const tag = match?.[1] ?? 'div';
-  const attrs = match?.[2] ?? '';
-
-  const el = new FakeElement(tag);
-  const idMatch = /\sid\s*=\s*["']([^"']+)["']/.exec(attrs);
-  if (idMatch?.[1]) {
-    el.id = idMatch[1];
-  }
-  return el;
+    globalThis.document = {
+      createElement: (tag) => {
+        const t = new Node_(tag);
+        t.content = new Node_('#fragment');
+        Object.defineProperty(t, 'innerHTML', { set(v) { t.content = new Node_('#fragment'); for (const n of v.split(' ').filter(Boolean)) t.content.appendChild(new Node_(n)); } });
+        return t;
+      },
+    };
+    const errors = [];
+    globalThis.queueMicrotask = (cb) => { try { cb(); } catch (e) { errors.push(e.message); } };
+    const { __bindIfExpr } = await import(${JSON.stringify(internalUrl)});
+    const { signal } = await import(${JSON.stringify(signalUrl)});
+    const root = new Node_('div');
+    const start = root.appendChild(new Node_('start'));
+    const end = root.appendChild(new Node_('end'));
+    const range = () => { const r = []; for (let n = start.nextSibling; n !== end; n = n.nextSibling) r.push(n); return r; };
+    ${body}
+  `;
+  const child = Bun.spawnSync([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' });
+  const out = child.stdout.toString().trim().split('\n').at(-1) ?? '';
+  if (!out) throw new Error(child.stderr.toString());
+  return JSON.parse(out);
 };
 
 describe('dom-binding remount semantics', () => {
   test('whenElse remount re-initializes nested bindings and does not reuse stale branch DOM', () => {
-    const originalDocument = (globalThis as any).document;
-    (globalThis as any).document = {
-      createElement: (tagName: string) => {
-        if (tagName.toLowerCase() === 'template') return new FakeTemplateElement();
-        return new FakeElement(tagName);
-      },
-    };
+    expect(
+      run(`
+        const show = signal(false);
+        let inits = 0;
+        let cleanups = 0;
+        const dispose = __bindIfExpr(start, end, [show], () => show(), 'div', () => { inits++; return [() => cleanups++]; });
+        const steps = [{ inits, cleanups, shown: range().length }];
+        show(true);
+        const first = range()[0];
+        steps.push({ inits, cleanups, shown: range().length });
+        show(false);
+        steps.push({ inits, cleanups, shown: range().length });
+        show(true);
+        const second = range()[0];
+        steps.push({ inits, cleanups, shown: range().length, fresh: second !== first });
+        show(false);
+        dispose();
+        steps.push({ inits, cleanups, shown: range().length });
+        console.log(JSON.stringify(steps));
+      `),
+    ).toEqual([
+      { inits: 0, cleanups: 0, shown: 0 },
+      { inits: 1, cleanups: 0, shown: 1 },
+      { inits: 1, cleanups: 1, shown: 0 },
+      { inits: 2, cleanups: 1, shown: 1, fresh: true },
+      { inits: 2, cleanups: 2, shown: 0 },
+    ]);
+  });
+});
 
-    try {
-      const root = new FakeElement('div');
-      const anchor = new FakeTemplateElement();
-      anchor.id = 'cond-1';
-      root.appendChild(anchor);
-
-      const show = signal(false);
-      let initNestedCount = 0;
-      let cleanupCount = 0;
-
-      const dispose = __bindIfExpr(
-        root as any,
-        [show],
-        () => show(),
-        'cond-1',
-        '<div id="cond-1"></div>',
-        () => {
-          initNestedCount++;
-          return [() => cleanupCount++];
-        },
-      );
-
-      expect(initNestedCount).toBe(0);
-      expect(cleanupCount).toBe(0);
-      expect(root.querySelector('#cond-1')?.tagName).toBe('TEMPLATE');
-
-      show(true);
-      const firstShownNode = root.querySelector('#cond-1');
-      expect(firstShownNode).toBeTruthy();
-      expect(firstShownNode?.tagName).toBe('DIV');
-      expect(initNestedCount).toBe(1);
-      expect(cleanupCount).toBe(0);
-
-      show(false);
-      expect(root.querySelector('#cond-1')?.tagName).toBe('TEMPLATE');
-      expect(initNestedCount).toBe(1);
-      expect(cleanupCount).toBe(1);
-
-      show(true);
-      const secondShownNode = root.querySelector('#cond-1');
-      expect(secondShownNode).toBeTruthy();
-      expect(secondShownNode?.tagName).toBe('DIV');
-      expect(secondShownNode).not.toBe(firstShownNode);
-      expect(initNestedCount).toBe(2);
-      expect(cleanupCount).toBe(1);
-
-      show(false);
-      expect(cleanupCount).toBe(2);
-      dispose();
-      expect(cleanupCount).toBe(2);
-    } finally {
-      (globalThis as any).document = originalDocument;
-    }
+describe('a branch template with no element', () => {
+  // A whenElse() branch that is only text and starts hidden (M1). Before A1-3 its placeholder was
+  // replaced by `null` (the text "null" in a real DOM) and the binding went inert; between anchors the
+  // text is inserted and removed like any other content.
+  test('a text-only branch that starts hidden shows its text and keeps toggling, without errors', () => {
+    expect(
+      run(`
+        const show = signal(false);
+        const inits = [];
+        let cleanups = 0;
+        const dispose = __bindIfExpr(start, end, [show], () => show(), '#text', (first) => { inits.push(first.name); return [() => cleanups++]; });
+        const seen = [];
+        for (let i = 0; i < 3; i++) {
+          show(true);
+          seen.push(range().map((n) => n.name).join());
+          show(false);
+          seen.push(range().map((n) => n.name).join());
+        }
+        dispose();
+        console.log(JSON.stringify({ seen, inits, cleanups, errors }));
+      `),
+    ).toEqual({
+      seen: ['#text', '', '#text', '', '#text', ''],
+      inits: ['#text', '#text', '#text'],
+      cleanups: 3,
+      errors: [],
+    });
   });
 });

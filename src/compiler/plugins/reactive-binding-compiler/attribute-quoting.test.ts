@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { processHtmlTemplateWithConditionals, replaceExpressionsWithValues } from './template-processing.js';
+import { processHtmlTemplateWithConditionals } from './template-processing.js';
 
 /**
  * Regression tests for unquoted attribute value quoting.
@@ -185,29 +185,6 @@ describe('unquoted attribute value quoting', () => {
   });
 });
 
-// ─── replaceExpressionsWithValues ────────────────────────────────────────
-
-describe('replaceExpressionsWithValues quoting', () => {
-  test('replaces unquoted attr expression with quoted value', () => {
-    const inits = new Map<string, string | number | boolean>([['name', 'hello']]);
-    const result = replaceExpressionsWithValues('<div title=${name()}></div>', inits);
-    expect(result).toContain('title="hello"');
-  });
-
-  test('does not double-quote already-positioned text content', () => {
-    const inits = new Map<string, string | number | boolean>([['name', 'hello']]);
-    const result = replaceExpressionsWithValues('<div>${name()}</div>', inits);
-    // In text content position (after >), should NOT be wrapped in quotes
-    expect(result).toContain('>hello<');
-  });
-
-  test('replaces unquoted attr with empty quoted value', () => {
-    const inits = new Map<string, string | number | boolean>();
-    const result = replaceExpressionsWithValues('<div title=${name()}></div>', inits);
-    expect(result).toContain('title=""');
-  });
-});
-
 // ─── when-directive contexts ────────────────────────────────────────────
 
 describe('unquoted attrs inside when-directive elements', () => {
@@ -250,8 +227,8 @@ describe('attribute ordering and completeness', () => {
   test('static-dynamic-static: all attrs present in original order', () => {
     const { processedContent } = process('<div class="card" title=${label()} data-testid="item">${label()}</div>');
     const names = attrNames(processedContent);
-    // id is injected first by the compiler
-    expect(names[0]).toBe('id');
+    // the bound element's mark (stripped when the template is emitted) is injected first by the compiler
+    expect(names[0]).toBe('data-thane-ref');
     expect(names).toContain('class');
     expect(names).toContain('title');
     expect(names).toContain('data-testid');

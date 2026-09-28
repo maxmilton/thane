@@ -2,9 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
 import { generateInitBindingsFunction } from './codegen.js';
 import { transformDefineComponentSource } from './index.js';
-import { CLOSURE_ACCESS } from './types.js';
+import type { EmitOptions } from './types.js';
 
 type Init = [string, string | number | boolean];
+const DEV: EmitOptions = { html: (template) => template, selector: (name) => name };
 const inits = (entries: Init[] = []) => new Map<string, string | number | boolean>(entries);
 const processTemplate = (template: string, initializers = inits()) =>
   processHtmlTemplateWithConditionals(template, initializers, 0);
@@ -16,13 +17,15 @@ const generate = (template: string, initializers = inits()) => {
     r.whenElseBlocks,
     r.repeatBlocks,
     r.eventBindings,
-    'x.ts',
-    CLOSURE_ACCESS,
+    DEV,
+    undefined,
+    [],
+    r.processedContent,
   ).code;
 };
 
 describe('when() content is processed as a sub-template', () => {
-  test('event handlers on elements inside a when() block get their own element ids', () => {
+  test('event handlers on elements inside a when() block get their own element marks', () => {
     const { conditionals, eventBindings, processedContent } = processTemplate(
       '<div ${when(show())}><button @click=${a}>A</button><button @click=${b}>B</button></div>',
       inits([['show', true]]),
@@ -34,10 +37,15 @@ describe('when() content is processed as a sub-template', () => {
       ['b1', 'a'],
       ['b2', 'b'],
     ]);
-    expect(cond.templateContent).toBe('<div id="b0"><button id="b1">A</button><button id="b2">B</button></div>');
+    // Bound elements carry a compile-time mark (stripped from the emitted HTML), not an id (A1-2)
+    // Bound elements carry a compile-time mark (stripped from the emitted HTML), not an id (A1-2),
+    // and the content is the element as written, without the directive's id (A1-3)
+    expect(cond.templateContent).toBe(
+      '<div><button data-thane-ref="b1">A</button><button data-thane-ref="b2">B</button></div>',
+    );
     // Not duplicated at the top level — the conditional's initializer owns them
     expect(eventBindings).toHaveLength(0);
-    expect(processedContent).toContain('<button id="b1">A</button>');
+    expect(processedContent).toContain('<button data-thane-ref="b1">A</button>');
   });
 
   test('content following a when() block that contains an event handler is preserved', () => {
@@ -45,7 +53,10 @@ describe('when() content is processed as a sub-template', () => {
       '<div ${when(show())}><button @click=${a}>A</button></div><p data-testid="after">AFTER</p>',
       inits([['show', true]]),
     );
-    expect(processedContent).toBe('<div id="b0"><button id="b1">A</button></div><p data-testid="after">AFTER</p>');
+    // The content sits between the directive's two anchors (marked while compiling, <!----> once emitted)
+    expect(processedContent).toBe(
+      '<!--b0(--><div><button data-thane-ref="b1">A</button></div><!--b0)--><p data-testid="after">AFTER</p>',
+    );
   });
 
   test('whenElse inside a when() block is owned by the conditional and adjacent content stays intact', () => {
@@ -62,7 +73,7 @@ describe('when() content is processed as a sub-template', () => {
     expect(cond.nestedWhenElse).toHaveLength(1);
     const we = cond.nestedWhenElse[0]!;
     expect(cond.templateContent).toBe(
-      `<div id="b0"><u id="${we.thenId}">a</u><template id="${we.elseId}"></template></div>`,
+      `<div><!--${we.thenId}(--><u>a</u><!--${we.thenId}|--><!--${we.thenId})--></div>`,
     );
     expect(r.processedContent).toContain('<p>AFTER-MARKER</p>');
   });
@@ -77,8 +88,9 @@ describe('when() content is processed as a sub-template', () => {
     const cond = r.conditionals[0]!;
     expect(cond.nestedRepeats).toHaveLength(1);
     const rep = cond.nestedRepeats[0]!;
-    expect(cond.templateContent).toBe(`<ul id="b0"><template id="${rep.id}"></template></ul>`);
-    expect(r.processedContent).toBe(`<ul id="b0"><template id="${rep.id}"></template></ul><p>AFTER</p>`);
+    // The list's anchor is a comment (A1-4)
+    expect(cond.templateContent).toBe(`<ul><!--${rep.id}.--></ul>`);
+    expect(r.processedContent).toBe(`<!--b0(--><ul><!--${rep.id}.--></ul><!--b0)--><p>AFTER</p>`);
   });
 
   test('bindings inside a nested when() belong to the nested block only', () => {
@@ -97,17 +109,18 @@ describe('when() content is processed as a sub-template', () => {
     expect(inner.nestedBindings).toHaveLength(1);
     expect(inner.nestedBindings[0]!.conditionalId).toBe(inner.id);
     expect(outer.templateContent).toBe(
-      `<div id="b0"><p id="${inner.id}">inner-<!--${inner.nestedBindings[0]!.id}-->1<!----></p></div>`,
+      `<div><!--${inner.id}(--><p>inner-<!--${inner.nestedBindings[0]!.id}-->1<!----></p><!--${inner.id})--></div>`,
     );
   });
 
   test('a when() condition without a known initializer defers rendering to the runtime', () => {
     const r = processTemplate('<div ${when(localFlag === "on")}>maybe</div>');
     expect(r.conditionals[0]!.initialValue).toBeUndefined();
-    expect(r.processedContent).toBe('<template id="b0"></template>');
+    // Nothing between the anchors: the runtime shows the content if the condition holds at mount
+    expect(r.processedContent).toBe('<!--b0(--><!--b0)-->');
   });
 
-  test('a user-supplied id on a when() element is reused as the conditional id without duplication', () => {
+  test('a user-supplied id on a when() element stays on the element; the directive has its own id', () => {
     const r = processTemplate(
       '<div id="box" ${when(show())} class=${cls()}>x</div>',
       inits([
@@ -115,8 +128,8 @@ describe('when() content is processed as a sub-template', () => {
         ['cls', 'c'],
       ]),
     );
-    expect(r.conditionals[0]!.id).toBe('box');
-    expect(r.processedContent).toBe('<div id="box" class="c">x</div>');
+    expect(r.conditionals[0]!.id).toBe('b0');
+    expect(r.processedContent).toBe('<!--b0(--><div data-thane-ref="b1" id="box" class="c">x</div><!--b0)-->');
   });
 });
 
@@ -131,13 +144,20 @@ describe('generated initializer for when() content', () => {
       ]),
     );
 
-    expect(code).toContain("__bindIf(r, show, 'b0'");
-    expect(code).toMatch(/_gid\('b\d+'\)\?\.addEventListener\('click', a\)/);
-    expect(code).toContain('__bindIfExpr(r, [inner], () => inner()');
-    expect(code).toContain('__bindIfExpr(r, [inner], () => !(inner())');
-    expect(code).toMatch(/count\.subscribe\(v => \{ b\d+\.nextSibling\.data = v \?\? ''; \}, true\)/);
+    expect(code).toMatch(/__bindIf\(_ws_b0, _we_b0, show, /);
+    // The initializer reaches the button by path from the content's root element
+    expect(code).toMatch(
+      /\(_c\) => \{\s+const (b\d+) = _c\.firstElementChild;[\s\S]*\1\.addEventListener\('click', a\)/,
+    );
+    // The nested whenElse() is bound over anchors the when() content's initializer reached from `_c`
+    expect(code).toContain('__bindIfExpr(_ws_b1, _wm_b1, [inner], () => inner()');
+    expect(code).toContain('__bindIfExpr(_wm_b1, _we_b1, [inner], () => !(inner())');
+    // The text binding writes its text node, reached by path from the button (A1-4)
+    expect(code).toMatch(
+      /const (b\d+) = b\d+\.nextSibling\.firstChild\.nextSibling;[\s\S]*count\.subscribe\(v => \{ \1\.data = v \?\? ''; \}, true\)/,
+    );
     // Nothing from inside the block leaks into the top-level initializer
-    expect(code.split("__bindIf(r, show, 'b0'")[0]).not.toContain('addEventListener');
+    expect(code.split('__bindIf(_ws_b0')[0]).not.toContain('addEventListener');
   });
 
   test('imports runtime helpers that are only used inside nested directive content', () => {

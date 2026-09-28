@@ -1,8 +1,45 @@
-export const minifyHTML = (html: string): string => {
+/**
+ * Text minifiers for the two languages the compiler owns. They are only ever given text the
+ * compiler knows to be HTML (a compiled template) or CSS (a `css` template, a `.css` import),
+ * at compile time. Emitted JavaScript is never passed through them.
+ */
+
+/**
+ * Elements whose content is not HTML text: whitespace is significant in it (`pre`, `textarea`)
+ * or it is another language (`script`, where a line break ends a `//` comment, and `style`).
+ * They are carried through exactly as written.
+ */
+const VERBATIM_ELEMENT = /<(pre|textarea|script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+// Private-use characters: never in real markup
+const VERBATIM_OPEN = '';
+const VERBATIM_CLOSE = '';
+
+/**
+ * Apply `transform` to the HTML outside verbatim elements, which are masked while it runs and put
+ * back as written. Every place that collapses a template's whitespace goes through it (H-03).
+ */
+export const outsideVerbatim = (html: string, transform: (html: string) => string): string => {
+  const verbatim: string[] = [];
+  const masked = html.replace(VERBATIM_ELEMENT, (block) => {
+    verbatim.push(block);
+    return `${VERBATIM_OPEN}${verbatim.length - 1}${VERBATIM_CLOSE}`;
+  });
+  const result = transform(masked);
+  if (verbatim.length === 0) return result;
+  return result.replace(
+    new RegExp(`${VERBATIM_OPEN}(\\d+)${VERBATIM_CLOSE}`, 'g'),
+    (_match, index: string) => verbatim[Number(index)]!,
+  );
+};
+
+export const minifyHTML = (html: string): string => outsideVerbatim(html, collapseHTML);
+
+const collapseHTML = (html: string): string => {
   return (
     html
       .replace(/\s+/g, ' ')
-      .replace(/>\s+<(?![!-])/g, '><')
+      // A binding's boundary keeps the space before an element, which is text (H-53)
+      .replace(/(?<!<!----)>\s+<(?![!-])|>\s+<(?=\/)/g, '><')
       // Strip non-binding HTML comments (preserve <!--bN-->, <!--iN-->, <!--[if]-->, and <!----> boundary)
       .replace(/<!--(?!b\d)(?!i\d)(?!\[)(?!--)[\s\S]*?-->/g, '')
       // Repair: aggressive strip may have merged binding markers with boundary comments;
@@ -15,169 +52,69 @@ export const minifyHTML = (html: string): string => {
   );
 };
 
+const NO_SPACE_AFTER = new Set(['{', '}', ';', ',', ':', '(']);
+const NO_SPACE_BEFORE = new Set(['{', '}', ';', ',', ')']);
+const COMBINATORS = new Set(['>', '+', '~']);
+
+/**
+ * Minify CSS in one pass: comments go, runs of whitespace collapse, and a space is dropped
+ * only where CSS never needs it. Two spaces are significant and kept:
+ *   - around `+`, `-`, `>` inside parentheses (`calc(100% + 1px)` is invalid without them);
+ *   - before a `:` (`.a :hover` is a descendant selector, `.a:hover` is not).
+ * Quoted strings are copied verbatim.
+ */
 export const minifyCSS = (css: string): string => {
-  return css
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\s+/g, ' ')
-    .replace(/([{;:,])\s+/g, '$1')
-    .replace(/\s+([};:,])/g, '$1')
-    .replace(/\s*([>+~])\s*/g, '$1')
-    .replace(/\)\s+\{/g, '){')
-    .replace(/:\s+/g, ':')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-};
+  let out = '';
+  let parenDepth = 0;
+  let pendingSpace = false;
+  const length = css.length;
 
-export const minifyTemplatesInSource = (source: string): string => {
-  const result: string[] = [];
-  let i = 0;
-
-  while (i < source.length) {
-    const char = source[i]!;
-    if (char === '`') {
-      const templateContent = extractTemplateLiteral(source, i);
-
-      if (templateContent !== null) {
-        const { content, endIndex } = templateContent;
-        const minified = minifyTemplateContent(content);
-
-        result.push('`' + minified + '`');
-        i = endIndex + 1;
-        continue;
-      }
+  const emit = (text: string): void => {
+    const next = text[0]!;
+    const prev = out[out.length - 1];
+    if (pendingSpace && prev !== undefined) {
+      const droppable =
+        NO_SPACE_AFTER.has(prev) ||
+        NO_SPACE_BEFORE.has(next) ||
+        (parenDepth === 0 && (COMBINATORS.has(prev) || COMBINATORS.has(next)));
+      if (!droppable) out += ' ';
     }
-    if (char === '"' || char === "'") {
-      const quote = char;
-      result.push(quote);
-      i++;
+    pendingSpace = false;
+    // the last declaration of a block does not need its semicolon
+    if (next === '}' && out.endsWith(';')) out = out.slice(0, -1);
+    out += text;
+  };
 
-      while (i < source.length && source[i] !== quote) {
-        if (source[i] === '\\' && i + 1 < source.length) {
-          result.push(source[i]!, source[i + 1]!);
-          i += 2;
-        } else {
-          result.push(source[i]!);
-          i++;
-        }
-      }
+  for (let i = 0; i < length; i++) {
+    const ch = css[i]!;
 
-      if (i < source.length) {
-        result.push(source[i]!); // closing quote
-        i++;
-      }
+    if (ch === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = end === -1 ? length : end + 1;
+      pendingSpace = true;
       continue;
     }
-    if (char === '/' && i + 1 < source.length) {
-      if (source[i + 1] === '/') {
-        while (i < source.length && source[i] !== '\n') {
-          result.push(source[i]!);
-          i++;
-        }
-        continue;
-      } else if (source[i + 1] === '*') {
-        result.push('/*');
-        i += 2;
-        while (i < source.length - 1 && !(source[i] === '*' && source[i + 1] === '/')) {
-          result.push(source[i]!);
-          i++;
-        }
-        if (i < source.length - 1) {
-          result.push('*/');
-          i += 2;
-        }
-        continue;
-      }
-    }
 
-    result.push(char);
-    i++;
-  }
-
-  return result.join('');
-};
-
-const extractTemplateLiteral = (source: string, startIndex: number): { content: string; endIndex: number } | null => {
-  if (source[startIndex] !== '`') return null;
-
-  let i = startIndex + 1;
-  let content = '';
-  let braceDepth = 0;
-
-  while (i < source.length) {
-    const char = source[i]!;
-    if (char === '\\' && i + 1 < source.length) {
-      content += char + source[i + 1]!;
-      i += 2;
+    if (ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r' || ch === '\f') {
+      pendingSpace = true;
       continue;
     }
-    if (char === '$' && i + 1 < source.length && source[i + 1] === '{') {
-      content += '${';
-      i += 2;
-      braceDepth = 1;
-      while (i < source.length && braceDepth > 0) {
-        const innerChar = source[i]!;
 
-        if (innerChar === '\\' && i + 1 < source.length) {
-          content += innerChar + source[i + 1]!;
-          i += 2;
-          continue;
-        }
-
-        if (innerChar === '{') {
-          braceDepth++;
-        } else if (innerChar === '}') {
-          braceDepth--;
-        } else if (innerChar === '`') {
-          const nested = extractTemplateLiteral(source, i);
-          if (nested) {
-            content += '`' + nested.content + '`';
-            i = nested.endIndex + 1;
-            continue;
-          }
-        } else if (innerChar === '"' || innerChar === "'") {
-          const quote = innerChar;
-          content += quote;
-          i++;
-          while (i < source.length && source[i] !== quote) {
-            if (source[i] === '\\' && i + 1 < source.length) {
-              content += source[i]! + source[i + 1]!;
-              i += 2;
-            } else {
-              content += source[i]!;
-              i++;
-            }
-          }
-          if (i < source.length) {
-            content += source[i]!;
-            i++;
-          }
-          continue;
-        }
-
-        content += innerChar;
-        i++;
+    if (ch === '"' || ch === "'") {
+      let end = i + 1;
+      while (end < length && css[end] !== ch) {
+        if (css[end] === '\\') end++;
+        end++;
       }
+      emit(css.slice(i, end + 1));
+      i = end;
       continue;
     }
-    if (char === '`') {
-      return { content, endIndex: i };
-    }
 
-    content += char;
-    i++;
+    emit(ch);
+    if (ch === '(') parenDepth++;
+    else if (ch === ')' && parenDepth > 0) parenDepth--;
   }
-  return null;
-};
 
-const minifyTemplateContent = (content: string): string => {
-  const hasHTMLTags = /<[a-zA-Z][^>]*>/.test(content) || /<\/[a-zA-Z][^>]*>/.test(content);
-  const hasCSSRules = /[{;]\s*[a-zA-Z-]+\s*:/.test(content) || /^\s*\.[a-zA-Z]/.test(content);
-
-  if (hasHTMLTags) {
-    return minifyHTML(content);
-  } else if (hasCSSRules) {
-    return minifyCSS(content);
-  } else {
-    return content.replace(/\s+/g, ' ').trim();
-  }
+  return out;
 };

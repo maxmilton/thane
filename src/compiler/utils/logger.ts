@@ -24,13 +24,6 @@ export class Logger {
   }
 
   /**
-   * Get current log level
-   */
-  getLevel(): LogLevel {
-    return this.level;
-  }
-
-  /**
    * Log an error (always shown unless silent)
    * Supports: error(message), error(tag, message), error(tag, message, error)
    */
@@ -87,14 +80,6 @@ export class Logger {
   }
 
   /**
-   * Log a success message (shown in normal and verbose)
-   */
-  success(message: string): void {
-    if (this.level === 'silent') return;
-    console.log(`${ansi.green}[thane]${ansi.reset} ${message}`);
-  }
-
-  /**
    * Log a verbose/debug message (only shown in verbose)
    */
   verbose(message: string): void {
@@ -126,42 +111,6 @@ export class Logger {
    */
   diagnostics(diagnostics: Diagnostic[]): void {
     diagnostics.forEach((d) => this.diagnostic(d));
-  }
-
-  /**
-   * Start a timed operation
-   */
-  time(label: string): void {
-    if (this.level === 'verbose') {
-      console.time(`${ansi.dim}[thane] ${label}${ansi.reset}`);
-    }
-  }
-
-  /**
-   * End a timed operation
-   */
-  timeEnd(label: string): void {
-    if (this.level === 'verbose') {
-      console.timeEnd(`${ansi.dim}[thane] ${label}${ansi.reset}`);
-    }
-  }
-
-  /**
-   * Create a sub-section (verbose only)
-   */
-  section(title: string): void {
-    if (this.level === 'verbose') {
-      console.log(`\n${ansi.magenta}${title}${ansi.reset}`);
-    }
-  }
-
-  /**
-   * Log a blank line (normal and verbose)
-   */
-  newline(): void {
-    if (this.level !== 'silent') {
-      console.log();
-    }
   }
 }
 

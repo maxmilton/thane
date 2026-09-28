@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { createKeyedReconciler } from './dom-binding.js';
+import { __batchRows, createKeyedReconciler } from './dom-binding.js';
 
 /**
  * A minimal DOM stand-in: enough of Node/Element for the keyed reconciler, which only
@@ -259,14 +259,10 @@ describe('batch row creation', () => {
         return { el: el as unknown as Element, cleanups: [], value: item, update: () => {} };
       },
       'id',
-      {
-        size,
-        row: template as unknown as Node,
-        bind: (el, item, index) => {
-          bound.push({ el: el as unknown as FakeNode, item, index });
-          return { el, cleanups: [], value: item, update: () => {} };
-        },
-      },
+      __batchRows<Row>(size, template as unknown as Node, (el, item, index) => {
+        bound.push({ el: el as unknown as FakeNode, item, index });
+        return { el, cleanups: [], value: item, update: () => {} };
+      }),
     );
     const order = () => tbody.childNodes.map((n) => n.name);
     return { tbody, anchor, template, reconciler, bound, singles, order };
@@ -342,16 +338,16 @@ describe('shared update function for lean rows', () => {
         return { el: el as unknown as Element, cleanups: [], value: item, p0: item.label } as never;
       },
       'id',
-      {
-        size: 100,
-        row: template as unknown as Node,
-        bind: (el, item) => ({ el, cleanups: [], value: item, p0: item.label }) as never,
-        update: (managed, item, index) => {
+      __batchRows<Row>(
+        100,
+        template as unknown as Node,
+        (el, item) => ({ el, cleanups: [], value: item, p0: item.label }) as never,
+        (managed, item, index) => {
           const record = managed as unknown as { value: Row; p0: string };
           calls.push({ id: item.id, index, valueId: record.value.id, p0: record.p0 });
           record.p0 = item.label;
         },
-      },
+      ),
     );
     const rows = [
       { id: 1, label: 'a' },

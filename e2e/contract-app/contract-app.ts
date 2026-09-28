@@ -1,6 +1,6 @@
 import { defineComponent, signal, registerGlobalStyles } from 'thane';
 import { batch, computed, effect } from 'thane';
-import { mountComponent } from 'thane';
+import { mountComponent } from 'thane/runtime';
 import type { MountHandle } from 'thane';
 import { ChildCounter } from './child-counter.js';
 import { StyledChild } from './styled-child.js';

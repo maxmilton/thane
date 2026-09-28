@@ -73,24 +73,14 @@ export const watchAndRecursivelyCopyAssetsIntoDist = (
         const destPath = path.join(dest, filename);
 
         try {
-          if (eventType === 'change') {
-            const stat = await fs.promises.lstat(srcPath).catch(() => null);
-            if (stat?.isDirectory()) {
-              await recursivelyCopyAssetsIntoDist(srcPath, destPath);
-            } else if (stat) {
-              await fs.promises.copyFile(srcPath, destPath);
-            }
+          // fs.watch reports only `change` and `rename`; a path that has gone is removed on `rename`
+          const stat = await fs.promises.lstat(srcPath).catch(() => null);
+          if (stat?.isDirectory()) {
+            await recursivelyCopyAssetsIntoDist(srcPath, destPath);
+          } else if (stat) {
+            await fs.promises.copyFile(srcPath, destPath);
           } else if (eventType === 'rename') {
-            const stat = await fs.promises.lstat(srcPath).catch(() => null);
-            if (stat) {
-              if (stat.isDirectory()) {
-                await recursivelyCopyAssetsIntoDist(srcPath, destPath);
-              } else {
-                await fs.promises.copyFile(srcPath, destPath);
-              }
-            } else {
-              await fs.promises.rm(destPath, { recursive: true, force: true }).catch(() => {});
-            }
+            await fs.promises.rm(destPath, { recursive: true, force: true }).catch(() => {});
           }
           onUpdate?.();
         } catch (error) {

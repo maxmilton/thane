@@ -6,15 +6,6 @@ export interface SourceEdit {
   replacement: string;
 }
 
-/**
- * Represents a code removal (edit with empty replacement)
- */
-export interface CodeRemoval {
-  start: number;
-  end: number;
-  description?: string;
-}
-
 /** Apply multiple edits to source code (applied bottom-to-top to avoid position shifting). */
 export const applyEdits = (source: string, edits: SourceEdit[]): string => {
   if (edits.length === 0) return source;
@@ -39,14 +30,4 @@ export const applyEdits = (source: string, edits: SourceEdit[]): string => {
   }
 
   return result;
-};
-
-/** Remove code at specified positions. */
-export const removeCode = (source: string, removals: CodeRemoval[]): string => {
-  const edits: SourceEdit[] = removals.map((r) => ({
-    start: r.start,
-    end: r.end,
-    replacement: '',
-  }));
-  return applyEdits(source, edits);
 };

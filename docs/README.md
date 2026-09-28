@@ -60,7 +60,7 @@ export const Greeter = defineComponent<{ name: string }>('app-greeter', ({ props
 
 ## Templates
 
-Tagged template literals — `html```, text bindings, attribute bindings, style bindings, and HTML fragment injection.
+Tagged template literals — `html` templates, text bindings, attribute bindings, style bindings, and HTML fragment injection.
 
 ```typescript
 template: html`
@@ -169,7 +169,7 @@ How the build pipeline works — esbuild plugins, template compilation, binding 
 
 ## Lint Rules
 
-12 compile-time lint rules (THANE400–THANE411) that catch silent failures before they reach the browser.
+12 compile-time lint rules (THANE400–THANE412) and the template errors (THANE006–THANE010) that catch silent failures before they reach the browser.
 
 **→ [Lint Rules](lint-rules.md)**
 
@@ -177,7 +177,7 @@ How the build pipeline works — esbuild plugins, template compilation, binding 
 
 ## API Reference
 
-Complete API surface — all exports from `thane` and `thane/router`, global template functions, and types.
+Complete API surface — all exports from `thane` and `thane/router`, global template functions, and types. (`thane/runtime` is the compiler's own entry: never import it.)
 
 **→ [API Reference](api-reference.md)**
 

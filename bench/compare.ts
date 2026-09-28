@@ -41,6 +41,8 @@ export interface Summary {
   dirty: boolean;
   builtAt: string;
   browser: string;
+  /** Which benchmark app the label holds (`--app`); results from before it existed are the standard app. */
+  app?: string;
   updatedAt: string;
   benchmarks: Record<
     string,
@@ -86,15 +88,20 @@ export function renderComparison(loaded: LoadedLabel[], metrics: Metric[] = DEFA
   const others = loaded.slice(1);
   const lines: string[] = [];
 
+  const appOf = (l: LoadedLabel) => l.summary.app ?? 'standard';
   const meta = loaded.map((l) => {
     const dirty = l.summary.dirty ? ' (uncommitted changes)' : '';
-    return `  ${pad(l.label, 16)} commit ${l.summary.commit}${dirty}, ${l.summary.browser}, built ${l.summary.builtAt}`;
+    const app = appOf(l) === 'standard' ? '' : `, ${appOf(l)} app`;
+    return `  ${pad(l.label, 16)} commit ${l.summary.commit}${dirty}, ${l.summary.browser}, built ${l.summary.builtAt}${app}`;
   });
   lines.push('labels:', ...meta, '');
 
   const browsers = new Set(loaded.map((l) => l.summary.browser));
   if (browsers.size > 1) {
     lines.push('  ⚠ these labels were measured on different browsers; ratios are not reliable', '');
+  }
+  if (new Set(loaded.map(appOf)).size > 1) {
+    lines.push('  ⚠ these labels hold different benchmark apps; their benchmarks do not compare', '');
   }
 
   const VALUE_W = 11;
@@ -106,10 +113,12 @@ export function renderComparison(loaded: LoadedLabel[], metrics: Metric[] = DEFA
     if (ids.length === 0) continue;
 
     lines.push(METRIC_TITLES[metric]);
+    // With several labels, each ratio column names its label: `<label>/<baseline>`
+    const ratioTitle = (l: LoadedLabel) => (others.length > 1 ? `${l.label}/${base.label}` : `vs ${base.label}`);
     const header =
       pad('benchmark', NAME_W) +
       loaded.map((l) => padStart(l.label.slice(0, VALUE_W - 1), VALUE_W)).join('') +
-      others.map(() => padStart(`vs ${base.label}`.slice(0, RATIO_W - 1), RATIO_W)).join('');
+      others.map((l) => padStart(ratioTitle(l).slice(0, RATIO_W - 1), RATIO_W)).join('');
     lines.push(header);
     lines.push('-'.repeat(header.length));
 

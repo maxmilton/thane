@@ -7,7 +7,8 @@ import { fileURLToPath } from 'url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const appRoot = resolve(repoRoot, 'e2e', 'browser-error-app');
-const port = 4318;
+// E2E_PORT_BASE + 145, clear of the static e2e servers at base + 0, 1, 2… (playwright.config.ts)
+const port = (process.env.E2E_PORT_BASE ? Number(process.env.E2E_PORT_BASE) : 4173) + 145;
 
 const waitFor = async (predicate: () => boolean, timeoutMs: number, intervalMs: number = 100): Promise<void> => {
   const deadline = Date.now() + timeoutMs;

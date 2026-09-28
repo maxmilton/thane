@@ -66,7 +66,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -76,9 +76,9 @@ mount(App);
     const js = await buildAndReadJs(source);
     // The fill writes textContent (through the guard variable) and keeps the Text node it
     // created; the guarded update writes the node's nodeValue
-    expect(js).toMatch(/\.textContent\s*=\s*\(?(\w+\s*=\s*)?\w+\.label/);
+    expect(js).toMatch(/\.textContent\s*=\s*\(?([\w$]+\s*=\s*)?[\w$]+\.label/);
     expect(js).toMatch(/\.firstChild/);
-    expect(js).toMatch(/\.nodeValue\s*=\s*\w+/);
+    expect(js).toMatch(/\.nodeValue\s*=\s*[\w$]+/);
   });
 
   test('sole-content leaves the element empty in the template', async () => {
@@ -90,7 +90,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>\${item.label}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -117,7 +117,7 @@ export const App = defineComponent('test-app', () => {
               <td>\${item.id}</td>
               <td>\${item.label}</td>
             </tr>
-          \`, (item) => item.id)}
+          \`, null, (item) => item.id)}
         </tbody>
       </table>
     \`,
@@ -148,7 +148,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>Name: \${item.name}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>Name: \${item.name}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -156,10 +156,11 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    // Mixed-content should use TreeWalker for comment markers
-    expect(js).toContain('createTreeWalker');
-    // The text node after the marker is resolved once per row and written through `.data`
-    expect(js).toMatch(/\?\.nextSibling/);
+    // The text node after the marker is reached by path once per row (A1-4), no TreeWalker, and
+    // written through `.data`
+    expect(js).not.toContain('createTreeWalker');
+    expect(js).toContain('<li>Name: <!----> <!----></li>');
+    expect(js).toMatch(/\.lastChild\.previousSibling/);
     expect(js).toMatch(/\.data\s*=/);
   });
 
@@ -172,7 +173,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>\${item.first} \${item.last}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>\${item.first} \${item.last}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -180,8 +181,10 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    // Two comment markers means two resolved text nodes, each written in fill and update
-    expect(js.match(/\?\.nextSibling/g)!.length).toBe(2);
+    // Two comment markers means two text nodes, each written in fill and update; the space between
+    // the bindings stays (H-52)
+    expect(js).toContain('<li><!----> <!----> <!----> <!----></li>');
+    expect(js).not.toContain('createTreeWalker');
     const dataWrites = js.match(/\.data\s*=/g);
     expect(dataWrites).toBeTruthy();
     // At minimum: 2 fill + 2 update = 4
@@ -197,7 +200,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li>\${item.a}\${item.b}</li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li>\${item.a}\${item.b}</li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -206,8 +209,8 @@ mount(App);
 `;
     const js = await buildAndReadJs(source);
     // Both bindings need comment markers since they share an element with multiple bindings
-    expect(js).toContain('createTreeWalker');
-    expect(js.match(/\?\.nextSibling/g)!.length).toBe(2);
+    expect(js).toContain('<li><!----> <!----><!----> <!----></li>');
+    expect(js).not.toContain('createTreeWalker');
     const dataWrites = js.match(/\.data\s*=/g);
     expect(dataWrites).toBeTruthy();
     expect(dataWrites!.length).toBeGreaterThan(3);
@@ -240,13 +243,13 @@ mount(App);
     // Update path: `if (_m.p !== (_m.p = expr)) write(_m.p)` — the guard (a field on the row's
     // record for lean rows, a closure variable otherwise) is compared with its own
     // reassignment, so an unchanged value never reaches textContent/setAttribute
-    expect(js).toMatch(/([\w.]+)\s*!==\s*\(\1\s*=\s*\w+\.label\)/);
+    expect(js).toMatch(/([\w$.]+)\s*!==\s*\(\1\s*=\s*[\w$]+\.label\)/);
     // (the selection class binding is owned by the list-level subscription, so the row update
     // path no longer recomputes it; its guarded fill is asserted below)
     // Create path: the template already ships class="", so an empty result skips the write
     // (esbuild shortens the strict comparison against a string literal to `!=`; the class
     // write itself goes through className on HTML elements)
-    expect(js).toMatch(/\)\s*!==?\s*""\s*&&\s*\(?\w+\.className\s*=/);
+    expect(js).toMatch(/\)\s*!==?\s*""\s*&&\s*\(?[\w$]+\.className\s*=/);
   });
 });
 
@@ -296,7 +299,7 @@ export const App = defineComponent('test-app', () => {
               <td>\${item.id}</td>
               <td>\${item.label}</td>
             </tr>
-          \`, (item) => item.id)}
+          \`, null, (item) => item.id)}
         </tbody>
       </table>
     \`,
@@ -319,7 +322,7 @@ export const App = defineComponent('test-app', () => {
   return {
     template: html\`
       <ul>
-        \${repeat(items(), (item) => html\`<li><a @click=\${() => click(item)}>\${item.label}</a></li>\`, (item) => item.id)}
+        \${repeat(items(), (item) => html\`<li><a @click=\${() => click(item)}>\${item.label}</a></li>\`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -354,7 +357,7 @@ export const App = defineComponent('test-app', () => {
               <td>\${item.id}</td>
               <td>\${item.label}</td>
             </tr>
-          \`, (item) => item.id)}
+          \`, null, (item) => item.id)}
         </tbody>
       </table>
     \`,
@@ -366,17 +369,10 @@ mount(App);
     // The second binding should reference the first variable, not navigate from root again
     // After minification: let x = r.firstElementChild, y = x.nextElementSibling
     // Instead of: let x = r.firstElementChild, y = r.firstElementChild.nextElementSibling
-    const rowCreationMatch = js.match(/cloneNode.*?update:/s);
-    expect(rowCreationMatch).toBeTruthy();
-    const rowCode = rowCreationMatch![0];
-    // With prefix reuse, the second var should chain off the first via .nextElementSibling
-    // not re-navigate from the clone root. Check that the pattern varName.nextElementSibling
-    // appears where varName was previously assigned to .firstElementChild
-    const firstElemAssign = rowCode.match(/(\w+)=\w+\.firstElementChild/);
-    expect(firstElemAssign).toBeTruthy();
-    const firstVar = firstElemAssign![1];
-    // The second binding should reuse firstVar (e.g., g.nextElementSibling)
-    expect(rowCode).toContain(`${firstVar}.nextElementSibling`);
+    // In the compiled component (not the runtime before it), the row binder declares both
+    // cells, the second chained off the first via .nextElementSibling
+    const compiled = js.slice(js.indexOf('__b:'));
+    expect(compiled).toMatch(/let ([\w$]+)=[\w$]+\.firstElementChild,[\w$]+=\1\.nextElementSibling/);
   });
 });
 
@@ -423,7 +419,7 @@ export const App = defineComponent('test-app', () => {
           <li>
             Item: <strong>\${item.label}</strong> (#\${item.id})
           </li>
-        \`, (item) => item.id)}
+        \`, null, (item) => item.id)}
       </ul>
     \`,
   };
@@ -437,7 +433,7 @@ mount(App);
     // The #${item.id} is mixed-content in the <li>, should use comment markers
     expect(js).toMatch(/\.nodeValue\s*=/);
     expect(js).toMatch(/<strong><\/strong>/);
-    expect(js).toContain('createTreeWalker');
+    expect(js).not.toContain('createTreeWalker');
   });
 });
 
@@ -463,14 +459,11 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    // The comment markers <!--bN--> and <!----> should survive in the template
-    // Look for the comment marker pattern in the compiled template string
-    expect(js).toMatch(/<!--b\d+-->/);
-    expect(js).toContain('<!---->');
-    // The text node between them must exist (space between marker and boundary)
-    // Pattern: <!--bN-->text<!----> with space or content between markers
-    // The nextSibling.data pattern should be present for updating the text node
-    expect(js).toContain('nextSibling.data');
+    // The marker and the boundary comment survive in the template, the marker without its id
+    // (A1-4), with the text node between them, which the binding writes
+    expect(js).not.toMatch(/<!--b\d+-->/);
+    expect(js).toContain('Hello <!---->World<!----> World');
+    expect(js).toMatch(/\.data ?=/);
   });
 
   test('when conditional markers survive whitespace stripping', async () => {
@@ -512,8 +505,9 @@ export const App = defineComponent('test-app', () => {
 mount(App);
 `;
     const js = await buildAndReadJs(source);
-    expect(js).toMatch(/<!--b\d+-->/);
-    expect(js).toContain('nextSibling.data');
+    expect(js).toContain('<!----> <!----></span>');
+    expect(js).not.toMatch(/<!--b\d+-->/);
+    expect(js).toMatch(/\.data ?=/);
     expect(js).not.toContain('${count() + 1}');
   });
 });

@@ -62,17 +62,6 @@ class SourceFileCache {
   clear(): void {
     this.cache.clear();
   }
-
-  invalidate(filePath: string): void {
-    this.cache.delete(filePath);
-  }
-
-  stats(): { size: number; files: string[] } {
-    return {
-      size: this.cache.size,
-      files: Array.from(this.cache.keys()),
-    };
-  }
 }
 
 export const sourceCache = new SourceFileCache();

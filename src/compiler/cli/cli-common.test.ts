@@ -12,7 +12,7 @@ describe('parseArgs', () => {
     expect(opts.command).toBe('build');
     expect(opts.prod).toBe(false);
     expect(opts.gzip).toBe(false);
-    expect(opts.app).toBe('client');
+    expect(opts).not.toHaveProperty('app');
     expect(opts.serve).toBe(false);
     expect(opts.logLevel).toBe('normal');
   });
@@ -45,8 +45,15 @@ describe('parseArgs', () => {
     expect(parseArgs(['--gzip']).gzip).toBe(true);
   });
 
-  test('parses --app flag with value', () => {
-    expect(parseArgs(['--app', 'my-app']).app).toBe('my-app');
+  test('--app is an unknown flag and its value a stray positional (CL-5), warned about since H-24', () => {
+    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+    const opts = parseArgs(['--app', 'my-app']);
+    expect(warnSpy.mock.calls).toEqual([
+      ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."],
+      ["Warning: Unknown command 'my-app'. Run 'thane --help' to see available commands."],
+    ]);
+    warnSpy.mockRestore();
+    expect(opts).toEqual(parseArgs([]));
   });
 
   test('parses --entry flag with value', () => {
@@ -171,7 +178,6 @@ describe('createBuildConfig', () => {
     command: 'build',
     prod: false,
     gzip: false,
-    app: 'client',
     serve: false,
     logLevel: 'normal',
   };

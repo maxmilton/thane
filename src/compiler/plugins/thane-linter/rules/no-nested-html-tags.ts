@@ -22,13 +22,9 @@
 import ts from 'typescript';
 import type { Diagnostic } from '../../../types.js';
 import type { LintRuleDefinition } from './types.js';
-import { ErrorCode, createError } from '../../../errors.js';
+import { ErrorCode } from '../../../errors.js';
 import { FN } from '../../../utils/constants.js';
-
-const isHtmlTag = (node: ts.TaggedTemplateExpression): boolean => {
-  const tag = node.tag;
-  return ts.isIdentifier(tag) && tag.text === FN.HTML;
-};
+import { createReporter, isTaggedWith } from './lint-utils.js';
 
 /** Directive calls whose arguments may legitimately contain html`` */
 const DIRECTIVE_CALLS: ReadonlySet<string> = new Set([FN.REPEAT, FN.WHEN, FN.WHEN_ELSE]);
@@ -40,19 +36,15 @@ const isDirectiveCall = (node: ts.Node): boolean => {
 };
 
 const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
+  const { diagnostics, report } = createReporter(sourceFile, filePath, ErrorCode.NO_NESTED_HTML_TAGS, 'error');
 
   const visit = (node: ts.Node, insideHtmlTag: boolean) => {
-    if (ts.isTaggedTemplateExpression(node) && isHtmlTag(node)) {
+    if (isTaggedWith(node, [FN.HTML])) {
       if (insideHtmlTag) {
-        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-        diagnostics.push(
-          createError(
-            "Nested 'html' tagged templates are not supported. The inner template will not be " +
-              'processed for signal bindings or subscriptions. Extract it into a const variable instead.',
-            { file: filePath, line: line + 1, column: character + 1 },
-            ErrorCode.NO_NESTED_HTML_TAGS,
-          ),
+        report(
+          node,
+          "Nested 'html' tagged templates are not supported. The inner template will not be " +
+            'processed for signal bindings or subscriptions. Extract it into a const variable instead.',
         );
         // Still visit children to catch deeper nesting
       }

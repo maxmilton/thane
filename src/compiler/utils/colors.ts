@@ -19,27 +19,26 @@ export const supportsColor: boolean =
     ? _forceColor !== '0' && _forceColor !== 'false'
     : _noColor === undefined && (process.stdout?.isTTY ?? false);
 
-const _wrap = (code: string, fmt: string): string => (supportsColor ? code : fmt === 'console' ? '%s' : '');
-
-export const consoleColors = {
-  green: _wrap('\x1b[32m%s\x1b[0m', 'console'),
-  yellow: _wrap('\x1b[33m%s\x1b[0m', 'console'),
-  blue: _wrap('\x1b[94m%s\x1b[0m', 'console'),
-  cyan: _wrap('\x1b[36m%s\x1b[0m', 'console'),
-  red: _wrap('\x1b[31m%s\x1b[0m', 'console'),
-  orange: _wrap('\x1b[38;5;208m%s\x1b[0m', 'console'),
-  reset: _wrap('\x1b[0m', 'console'),
-} as const;
+const _wrap = (code: string): string => (supportsColor ? code : '');
 
 export const ansi = {
-  green: _wrap('\x1b[32m', 'raw'),
-  yellow: _wrap('\x1b[33m', 'raw'),
-  blue: _wrap('\x1b[94m', 'raw'),
-  cyan: _wrap('\x1b[36m', 'raw'),
-  red: _wrap('\x1b[31m', 'raw'),
-  magenta: _wrap('\x1b[35m', 'raw'),
-  orange: _wrap('\x1b[38;5;208m', 'raw'),
-  gray: _wrap('\x1b[90m', 'raw'),
-  dim: _wrap('\x1b[2m', 'raw'),
-  reset: _wrap('\x1b[0m', 'raw'),
+  green: _wrap('\x1b[32m'),
+  yellow: _wrap('\x1b[33m'),
+  blue: _wrap('\x1b[94m'),
+  cyan: _wrap('\x1b[36m'),
+  red: _wrap('\x1b[31m'),
+  magenta: _wrap('\x1b[35m'),
+  orange: _wrap('\x1b[38;5;208m'),
+  gray: _wrap('\x1b[90m'),
+  dim: _wrap('\x1b[2m'),
+  reset: _wrap('\x1b[0m'),
+} as const;
+
+export const consoleColors = {
+  green: `${ansi.green}%s${ansi.reset}`,
+  yellow: `${ansi.yellow}%s${ansi.reset}`,
+  blue: `${ansi.blue}%s${ansi.reset}`,
+  cyan: `${ansi.cyan}%s${ansi.reset}`,
+  red: `${ansi.red}%s${ansi.reset}`,
+  orange: `${ansi.orange}%s${ansi.reset}`,
 } as const;
