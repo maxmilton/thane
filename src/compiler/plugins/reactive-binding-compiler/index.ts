@@ -20,6 +20,7 @@ import type { SelectorMap } from '../minification/selector-minifier.js';
 import { processHtmlTemplateWithConditionals } from './template-processing.js';
 import { anchorMark } from './template-utils.js';
 import { placeChildHosts } from './child-hosts.js';
+import { walkDirectives } from './directive-tree.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
 
 // ============================================================================
@@ -468,75 +469,29 @@ export const transformDefineComponentSource = (
   const directiveChildMounts = new Map<string, { cm: ChildMountInfo; globalIndex: number }[]>();
   const topLevelChildMounts: { cm: ChildMountInfo; globalIndex: number }[] = [];
 
-  if (childMounts && childMounts.length > 0) {
-    const addToDirective = (key: string, cm: ChildMountInfo, idx: number) => {
-      if (!directiveChildMounts.has(key)) directiveChildMounts.set(key, []);
-      directiveChildMounts.get(key)!.push({ cm, globalIndex: idx });
-    };
-
-    // Recursive helpers: search nested directives first so the innermost match wins.
-    // A child mount inside a directive branch must be set up by that branch's initializer.
-    const findInConditionals = (marker: string, conds: ConditionalBlock[]): string | null => {
-      for (const c of conds) {
-        const inner = findInConditionals(marker, c.nestedConditionals) ?? findInWhenElse(marker, c.nestedWhenElse);
-        if (inner) return inner;
-        if (c.templateContent.includes(marker)) return c.id;
-      }
-      return null;
-    };
-
-    const findInWhenElse = (marker: string, wes: WhenElseBlock[]): string | null => {
-      for (const we of wes) {
-        const inner =
-          findInConditionals(marker, we.thenConditionals) ??
-          findInWhenElse(marker, we.thenWhenElse) ??
-          findInConditionals(marker, we.elseConditionals) ??
-          findInWhenElse(marker, we.elseWhenElse);
-        if (inner) return inner;
-        if (we.thenTemplate.includes(marker)) return we.thenId;
-        if (we.elseTemplate.includes(marker)) return we.elseId;
-      }
-      return null;
-    };
-
-    // A list whose rows hold the marker: the row's own when()/whenElse() if the marker is in one,
-    // otherwise the list, whose row factory mounts the child.
-    const findInLists = (marker: string, reps: RepeatBlock[]): string | null => {
-      const rep = reps.find((r) => r.itemTemplate.includes(marker));
-      if (!rep) return null;
-      return findInConditionals(marker, rep.nestedConditionals) ?? findInWhenElse(marker, rep.nestedWhenElse) ?? rep.id;
-    };
-
-    // A list inside a when() or whenElse() branch, at any depth of branches (H-40)
-    const findInBranchLists = (marker: string, conds: ConditionalBlock[], wes: WhenElseBlock[]): string | null => {
-      for (const c of conds) {
-        const id =
-          findInLists(marker, c.nestedRepeats) ?? findInBranchLists(marker, c.nestedConditionals, c.nestedWhenElse);
-        if (id) return id;
-      }
-      for (const we of wes) {
-        const id =
-          findInLists(marker, [...we.thenRepeats, ...we.elseRepeats]) ??
-          findInBranchLists(marker, we.thenConditionals, we.thenWhenElse) ??
-          findInBranchLists(marker, we.elseConditionals, we.elseWhenElse);
-        if (id) return id;
-      }
-      return null;
-    };
-
-    for (let i = 0; i < childMounts.length; i++) {
-      const cm = childMounts[i]!;
-      const marker = anchorMark(cm.anchorId, '.');
-      const directiveId =
-        findInLists(marker, allRepeatBlocks) ??
-        findInBranchLists(marker, allConditionals, allWhenElseBlocks) ??
-        findInConditionals(marker, allConditionals) ??
-        findInWhenElse(marker, allWhenElseBlocks);
-      // Outside every directive: a top-level mount
-      if (directiveId) addToDirective(directiveId, cm, i);
-      else topLevelChildMounts.push({ cm, globalIndex: i });
-    }
-  }
+  // A child is mounted by the innermost directive whose own template holds its placeholder: a
+  // branch's initializer, or the row factory of a list, at any depth (H-40, RW-2). The templates that
+  // hold it are nested in one another (a pre-rendered branch is in its parent's too), and the walk
+  // visits a block before the blocks inside it, so the last one found is the innermost. A child in
+  // no directive is a top-level mount.
+  (childMounts ?? []).forEach((cm, globalIndex) => {
+    const marker = anchorMark(cm.anchorId, '.');
+    let owner: string | undefined;
+    walkDirectives(
+      { conditionals: allConditionals, whenElse: allWhenElseBlocks, repeats: allRepeatBlocks },
+      {
+        cond: (c) => void (c.templateContent.includes(marker) && (owner = c.id)),
+        whenElse: (we) =>
+          void (we.thenTemplate.includes(marker)
+            ? (owner = we.thenId)
+            : we.elseTemplate.includes(marker) && (owner = we.elseId)),
+        repeat: (rep) => void (rep.itemTemplate.includes(marker) && (owner = rep.id)),
+      },
+    );
+    if (!owner) topLevelChildMounts.push({ cm, globalIndex });
+    else if (directiveChildMounts.has(owner)) directiveChildMounts.get(owner)!.push({ cm, globalIndex });
+    else directiveChildMounts.set(owner, [{ cm, globalIndex }]);
+  });
 
   // Generate bindings code. A production build minifies templates and renames selectors.
   const emit: EmitOptions = {

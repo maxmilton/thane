@@ -419,12 +419,12 @@
           _insertBefore.call(_ct_b1, _el, _ref);
           const _cleanups = [];
           _cleanups.push(__bindIf(_ws_b2, _we_b2, on, `<span><!----> <!----></span>`, (_c) => {
-  const _n_b3 = _c.firstChild.nextSibling;
-  _n_b3.data = lbl() ?? '';
-  const _nsubs = [];
-  _nsubs.push(lbl.subscribe(v => { _n_b3.data = v ?? ''; }, true));
-  return _nsubs;
-}));
+      const b3 = _c.firstChild.nextSibling;
+      b3.data = lbl() ?? '';
+      return [
+        lbl.subscribe(v => { b3.data = v ?? ''; }, true),
+      ];
+    }));
           return { el: _el, cleanups: _cleanups, value: item,
             update: (item) => { ; } };
         },
@@ -523,11 +523,11 @@
           _insertBefore.call(_ct_b5, _el, _ref);
           const _cleanups = [];
           _cleanups.push(__bindIf(_ws_b6, _we_b6, on, `<button>b</button>`, (_c) => {
-  const _n_b7 = _c;
-  const _nsubs = [];
-  _n_b7.addEventListener('click', go);
-  return _nsubs;
-}));
+      const b7 = _c;
+      b7.addEventListener('click', go);
+      return [
+      ];
+    }));
           return { el: _el, cleanups: _cleanups, value: item,
             update: (item) => { ; } };
         },
@@ -572,11 +572,11 @@
         _insertBefore.call(_ct_b12, _el, _ref);
         const _cleanups = [];
         _cleanups.push(__bindIf(_ws_b13, _we_b13, on, `<p><button>4</button></p>`, (_c) => {
-  const _n_b14 = _c.lastElementChild;
-  const _nsubs = [];
-  _n_b14.addEventListener('click', four);
-  return _nsubs;
-}));
+      const b14 = _c.lastElementChild;
+      b14.addEventListener('click', four);
+      return [
+      ];
+    }));
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { ; } };
       },
@@ -1502,40 +1502,44 @@
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         _cleanups.push(__bindIf(_ws_b1, _we_b1, show, `<b><!----> <!----></b>`, (_c) => {
-  const _n_b2 = _c.firstChild.nextSibling;
-  _n_b2.data = lbl() ?? '';
-  const _nsubs = [];
-  _nsubs.push(lbl.subscribe(v => { _n_b2.data = v ?? ''; }, true));
-  return _nsubs;
-}));
+      const b2 = _c.firstChild.nextSibling;
+      b2.data = lbl() ?? '';
+      return [
+        lbl.subscribe(v => { b2.data = v ?? ''; }, true),
+      ];
+    }));
         _cleanups.push(__bindIfExpr(_ws_b3, _we_b3, [flag, it$], () => it$().on && flag(), `<i title=""><!----> <!----></i>`, (_c) => {
-  const _n_b4 = _c;
-  const _n_b5 = _c.firstChild.nextSibling;
-  let _pv_b4; _n_b4.setAttribute('title', _pv_b4 = it$().t);
-  let _pv_b5; _n_b5.data = (_pv_b5 = it$().name) ?? '';
-  const _nsubs = [];
-  _nsubs.push(it$.subscribe(() => { if (_pv_b4 !== (_pv_b4 = it$().t)) _n_b4.setAttribute('title', _pv_b4); }, true));
-  _nsubs.push(it$.subscribe(() => { if (_pv_b5 !== (_pv_b5 = it$().name)) _n_b5.data = (_pv_b5) ?? ''; }, true));
-  _n_b4.addEventListener('click', go);
-  return _nsubs;
-}));
+      const b4 = _c;
+      const b5 = _c.firstChild.nextSibling;
+      let _pv_b4_0; const _upd_b4_0 = () => { if (_pv_b4_0 !== (_pv_b4_0 = it$().t)) b4.setAttribute('title', _pv_b4_0); };
+      _upd_b4_0();
+      let _pv_b5_1; const _upd_b5_1 = () => { if (_pv_b5_1 !== (_pv_b5_1 = it$().name)) b5.data = (_pv_b5_1) ?? ''; };
+      _upd_b5_1();
+      b4.addEventListener('click', go);
+      return [
+        it$.subscribe(_upd_b4_0, true),
+        it$.subscribe(_upd_b5_1, true),
+      ];
+    }));
         _cleanups.push(__bindIfExpr(_ws_b6, _wm_b6, [it$], () => it$().done, `<s><!----> <!----></s>`, (_c) => {
-  const _n_b8 = _c.firstChild.nextSibling;
-  let _pv_b8; _n_b8.data = (_pv_b8 = it$().name) ?? '';
-  const _nsubs = [];
-  _nsubs.push(it$.subscribe(() => { if (_pv_b8 !== (_pv_b8 = it$().name)) _n_b8.data = (_pv_b8) ?? ''; }, true));
-  return _nsubs;
-}));
+      const b8 = _c.firstChild.nextSibling;
+      let _pv_b8_0; const _upd_b8_0 = () => { if (_pv_b8_0 !== (_pv_b8_0 = it$().name)) b8.data = (_pv_b8_0) ?? ''; };
+      _upd_b8_0();
+      return [
+        it$.subscribe(_upd_b8_0, true),
+      ];
+    }));
         _cleanups.push(__bindIfExpr(_wm_b6, _we_b6, [it$], () => !(it$().done), `<u style="color: "><!----> <!----></u>`, (_c) => {
-  const _n_b9 = _c;
-  const _n_b10 = _c.firstChild.nextSibling;
-  _n_b9.style.setProperty('color', col());
-  let _pv_b10; _n_b10.data = (_pv_b10 = i$()) ?? '';
-  const _nsubs = [];
-  _nsubs.push(col.subscribe(v => { _n_b9.style.setProperty('color', v); }, true));
-  _nsubs.push(i$.subscribe(() => { if (_pv_b10 !== (_pv_b10 = i$())) _n_b10.data = (_pv_b10) ?? ''; }, true));
-  return _nsubs;
-}));
+      const b9 = _c;
+      const b10 = _c.firstChild.nextSibling;
+      b9.style.color = col();
+      let _pv_b10_0; const _upd_b10_0 = () => { if (_pv_b10_0 !== (_pv_b10_0 = i$())) b10.data = (_pv_b10_0) ?? ''; };
+      _upd_b10_0();
+      return [
+        col.subscribe(v => { b9.style.color = v; }, true),
+        i$.subscribe(_upd_b10_0, true),
+      ];
+    }));
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item, i) => { it$(item); i$(i); } };
       },
@@ -1612,15 +1616,19 @@
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         _cleanups.push(__bindIf(_ws_b1, _we_b1, show, `<b style="color: " title=""><!----> <!----></b>`, (_c) => {
-  const _n_b2 = _c;
-  const _n_b3 = _c.firstChild.nextSibling;
-  _n_b2.style.setProperty('color', col());
-  _n_b2.setAttribute('title', col());
-  _n_b3.data = col() ?? '';
-  const _nsubs = [];
-  _nsubs.push(col.subscribe(v => { _n_b2.style.setProperty('color', v); _n_b2.setAttribute('title', v); _n_b3.data = v ?? ''; }, true));
-  return _nsubs;
-}));
+      const b2 = _c;
+      const b3 = _c.firstChild.nextSibling;
+      b2.style.color = col();
+      b2.setAttribute('title', col());
+      b3.data = col() ?? '';
+      return [
+        col.subscribe(v => {
+      b2.style.color = v;
+      b2.setAttribute('title', v);
+      b3.data = v ?? '';
+    }, true),
+      ];
+    }));
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { ; } };
       },
@@ -1648,39 +1656,40 @@
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
         const _e0 = _el.firstElementChild;
-        const _nrA_b1 = _el.lastChild.lastChild;
+        const _a_b1 = _el.lastChild.lastChild;
         let _p0;
         _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrC_b1 = _nrA_b1.parentNode;
-        const _nrTc_b1 = __tpl_b1.content.firstElementChild;
-        const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
-          (_nrItem, _idx, _nrRef) => {
-            const _nrEl = _cloneNode.call(_nrTc_b1, true);
-            const _nrc0 = _nrEl.firstChild.nextSibling.nextSibling.nextSibling;
-            const _nrst0 = _nrEl.lastChild.firstChild.nextSibling;
-            const _nre0 = _nrEl;
-            const _nre1 = _nrEl.firstElementChild;
-            let _nrp0, _nrp1;
-            if ((_nrp0 = _nrItem.cls) !== '') _nre0.className = _nrp0;
-            _nre1.textContent = (_nrp1 = _nrItem.label) ?? ''; let _nrt1;
-            _nrc0.data = (_nrItem.n) ?? '';
-            _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
-            const _nrs0 = _nrEl.firstElementChild.nextElementSibling;
-            const _nrs1 = _nrEl.firstElementChild.nextElementSibling;
-            _nrs0.setAttribute('title', tip()); _nrs1.style.setProperty('color', col()); _nrst0.data = sel() ?? '';
-            const _nrCleanups = [];
-            _nrCleanups.push(tip.subscribe(() => { _nrs0.setAttribute('title', tip()); }, true));
-            _nrCleanups.push(col.subscribe(() => { _nrs1.style.setProperty('color', col()); }, true));
-            _nrCleanups.push(sel.subscribe(() => { _nrst0.data = sel() ?? ''; }, true));
-            return { el: _nrEl, cleanups: _nrCleanups, value: _nrItem,
-              update: (_nrItem) => { if (_nrp0 !== (_nrp0 = _nrItem.cls)) _nre0.className = _nrp0; if (_nrp1 !== (_nrp1 = _nrItem.label)) (_nrt1 ??= _nre1.firstChild) ? (_nrt1.nodeValue = _nrp1 ?? '') : (_nre1.textContent = _nrp1 ?? ''); _nrc0.data = (_nrItem.n) ?? ''; } };
+        const _tc_b1 = __tpl_b1.content.firstElementChild;
+        const _ct_b1 = _a_b1.parentNode;
+        const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
+          (item, _idx, _ref) => {
+            const _el = _cloneNode.call(_tc_b1, true);
+            const _e0 = _el;
+            const _e1 = _e0.firstElementChild;
+            const _c0 = _el.firstChild.nextSibling.nextSibling.nextSibling;
+            const _st0 = _el.lastChild.firstChild.nextSibling;
+            const _s0 = _el.firstElementChild.nextElementSibling;
+            const _s1 = _el.firstElementChild.nextElementSibling;
+            let _p0, _p1, _p2;
+            if ((_p0 = item.cls) !== '') _e0.className = _p0; _e1.textContent = (_p1 = item.label) ?? ''; let _t0;
+            _c0.data = (_p2 = item.n) ?? '';
+            _s0.setAttribute('title', tip()); _s1.style.setProperty('color', col()); _st0.data = sel() ?? '';
+            _insertBefore.call(_ct_b1, _el, _ref);
+            const _cleanups = [];
+            _cleanups.push(tip.subscribe(() => { _s0.setAttribute('title', tip()); }, true));
+            _cleanups.push(col.subscribe(() => { _s1.style.setProperty('color', col()); }, true));
+            _cleanups.push(sel.subscribe(() => { _st0.data = sel() ?? ''; }, true));
+            return { el: _el, cleanups: _cleanups, value: item,
+              update: (item) => { if (_p0 !== (_p0 = item.cls)) _e0.className = _p0; if (_p1 !== (_p1 = item.label)) (_t0 ??= _e1.firstChild) ? (_t0.nodeValue = _p1 ?? '') : (_e1.textContent = _p1 ?? ''); if (_p2 !== (_p2 = item.n)) _c0.data = (_p2) ?? ''; } };
           },
         (_, i) => i);
-        _nrRc_b1.reconcile(g$().items);
-        _cleanups.push(g$.subscribe(() => { _nrRc_b1.reconcile(g$().items); }, true));
-        _cleanups.push(() => { _nrRc_b1.clearAll(); });
+        const _items_b1 = () => g$().items;
+        _rc_b1.reconcile(_items_b1());
+        const _rsrc_b1_0 = g$;
+        _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
+        _cleanups.push(() => _rc_b1.clearAll());
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { if (_p0 !== (_p0 = item.name)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); g$(item); } };
       },
@@ -1708,32 +1717,34 @@
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
-        const _nrA_b1 = _el.lastChild.lastChild;
+        const _a_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrC_b1 = _nrA_b1.parentNode;
-        const _nrTc_b1 = __tpl_b1.content.firstElementChild;
-        const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
-          (_nrItem, _idx, _nrRef) => {
-            const _nrEl = _cloneNode.call(_nrTc_b1, true);
-            const _nrst0 = _nrEl.lastElementChild.firstChild.nextSibling;
-            const _nrst1 = _nrEl.lastChild.previousSibling;
-            const _nre0 = _nrEl.firstElementChild;
-            let _nrp0;
-            _nre0.textContent = (_nrp0 = _nrItem.label) ?? ''; let _nrt0;
-            _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
-            _nrst0.data = sel() ?? ''; _nrst1.data = other() ?? '';
-            const _nrCleanups = [];
-            _nrCleanups.push(sel.subscribe(() => { _nrst0.data = sel() ?? ''; }, true));
-            _nrCleanups.push(other.subscribe(() => { _nrst1.data = other() ?? ''; }, true));
-            return { el: _nrEl, cleanups: _nrCleanups, value: _nrItem,
-              update: (_nrItem) => { if (_nrp0 !== (_nrp0 = _nrItem.label)) (_nrt0 ??= _nre0.firstChild) ? (_nrt0.nodeValue = _nrp0 ?? '') : (_nre0.textContent = _nrp0 ?? ''); } };
+        const _tc_b1 = __tpl_b1.content.firstElementChild;
+        const _ct_b1 = _a_b1.parentNode;
+        const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
+          (item, _idx, _ref) => {
+            const _el = _cloneNode.call(_tc_b1, true);
+            const _e0 = _el.firstElementChild;
+            const _st0 = _el.lastElementChild.firstChild.nextSibling;
+            const _st1 = _el.lastChild.previousSibling;
+            let _p0;
+            _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
+            _st0.data = sel() ?? ''; _st1.data = other() ?? '';
+            _insertBefore.call(_ct_b1, _el, _ref);
+            const _cleanups = [];
+            _cleanups.push(sel.subscribe(() => { _st0.data = sel() ?? ''; }, true));
+            _cleanups.push(other.subscribe(() => { _st1.data = other() ?? ''; }, true));
+            return { el: _el, cleanups: _cleanups, value: item,
+              update: (item) => { if (_p0 !== (_p0 = item.label)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
           },
         'id');
-        _nrRc_b1.reconcile(g$().items);
-        _cleanups.push(g$.subscribe(() => { _nrRc_b1.reconcile(g$().items); }, true));
-        _cleanups.push(() => { _nrRc_b1.clearAll(); });
+        const _items_b1 = () => g$().items;
+        _rc_b1.reconcile(_items_b1());
+        const _rsrc_b1_0 = g$;
+        _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
+        _cleanups.push(() => _rc_b1.clearAll());
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { g$(item); } };
       },
@@ -1761,32 +1772,35 @@
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
-        const _nrA_b1 = _el.lastChild.lastChild;
+        const _a_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrC_b1 = _nrA_b1.parentNode;
-        const _nrTc_b1 = __tpl_b1.content.firstElementChild;
-        const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
-          (_nrItem, j, _nrRef) => {
-            const _nrEl = _cloneNode.call(_nrTc_b1, true);
-            const _nrst0 = _nrEl.lastChild.firstChild.nextSibling;
-            _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
-            const _nrs0 = _nrEl;
-            const _nrs1 = _nrEl;
-            _nrs0.setAttribute('title', `${a()}-${b()}`); _nrs1.style.setProperty('left', x()); _nrst0.data = user().name ?? '';
-            const _nrCleanups = [];
-            _nrCleanups.push(a.subscribe(() => { _nrs0.setAttribute('title', `${a()}-${b()}`); }, true));
-            _nrCleanups.push(b.subscribe(() => { _nrs0.setAttribute('title', `${a()}-${b()}`); }, true));
-            _nrCleanups.push(x.subscribe(() => { _nrs1.style.setProperty('left', x()); }, true));
-            _nrCleanups.push(user.subscribe(() => { _nrst0.data = user().name ?? ''; }, true));
-            return { el: _nrEl, cleanups: _nrCleanups, value: _nrItem,
-              update: (_nrItem) => {  } };
+        const _tc_b1 = __tpl_b1.content.firstElementChild;
+        const _ct_b1 = _a_b1.parentNode;
+        const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
+          (item, j, _ref) => {
+            const _el = _cloneNode.call(_tc_b1, true);
+            const _st0 = _el.lastChild.firstChild.nextSibling;
+            const _s0 = _el;
+            const _s1 = _el;
+            ;
+            _s0.setAttribute('title', `${a()}-${b()}`); _s1.style.setProperty('left', x()); _st0.data = user().name ?? '';
+            _insertBefore.call(_ct_b1, _el, _ref);
+            const _cleanups = [];
+            _cleanups.push(a.subscribe(() => { _s0.setAttribute('title', `${a()}-${b()}`); }, true));
+            _cleanups.push(b.subscribe(() => { _s0.setAttribute('title', `${a()}-${b()}`); }, true));
+            _cleanups.push(x.subscribe(() => { _s1.style.setProperty('left', x()); }, true));
+            _cleanups.push(user.subscribe(() => { _st0.data = user().name ?? ''; }, true));
+            return { el: _el, cleanups: _cleanups, value: item,
+              update: (item) => { ; } };
           },
         (it) => it.k + 1);
-        _nrRc_b1.reconcile(g$().items);
-        _cleanups.push(g$.subscribe(() => { _nrRc_b1.reconcile(g$().items); }, true));
-        _cleanups.push(() => { _nrRc_b1.clearAll(); });
+        const _items_b1 = () => g$().items;
+        _rc_b1.reconcile(_items_b1());
+        const _rsrc_b1_0 = g$;
+        _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
+        _cleanups.push(() => _rc_b1.clearAll());
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { g$(item); } };
       },
@@ -1814,24 +1828,25 @@
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const _e0 = _el.firstElementChild;
-        const _nrA_b1 = _el.lastChild.lastChild;
+        const _a_b1 = _el.lastChild.lastChild;
         let _p0;
         _e0.textContent = (_p0 = item.name) ?? ''; let _t0;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrC_b1 = _nrA_b1.parentNode;
-        const _nrTc_b1 = __tpl_b1.content.firstElementChild;
-        const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
-          (_nrItem, _idx, _nrRef) => {
-            const _nrEl = _cloneNode.call(_nrTc_b1, true);
-            _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
-            return { el: _nrEl, cleanups: [], value: _nrItem,
-              update: (_nrItem) => {  } };
+        const _tc_b1 = __tpl_b1.content.firstElementChild;
+        const _ct_b1 = _a_b1.parentNode;
+        const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
+          (item, _idx, _ref) => {
+            const _el = _cloneNode.call(_tc_b1, true);
+            _insertBefore.call(_ct_b1, _el, _ref);
+            return { el: _el, cleanups: [], value: item, update: () => {} };
           },
         (_, i) => i);
-        _nrRc_b1.reconcile(things());
-        _cleanups.push(things.subscribe(() => { _nrRc_b1.reconcile(things()); }, true));
-        _cleanups.push(() => { _nrRc_b1.clearAll(); });
+        const _items_b1 = () => things();
+        _rc_b1.reconcile(_items_b1());
+        const _rsrc_b1_0 = things;
+        _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
+        _cleanups.push(() => _rc_b1.clearAll());
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { if (_p0 !== (_p0 = item.name)) (_t0 ??= _e0.firstChild) ? (_t0.nodeValue = _p0 ?? '') : (_e0.textContent = _p0 ?? ''); } };
       },
@@ -1859,26 +1874,32 @@
       (item, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
         const g$ = __sig(item);
-        const _nrA_b1 = _el.lastChild.lastChild;
+        const _a_b1 = _el.lastChild.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _nrC_b1 = _nrA_b1.parentNode;
-        const _nrTc_b1 = __tpl_b1.content.firstElementChild;
-        const _nrRc_b1 = createKeyedReconciler(_nrC_b1, _nrA_b1,
-          (_nrItem, _idx, _nrRef) => {
-            const _nrEl = _cloneNode.call(_nrTc_b1, true);
-            const _nrc0 = _nrEl.firstChild.nextSibling;
-            const _nrc1 = _nrEl.lastChild.previousSibling;
-            _nrc0.data = (_nrItem.a) ?? ''; _nrc1.data = (_nrItem.b) ?? '';
-            _insertBefore.call(_nrC_b1, _nrEl, _nrRef);
-            return { el: _nrEl, cleanups: [], value: _nrItem,
-              update: (_nrItem) => { _nrc0.data = (_nrItem.a) ?? ''; _nrc1.data = (_nrItem.b) ?? ''; } };
-          },
-        (_, i) => i);
-        _nrRc_b1.reconcile(g$().items);
-        _cleanups.push(g$.subscribe(() => { _nrRc_b1.reconcile(g$().items); }, true));
-        _cleanups.push(() => { _nrRc_b1.clearAll(); });
+        const _tc_b1 = __tpl_b1.content.firstElementChild;
+        const _ct_b1 = _a_b1.parentNode;
+        const _bind_b1 = (_el, item, _idx) => {
+            const _c0 = _el.firstChild.nextSibling;
+            const _c1 = _el.lastChild.previousSibling;
+            let _p0, _p1;
+            ;
+            _c0.data = (_p0 = item.a) ?? ''; _c1.data = (_p1 = item.b) ?? '';
+            return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, p1: _p1, c0: _c0, c1: _c1 };
+        };
+        const _update_b1 = (_m, item, _idx) => {
+          const _el = _m.el;
+          if (_m.p0 !== (_m.p0 = item.a)) _m.c0.data = (_m.p0) ?? ''; if (_m.p1 !== (_m.p1 = item.b)) _m.c1.data = (_m.p1) ?? '';
+        };
+        const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
+          (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, item, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
+        (_, i) => i, __batchRows(16, _tc_b1, _bind_b1, _update_b1));
+        const _items_b1 = () => g$().items;
+        _rc_b1.reconcile(_items_b1());
+        const _rsrc_b1_0 = g$;
+        _cleanups.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
+        _cleanups.push(() => _rc_b1.clearAll());
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { g$(item); } };
       },
@@ -2025,34 +2046,38 @@
         const _cm0 = _el.lastElementChild;
         const _ws_b1 = _el.firstChild;
         const _we_b1 = _ws_b1.nextSibling;
-        const _nrA_b3 = _we_b1.nextSibling.lastChild;
+        const _a_b3 = _we_b1.nextSibling.lastChild;
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
         _cleanups.push(__dc(Kid.__f(_cm0, { g: item })));
         _cleanups.push(__bindIf(_ws_b1, _we_b1, on, `<b><!----> <!----></b>`, (_c) => {
-  const _n_b2 = _c.firstChild.nextSibling;
-  _n_b2.data = lbl() ?? '';
-  const _nsubs = [];
-  _nsubs.push(lbl.subscribe(v => { _n_b2.data = v ?? ''; }, true));
-  return _nsubs;
-}));
-        const _nrC_b3 = _nrA_b3.parentNode;
-        const _nrTc_b3 = __tpl_b3.content.firstElementChild;
-        const _nrRc_b3 = createKeyedReconciler(_nrC_b3, _nrA_b3,
-          (_nrItem, _idx, _nrRef) => {
-            const _nrEl = _cloneNode.call(_nrTc_b3, true);
-            const _nre0 = _nrEl;
-            let _nrp0;
-            _nre0.textContent = (_nrp0 = _nrItem.label) ?? ''; let _nrt0;
-            _insertBefore.call(_nrC_b3, _nrEl, _nrRef);
-            return { el: _nrEl, cleanups: [], value: _nrItem,
-              update: (_nrItem) => { if (_nrp0 !== (_nrp0 = _nrItem.label)) (_nrt0 ??= _nre0.firstChild) ? (_nrt0.nodeValue = _nrp0 ?? '') : (_nre0.textContent = _nrp0 ?? ''); } };
-          },
-        (_, i) => i);
-        _nrRc_b3.reconcile(g$().items);
-        _cleanups.push(g$.subscribe(() => { _nrRc_b3.reconcile(g$().items); }, true));
-        _cleanups.push(() => { _nrRc_b3.clearAll(); });
+      const b2 = _c.firstChild.nextSibling;
+      b2.data = lbl() ?? '';
+      return [
+        lbl.subscribe(v => { b2.data = v ?? ''; }, true),
+      ];
+    }));
+        const _tc_b3 = __tpl_b3.content.firstElementChild;
+        const _ct_b3 = _a_b3.parentNode;
+        const _bind_b3 = (_el, item, _idx) => {
+            const _e0 = _el;
+            let _p0;
+            _e0.textContent = (_p0 = item.label) ?? ''; let _t0;
+            return { el: _el, cleanups: __nc, value: item, key: undefined, p0: _p0, t0: undefined };
+        };
+        const _update_b3 = (_m, item, _idx) => {
+          const _el = _m.el;
+          if (_m.p0 !== (_m.p0 = item.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+        };
+        const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
+          (item, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, item, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
+        (_, i) => i, __batchRows(16, _tc_b3, _bind_b3, _update_b3));
+        const _items_b3 = () => g$().items;
+        _rc_b3.reconcile(_items_b3());
+        const _rsrc_b3_0 = g$;
+        _cleanups.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
+        _cleanups.push(() => _rc_b3.clearAll());
         return { el: _el, cleanups: _cleanups, value: item,
           update: (item) => { g$(item); } };
       },

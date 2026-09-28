@@ -27,10 +27,13 @@ import {
   extractSignalsFromExpression,
   type HtmlElement,
 } from '../../utils/html-parser/index.js';
-import { renameIdentifierInExpression, expressionReferencesIdentifier } from '../../utils/index.js';
+import ts from 'typescript';
+import { expressionReferencesIdentifier } from '../../utils/index.js';
 import {
   collectConditionalBlocks,
   collectWhenElseBlocks,
+  collectDirectiveRanges,
+  isNestedInsideAny,
   buildConditionalEdits,
   buildWhenElseEdits,
   buildBoundMarkEdits,
@@ -56,6 +59,41 @@ const SPACE_BEFORE_MARKER_AFTER_NON_SIBLING = new RegExp(
 );
 
 /**
+ * `expr` with each reference to the variable `name` replaced by `replacement`. Everything else keeps
+ * its text: printed again, a nested directive's html`` template would read `html \`…\``, which the
+ * template parser takes for markup. A function inside that declares its own `name` shadows it there,
+ * as in JavaScript.
+ */
+const replaceReferences = (expr: string, name: string, replacement: string): string => {
+  const sf = ts.createSourceFile('__row.ts', `(${expr})`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const edits: [start: number, end: number, text: string][] = [];
+  const binds = (n: ts.BindingName): boolean =>
+    ts.isIdentifier(n) ? n.text === name : n.elements.some((e) => !ts.isOmittedExpression(e) && binds(e.name));
+  const isPropertyName = (node: ts.Identifier): boolean => {
+    const p = node.parent;
+    return (
+      ((ts.isPropertyAccessExpression(p) || ts.isPropertyAssignment(p) || ts.isMethodDeclaration(p)) &&
+        p.name === node) ||
+      ((ts.isGetAccessorDeclaration(p) || ts.isSetAccessorDeclaration(p)) && p.name === node) ||
+      (ts.isBindingElement(p) && p.propertyName === node)
+    );
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) && node.parameters.some((p) => binds(p.name))) return;
+    if (ts.isShorthandPropertyAssignment(node) && node.name.text === name) {
+      edits.push([node.name.end, node.name.end, `: ${replacement}`]);
+    } else if (ts.isIdentifier(node) && node.text === name && !isPropertyName(node)) {
+      edits.push([node.getStart(sf), node.end, replacement]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  let out = `(${expr})`;
+  for (const [start, end, text] of edits.reverse()) out = out.slice(0, start) + text + out.slice(end);
+  return out.slice(1, -1);
+};
+
+/**
  * Inside a row, nested directives (when/whenElse/repeat) cannot close over the row factory's
  * `item` and index parameters: their conditions and templates are compiled as sub-templates
  * whose bindings are driven by signals. So the row factory declares one signal per referenced
@@ -64,33 +102,32 @@ const SPACE_BEFORE_MARKER_AFTER_NON_SIBLING = new RegExp(
  * the existing signal machinery re-evaluates conditions, branch bindings and nested lists.
  *
  * An expression that calls the item variable (`row()`, the Signal<Signal<T>[]> pattern) is left
- * alone: there the item is itself the signal to subscribe to.
+ * alone: there the item is itself the signal to subscribe to. A name in `shadowed` (the parameters of
+ * a nested list's rows) is the inner row's own inside that list's template, and is left alone too.
  */
 const createRowRefRewriter = (itemVar: string, indexVar: string | undefined) => {
   const used = new Set<string>();
-  const itemAccessor = itemVar + '$';
-  const indexAccessor = indexVar ? indexVar + '$' : undefined;
   const callsItemVar = new RegExp('\\b' + itemVar.replace(/[$]/g, '\\$&') + '\\s*\\(');
-  const expression = (expr: string): { expression: string; extraSignals: string[] } => {
+  const expression = (
+    expr: string,
+    shadowed: (string | undefined)[] = [],
+  ): { expression: string; extraSignals: string[] } => {
     let out = expr;
     const extraSignals: string[] = [];
-    if (expressionReferencesIdentifier(expr, itemVar) && !callsItemVar.test(expr)) {
-      out = renameIdentifierInExpression(out, itemVar, itemAccessor + '()');
-      used.add(itemAccessor);
-      extraSignals.push(itemAccessor);
-    }
-    if (indexVar && indexAccessor && expressionReferencesIdentifier(out, indexVar)) {
-      out = renameIdentifierInExpression(out, indexVar, indexAccessor + '()');
-      used.add(indexAccessor);
-      extraSignals.push(indexAccessor);
+    for (const name of [callsItemVar.test(expr) ? undefined : itemVar, indexVar]) {
+      const renamed = name && !shadowed.includes(name) ? replaceReferences(out, name, `${name}$()`) : out;
+      if (renamed === out) continue;
+      out = renamed;
+      used.add(`${name}$`);
+      extraSignals.push(`${name}$`);
     }
     return { expression: out, extraSignals };
   };
-  const html = (source: string): string => {
+  const html = (source: string, shadowed?: (string | undefined)[]): string => {
     let out = '';
     let last = 0;
     for (const span of findTemplateExpressions(source)) {
-      out += source.slice(last, span.start) + '${' + expression(span.expression).expression + '}';
+      out += source.slice(last, span.start) + '${' + expression(span.expression, shadowed).expression + '}';
       last = span.end;
     }
     return out + source.slice(last);
@@ -191,8 +228,17 @@ export const generateStaticRepeatTemplate = (
     elementPaths.set(elementId, path);
   }
 
-  // Generate static HTML by removing dynamic expressions
-  let staticHtml = itemTemplate;
+  // A when() / whenElse() branch pre-rendered in the row is emitted exactly as its own template, which
+  // its initializer's paths are computed on (RW-2): it is set aside, by its opening anchor, while the
+  // row's own markup is processed, and put back after.
+  const branches = new Map<string, string>();
+  let staticHtml = itemTemplate.replace(
+    /<!--(b\d+)([(|])-->([\s\S]*?)(?=<!--\1[|)]-->)/g,
+    (_match, id: string, kind: string, content: string) => {
+      branches.set(id + kind, content);
+      return `<!--${id}${kind}-->`;
+    },
+  );
 
   // Strip ALL remaining ${...} template expressions from the static HTML.
   // By this point, component-level signal bindings have already been replaced
@@ -229,7 +275,9 @@ export const generateStaticRepeatTemplate = (
   // Insert comment marker placeholders AFTER stripping (so they survive intact).
   // Mixed-content text bindings need: <!--iN--> + text node + <!----> boundary, so that the
   // binding's text node exists on its own for the row's path to reach it.
-  staticHtml = staticHtml.replace(/(<!--[ib]\d+-->)/g, '$1 <!---->');
+  staticHtml = staticHtml
+    .replace(/(<!--[ib]\d+-->)/g, '$1 <!---->')
+    .replace(/<!--(b\d+[(|])-->/g, (open, key: string) => open + (branches.get(key) ?? ''));
 
   // Build element bindings array (sorted by path for consistent indexing)
   const elementBindingsArray: StaticTemplateInfo['elementBindings'] = [];
@@ -690,9 +738,23 @@ export const processItemTemplate = (
   const conditionals = condResult.conditionals;
   signalBindings.push(...condResult.bindings.filter(isSimpleBinding));
 
+  // ── Directive ownership: a whenElse/repeat nested inside another directive of the row (a nested
+  //    list, a whenElse branch, a when() element) belongs to that directive's processing, as at
+  //    component level (RW-6) ──
+  const ranges = collectDirectiveRanges(parsed);
+  const isOwnedByNestedProcessing = (start: number, end: number): boolean =>
+    isNestedInsideAny(start, end, ranges.repeat) ||
+    isNestedInsideAny(start, end, ranges.whenElse) ||
+    isNestedInsideAny(start, end, ranges.conditional);
+
   // ── WhenElse ──
   const whenElseBlocks = collectWhenElseBlocks(
-    parsed,
+    {
+      ...parsed,
+      bindings: parsed.bindings.filter(
+        (b) => b.type !== 'whenElse' || !isOwnedByNestedProcessing(b.expressionStart, b.expressionEnd),
+      ),
+    },
     signalInitializers,
     state,
     processRowSubTemplate,
@@ -703,6 +765,7 @@ export const processItemTemplate = (
   for (const binding of parsed.bindings) {
     if (binding.type !== 'repeat') continue;
     if (!binding.itemsExpression || !binding.itemVar || !binding.itemTemplate) continue;
+    if (isOwnedByNestedProcessing(binding.expressionStart, binding.expressionEnd)) continue;
 
     // The inner list and its rows may read the outer item/index: route them through the row signals
     const nestedItems = rowRefs.expression(binding.itemsExpression);
@@ -711,7 +774,7 @@ export const processItemTemplate = (
     ].filter((s) => s !== '');
     const nestedRepeatId = `b${state.idCounter++}`;
     const nestedProcessed = processItemTemplate(
-      rowRefs.html(binding.itemTemplate),
+      rowRefs.html(binding.itemTemplate, [binding.itemVar, binding.indexVar]),
       binding.itemVar,
       binding.indexVar,
       signalInitializers,

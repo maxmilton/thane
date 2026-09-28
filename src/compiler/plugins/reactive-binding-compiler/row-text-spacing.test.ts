@@ -239,12 +239,11 @@ const ROW_WHEN_SHAPES: Record<string, Shape> = {
 };
 
 /**
- * A row whose when() is pre-rendered (a component condition, true at compile time). Its row template
- * is garbled today (a boundary twice, no space; A1's hand-off note, finding 10), which is RW-2's: it is
- * pinned so that H-52 and H-53 are seen to leave it alone.
+ * A row whose when() is pre-rendered (a component condition, true at compile time). Until RW-2 its row
+ * template was garbled (a boundary twice, no space; A1's hand-off note, finding 10). Since RW-2 the row
+ * holds the when()'s own template, with one space between the two bindings.
  */
-const PRERENDERED_ROW_WHEN =
-  '<li class="rp-space"><!----><span><!----> <!----><!----><!----> <!----><!----></span><!----></li>';
+const PRERENDERED_ROW_WHEN = '<li class="rp-space"><!----><span><!----> <!----> <!----> <!----></span><!----></li>';
 
 const fixture = (): string => {
   const list = (row: string) => '<ul>${repeat(items(), (it) => html`' + row + '`)}</ul>';
@@ -344,7 +343,7 @@ for (const mode of Object.keys(MODES) as (keyof typeof MODES)[]) {
     }
 
     test(
-      "a row whose when() is pre-rendered (RW-2's, pinned)",
+      "a row whose when() is pre-rendered holds the when()'s own template (RW-2)",
       async () => {
         expect(emitted(await bundle(mode), '<li class="rp-space">', '</li>', true)).toBe(PRERENDERED_ROW_WHEN);
       },

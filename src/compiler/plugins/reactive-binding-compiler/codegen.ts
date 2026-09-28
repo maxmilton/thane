@@ -11,7 +11,6 @@ import type {
   RepeatBlock,
   BindingInfo,
   SimpleBinding,
-  ExpressionBinding,
   EventBinding,
   ItemEventBinding,
   EmitOptions,
@@ -29,7 +28,7 @@ import {
 } from '../../utils/index.js';
 import { escapeTemplateLiteral } from '../../utils/html-parser/index.js';
 import { buildDomModel, cookTemplateText, type DomModel, type DomNode } from './dom-model.js';
-import { anchorMark, BOUND_MARK, stripMarks } from './template-utils.js';
+import { BOUND_MARK, stripMarks } from './template-utils.js';
 import { ErrorCode } from '../../errors.js';
 import type { ImportInfo } from '../../types.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
@@ -104,6 +103,10 @@ const pathToSiblingNav = (root: string, path: number[]): string => {
   }
   return expr;
 };
+
+/** True when generated statements read `name` as a variable (a property of that name does not count). */
+const codeReferences = (statements: string[], name: string): boolean =>
+  expressionReferencesIdentifier(`() => {\n${statements.join('\n')}\n}`, name);
 
 // ============================================================================
 // Scopes: where compiled code finds the nodes it binds (A1)
@@ -411,7 +414,7 @@ const matchSelectionBinding = (
  * Emit the list-level subscription for a selection binding. It remembers the previously
  * selected key, and on change clears the old row and marks the new one; rows that no longer
  * exist (or keys with no row) are skipped. Rows still compute the value on creation, so a row
- * created while selected starts in the right state.
+ * created while selected starts in the right state. The unsubscribe goes into the list's `cleanups`.
  */
 const buildSelectionSubscription = (
   repId: string,
@@ -419,13 +422,14 @@ const buildSelectionSubscription = (
   sel: SelectionBinding,
   path: number[],
   write: (target: string, value: string) => string,
+  cleanups: string,
 ): string => {
   const nav = (managed: string) => (path.length === 0 ? `${managed}.el` : pathToSiblingNav(`${managed}.el`, path));
   const prev = `_sel_${repId}_${index}`;
   const rc = `_rc_${repId}`;
   return (
     `let ${prev} = ${sel.signalName}(); ` +
-    `_subs.push(${sel.signalName}.subscribe((_v) => { ` +
+    `${cleanups}.push(${sel.signalName}.subscribe((_v) => { ` +
     `const _o = ${rc}.get(${prev}); if (_o) ${write(nav('_o'), sel.offValue)}; ` +
     `const _n = ${rc}.get(_v); if (_n) ${write(nav('_n'), sel.onValue)}; ` +
     `${prev} = _v; }, true));`
@@ -783,89 +787,6 @@ const compileEventHandler = (evt: EventBinding): string => {
   return isFnCall ? `() => { ${handlerCode}; }` : handlerCode;
 };
 
-/**
- * Generate an initNested function for a conditional/whenElse inside a repeat item.
- * The initNested receives `_c` (the first node of the conditional content), which
- * is already in the DOM by the time initNested is called; bound nodes are reached
- * from it by path (`model` is the content's template).
- */
-const generateRepeatNestedCondInitFn = (
-  nestedBindings: BindingInfo[],
-  nestedEventBindings: EventBinding[],
-  outerItemVar: string,
-  model: DomModel,
-): string => {
-  const hasSignalBindings = nestedBindings.length > 0;
-  const hasEvents = nestedEventBindings.length > 0;
-  if (!hasSignalBindings && !hasEvents) return '() => []';
-
-  const parts: string[] = [];
-  parts.push('(_c) => {');
-  // Bound elements and text nodes are reached inside the conditional's own content, by path from
-  // its first node (A1-2, A1-4)
-  const scope = branchScope(model, '  ');
-  const simpleNested = nestedBindings.filter(isSimpleBinding);
-  const exprNested = nestedBindings.filter(isExpressionBinding);
-  const target = (b: BindingInfo): string =>
-    b.type === 'text' ? scope.text(b.id, `_n_${b.id}`) : scope.at(b.id, `_n_${b.id}`);
-  // Elements first: a text node's path can then start from one of them
-  for (const b of nestedBindings) if (b.type !== 'text') target(b);
-  const eventTargets = nestedEventBindings.map((evt) => scope.at(evt.elementId, `_n_${evt.elementId}`));
-  for (const b of nestedBindings) if (b.type === 'text') target(b);
-  parts.push(...scope.head);
-  // A signal binding's write, of `value`
-  const write = (sb: SimpleBinding, value: string): string => {
-    const el = `_n_${sb.id}`;
-    if (sb.type === 'text') return `${el}.data = ${value} ?? ''`;
-    if (sb.type === 'attr' && sb.property) return attributeWrite(el, sb, value);
-    if (sb.type === 'style' && sb.property) return `${el}.style.setProperty('${sb.property}', ${value})`;
-    return '';
-  };
-  // Initial values for signal bindings
-  for (const sb of simpleNested) {
-    const w = write(sb, `${sb.signalName === outerItemVar ? 'item' : sb.signalName}()`);
-    if (w) parts.push(`  ${w};`);
-  }
-  // Expression bindings: first write here, guarded re-writes in the subscriptions below
-  const exprNestedWrites = new Map<ExpressionBinding, GuardedWrite>();
-  for (const eb of exprNested) {
-    const renamedExpr = renameIdentifierInExpression(eb.expression, outerItemVar, 'item');
-    const w = expressionWrite({ ...eb, id: `_n_${eb.id}` });
-    if (!w) continue;
-    const gw = guardedWrite(`_pv_${eb.id}`, w, renamedExpr);
-    exprNestedWrites.set(eb, gw);
-    parts.push(`  let _pv_${eb.id}; ${gw.fill};`);
-  }
-  parts.push('  const _nsubs = [];');
-  // Subscriptions for signal bindings
-  const renamedSimpleNested = simpleNested.map((sb) => ({
-    ...sb,
-    signalName: sb.signalName === outerItemVar ? 'item' : sb.signalName,
-  }));
-  for (const [signalName, sbs] of groupBindingsBySignal(renamedSimpleNested)) {
-    const updates = sbs.map((sb) => write(sb, 'v')).filter(Boolean);
-    if (updates.length > 0) {
-      parts.push(`  _nsubs.push(${signalName}.subscribe(v => { ${updates.join('; ')}; }, true));`);
-    }
-  }
-  for (const eb of exprNested) {
-    const gw = exprNestedWrites.get(eb);
-    if (!gw) continue;
-    const updFn = `() => { ${gw.update}; }`;
-    for (const sig of eb.signalNames) {
-      const renamedSig = sig === outerItemVar ? 'item' : sig;
-      parts.push(`  _nsubs.push(${renamedSig}.subscribe(${updFn}, true));`);
-    }
-  }
-  // Listeners inside the content: reached inside the content and discarded with it
-  nestedEventBindings.forEach((evt, i) => {
-    parts.push(`  ${eventTargets[i]}.addEventListener('${evt.eventName}', ${compileEventHandler(evt)});`);
-  });
-  parts.push('  return _nsubs;');
-  parts.push('}');
-  return parts.join('\n');
-};
-
 /** A when() condition that is a bare signal read (`show()`): bound by `__bindIf` on the signal itself. */
 const isSimpleConditional = (cond: ConditionalBlock): boolean =>
   cond.signalNames.length === 1 && cond.jsExpression === `${cond.signalName}()`;
@@ -898,6 +819,19 @@ export const generateInitBindingsFunction = (
     helpers.add(helper);
     return helper;
   };
+  /** The lists whose code is being generated, outermost first: a row factory is inside each (RW-3). */
+  const rowStack: RepeatBlock[] = [];
+  // A child's props, as written, in the row factory that mounts it (Step 10): the row's item is `item`
+  // there; its index keeps the developer's name. Inside an inner row the name `item` is the inner row's,
+  // so an outer row's item written `item` is read through that row's alias, `_item_<id>` (RW-3).
+  const rowProps = (props: string, itemVar: string | undefined): string => {
+    const named = [...rowStack].reverse().find((row) => row.itemVar === 'item');
+    let out = props;
+    if (named && named !== rowStack[rowStack.length - 1] && expressionReferencesIdentifier(out, 'item')) {
+      out = renameIdentifierInExpression(out, 'item', `_item_${named.id}`);
+    }
+    return itemVar ? renameIdentifierInExpression(out, itemVar, 'item') : out;
+  };
 
   // A child component, mounted where its placeholder was (A1-4): into its host element when the host
   // is in the template (see child-hosts.ts), otherwise into a new host that replaces its anchor
@@ -910,8 +844,7 @@ export const generateInitBindingsFunction = (
     itemVar?: string,
   ): { setup: string[]; cleanup: string } => {
     const varName = `_cm${globalIndex}`;
-    // Step 10: the row's item is `item` in the row factory; its index keeps the developer's name
-    const props = itemVar ? renameIdentifierInExpression(cm.propsExpression, itemVar, 'item') : cm.propsExpression;
+    const props = rowProps(cm.propsExpression, itemVar);
     const mount = (host: string) => `${use(BIND_FN.DESTROY_CHILD)}(${cm.componentName}.__f(${host}, ${props}))`;
     if (childHosts.has(cm.anchorId)) return { setup: [], cleanup: mount(scope.at(cm.anchorId, varName)) };
     const anchor = scope.at(`${cm.anchorId}.`, `_cma${globalIndex}`);
@@ -998,8 +931,18 @@ export const generateInitBindingsFunction = (
 
   // The call that binds a when() block between its two anchors (reached through `scope`):
   // `__bindIf` for a bare signal read, otherwise `__bindIfExpr` over every signal the condition
-  // reads. Callers add their wrapper.
-  const whenCall = (cond: ConditionalBlock, initCode: string, scope: NavScope): string => {
+  // reads. The content's initializer is the branch initializer at every level, a row's too (RW-2).
+  // Callers add their wrapper.
+  const whenCall = (cond: ConditionalBlock, scope: NavScope): string => {
+    const initCode = generateNestedInitializer(
+      cond.nestedBindings,
+      cond.nestedConditionals,
+      cond.nestedWhenElse,
+      cond.nestedRepeats,
+      cond.id,
+      cond.nestedEventBindings,
+      cond.templateContent,
+    );
     const template = escapeTemplateLiteral(stripMarks(emit.html(cond.templateContent)));
     const range = `${scope.at(`${cond.id}(`, `_ws_${cond.id}`)}, ${scope.at(`${cond.id})`, `_we_${cond.id}`)}`;
     if (isSimpleConditional(cond)) {
@@ -1012,7 +955,25 @@ export const generateInitBindingsFunction = (
   // The two `__bindIfExpr` calls that bind a whenElse() block over its three anchors: the then
   // branch between the first two on the condition, the else branch between the last two on its
   // negation. Callers add their wrapper.
-  const whenElseCalls = (we: WhenElseBlock, thenInit: string, elseInit: string, scope: NavScope): [string, string] => {
+  const whenElseCalls = (we: WhenElseBlock, scope: NavScope): [string, string] => {
+    const thenInit = generateNestedInitializer(
+      we.thenBindings,
+      we.thenConditionals,
+      we.thenWhenElse,
+      we.thenRepeats,
+      we.thenId,
+      we.thenEventBindings ?? [],
+      we.thenTemplate,
+    );
+    const elseInit = generateNestedInitializer(
+      we.elseBindings,
+      we.elseConditionals,
+      we.elseWhenElse,
+      we.elseRepeats,
+      we.elseId,
+      we.elseEventBindings ?? [],
+      we.elseTemplate,
+    );
     const signals = we.signalNames.join(', ');
     const [start, middle, end] = (['(', '|', ')'] as const).map((kind, i) =>
       scope.at(`${we.thenId}${kind}`, `_w${'sme'[i]}_${we.thenId}`),
@@ -1026,7 +987,7 @@ export const generateInitBindingsFunction = (
   };
 
   // A list's source, after its reconciler: the `_items_` thunk, the optional empty-template
-  // sync, the initial reconcile, one subscription per source signal into `_subs`, and the
+  // sync, the initial reconcile, one subscription per source signal into `cleanups`, and the
   // reconciler's clearAll.
   const emitListSource = (
     rep: RepeatBlock,
@@ -1034,6 +995,7 @@ export const generateInitBindingsFunction = (
     containerVar: string,
     anchorVar: string,
     lines: string[],
+    cleanups: string,
   ): void => {
     const itemsVar = `_items_${rep.id}`;
     const emptyVar = `_empty_${rep.id}`;
@@ -1055,21 +1017,20 @@ export const generateInitBindingsFunction = (
       const sourceVar = `_rsrc_${rep.id}_${sourceIdx}`;
       lines.push(`    const ${sourceVar} = ${source};`);
       lines.push(
-        `    _subs.push(typeof ${sourceVar}?.subscribe === 'function' ? ${sourceVar}.subscribe(() => { ${onChange} }, true) : () => {});`,
+        `    ${cleanups}.push(typeof ${sourceVar}?.subscribe === 'function' ? ${sourceVar}.subscribe(() => { ${onChange} }, true) : () => {});`,
       );
     });
-    // When the scope ends (destroy, or a branch hiding), the rows' own cleanups run too (H-28)
-    lines.push(`    _subs.push(() => ${reconcilerVar}.clearAll());`);
+    // When the scope ends (destroy, a branch hiding, a row going), the rows' own cleanups run too (H-28)
+    lines.push(`    ${cleanups}.push(() => ${reconcilerVar}.clearAll());`);
   };
 
-  // A row's bindings to component signals: navigation to each bound element (`<prefix>N`), the
-  // first writes, and one subscription per signal into the row's cleanups. Attribute and style
-  // bindings are reached by element path; a text binding's text node (`<prefix>tN`) through the
-  // row's scope, which declares it in its head. The options name the scope's variables (outer rows
-  // and nested rows use different names).
+  // A row's bindings to component signals: navigation to each bound element (`_sN`), the first
+  // writes, and one subscription per signal into the row's `_cleanups`. Attribute and style bindings
+  // are reached by element path from `_el`; a text binding's text node (`_stN`) through the row's
+  // scope, which declares it in its head.
   const emitRowSignalBindings = (
     staticInfo: StaticTemplateInfo,
-    scope: { row: string; prefix: string; cleanups: string; nodes: NavScope },
+    nodes: NavScope,
   ): { nav: string[]; fill: string[]; subscriptions: string[] } => {
     const nav: string[] = [];
     const fill: string[] = [];
@@ -1077,12 +1038,12 @@ export const generateInitBindingsFunction = (
     const bind = (write: string, signalNames: string[] | undefined, signalName: string) => {
       fill.push(write);
       for (const s of signalNames ?? [signalName]) {
-        subscriptions.push(`${scope.cleanups}.push(${s}.subscribe(() => { ${write}; }, true))`);
+        subscriptions.push(`_cleanups.push(${s}.subscribe(() => { ${write}; }, true))`);
       }
     };
     (staticInfo.signalElementBindings ?? []).forEach((sb, i) => {
-      const varName = `${scope.prefix}${i}`;
-      nav.push(`const ${varName} = ${sb.path.length === 0 ? scope.row : pathToSiblingNav(scope.row, sb.path)}`);
+      const varName = `_s${i}`;
+      nav.push(`const ${varName} = ${sb.path.length === 0 ? '_el' : pathToSiblingNav('_el', sb.path)}`);
       const signalCall = sb.expression ?? `${sb.signalName}()`;
       // Only attr/style — text bindings use signalCommentBindings
       if (sb.type === 'attr' && sb.property) {
@@ -1092,7 +1053,7 @@ export const generateInitBindingsFunction = (
       }
     });
     (staticInfo.signalCommentBindings ?? []).forEach((scb, i) => {
-      const text = scope.nodes.text(scb.commentId, `${scope.prefix}t${i}`);
+      const text = nodes.text(scb.commentId, `_st${i}`);
       const signalCall = scb.expression ?? `${scb.signalName}()`;
       bind(`${text}.data = ${signalCall} ?? ''`, scb.signalNames, scb.signalName);
     });
@@ -1100,13 +1061,17 @@ export const generateInitBindingsFunction = (
   };
 
   // One repeat() list: the anchor lookup, the row template, the row factory and the
-  // subscriptions, written as statements into `lines`. Component-level lists write straight
-  // into the binding function; a list inside a when()/whenElse() branch writes into that
-  // branch's initializer, where a block-scoped `_subs` collects its unsubscribes.
-  const emitRepeat = (rep: RepeatBlock, lines: string[], scope: NavScope): void => {
+  // subscriptions, written as statements into `lines`. `scope` reaches the list's anchor, and its
+  // unsubscribes go into `cleanups`. Component-level lists write straight into the binding function
+  // (`_subs`); a list inside a when()/whenElse() branch writes into that branch's initializer, where a
+  // block-scoped `_subs` collects them; a list inside a row writes into the row factory, into the
+  // row's `_cleanups` (RW-3). A row factory is a function of its own, so an inner list's `_el`, `item`
+  // and guards shadow the outer row's, as the source's own scoping does.
+  const emitRepeat = (rep: RepeatBlock, lines: string[], scope: NavScope, cleanups = '_subs'): void => {
     // The list's anchor comment, reached through the scope, which declares it in its head (A1-4)
     const anchorLine = (anchorVar: string): void => void scope.at(`${rep.id}.`, anchorVar);
     const indexVar = rep.indexVar || '_idx';
+    rowStack.push(rep);
     const hasNestedRepeats = rep.nestedRepeats.length > 0;
     const hasNestedConditionals = rep.nestedConditionals.length > 0;
     const hasItemEvents = rep.itemEvents.length > 0;
@@ -1118,8 +1083,7 @@ export const generateInitBindingsFunction = (
       const anchorVar = `_a_${rep.id}`;
       const containerVar = `_ct_${rep.id}`;
       const reconcilerVar = `_rc_${rep.id}`;
-      let propsExpr = directRepeatComponent.propsExpression;
-      propsExpr = renameIdentifierInExpression(propsExpr, rep.itemVar, 'item');
+      const propsExpr = rowProps(directRepeatComponent.propsExpression, rep.itemVar);
 
       anchorLine(anchorVar);
       lines.push(`    const ${containerVar} = ${anchorVar}.parentNode;`);
@@ -1132,7 +1096,8 @@ export const generateInitBindingsFunction = (
       );
       lines.push(`      },`);
       lines.push(`    ${keyArg(rep)});`);
-      emitListSource(rep, reconcilerVar, containerVar, anchorVar, lines);
+      emitListSource(rep, reconcilerVar, containerVar, anchorVar, lines, cleanups);
+      rowStack.pop();
       return;
     }
 
@@ -1282,7 +1247,7 @@ export const generateInitBindingsFunction = (
           nav: signalNavStatements,
           fill: signalFillStatements,
           subscriptions: signalSubscriptions,
-        } = emitRowSignalBindings(staticInfo, { row: '_el', prefix: '_s', cleanups: '_cleanups', nodes: rowScope });
+        } = emitRowSignalBindings(staticInfo, rowScope);
 
         // Mixed signal+item binding navigation, fill, subscription & update (Step 13c)
         const mixedNavStatements: string[] = [];
@@ -1291,10 +1256,10 @@ export const generateInitBindingsFunction = (
         // Selection bindings are lifted out of the row: one subscription per list (emitted after
         // the reconciler exists) instead of one per row
         const selectionSubscriptions: string[] = [];
-        // In a row whose when()/whenElse() content comes and goes, positions are only known when the
-        // row is created: selection bindings, which a list-level subscription reaches later by
-        // position, stay per row there (A1-3)
-        const rowHasRanges = hasNestedConditionals || rep.nestedWhenElse.length > 0;
+        // In a row whose when()/whenElse() content or inner list rows come and go, positions are only
+        // known when the row is created: selection bindings, which a list-level subscription reaches
+        // later by position, stay per row there (A1-3, RW-3)
+        const rowHasRanges = hasNestedConditionals || rep.nestedWhenElse.length > 0 || hasNestedRepeats;
         const mixedKeyProp = rep.trackByFn && !rowHasRanges ? extractKeyProperty(rep.trackByFn) : null;
         if (staticInfo.mixedSignalItemBindings && staticInfo.mixedSignalItemBindings.length > 0) {
           for (let i = 0; i < staticInfo.mixedSignalItemBindings.length; i++) {
@@ -1327,8 +1292,13 @@ export const generateInitBindingsFunction = (
                 guardedWrite(guards.next(), (v) => attributeWrite(varName, mb, v), expr, mb.staticValue).fill,
               );
               selectionSubscriptions.push(
-                buildSelectionSubscription(rep.id, i, selection, mb.path, (target, value) =>
-                  attributeWrite(target, mb, value),
+                buildSelectionSubscription(
+                  rep.id,
+                  i,
+                  selection,
+                  mb.path,
+                  (target, value) => attributeWrite(target, mb, value),
+                  cleanups,
                 ),
               );
               continue;
@@ -1446,40 +1416,28 @@ export const generateInitBindingsFunction = (
           lines.push(`        ${navStmt};`);
         }
         // Nested conditionals (Step 14) and lists (Step 15): the row reaches each one's anchors from
-        // `_el`. A directive that shows changes the row, so they are declared with the rest.
-        // A whenElse() or list inside a row's when() is collected as the row's too, but its anchors
-        // are in the when()'s content, not in the row: it is skipped, as before A1 (H-18, P20: RW's).
-        const inRow = (id: string, kind: '(' | '.') => staticInfo.staticHtml.includes(anchorMark(id, kind));
+        // `_el`. A directive that shows changes the row, so they are declared with the rest. Their
+        // content is bound by the branch initializer, as at component level (RW-2).
         const directiveCalls: string[] = [];
         for (const cond of rep.nestedConditionals) {
-          const condInitNested = generateRepeatNestedCondInitFn(
-            cond.nestedBindings,
-            cond.nestedEventBindings,
-            rep.itemVar,
-            modelOf(cond.templateContent, emit),
-          );
-          directiveCalls.push(`        _cleanups.push(${whenCall(cond, condInitNested, rowScope)});`);
+          directiveCalls.push(`        _cleanups.push(${whenCall(cond, rowScope)});`);
         }
-        // Nested whenElse codegen (Step 14)
-        for (const we of rep.nestedWhenElse.filter((w) => inRow(w.thenId, '('))) {
-          const thenInitFn = generateRepeatNestedCondInitFn(
-            we.thenBindings,
-            [],
-            rep.itemVar,
-            modelOf(we.thenTemplate, emit),
-          );
-          const elseInitFn = generateRepeatNestedCondInitFn(
-            we.elseBindings,
-            [],
-            rep.itemVar,
-            modelOf(we.elseTemplate, emit),
-          );
-          for (const call of whenElseCalls(we, thenInitFn, elseInitFn, rowScope)) {
-            directiveCalls.push(`        _cleanups.push(${call});`);
-          }
+        for (const we of rep.nestedWhenElse) {
+          for (const call of whenElseCalls(we, rowScope)) directiveCalls.push(`        _cleanups.push(${call});`);
         }
-        const rowLists = rep.nestedRepeats.filter((nr) => inRow(nr.id, '.'));
-        for (const nr of rowLists) rowScope.at(`${nr.id}.`, `_nrA_${nr.id}`);
+        // A list inside the row is generated like any other list, its unsubscribes in the row's
+        // cleanups (RW-3)
+        for (const nr of rep.nestedRepeats) {
+          const listLines: string[] = [];
+          emitRepeat(nr, listLines, rowScope, '_cleanups');
+          directiveCalls.push(...listLines.map((line) => `    ${line}`));
+        }
+        // The directives read the item and index through the row signals, except where they read the
+        // item variable itself: a child's props, and an item that is a signal (`row()`, the
+        // Signal<Signal<T>[]> pattern). The row factory's `item` is that variable under its own name,
+        // or, for an item named `item`, under the alias an inner row's code reads it by (rowProps).
+        const itemAlias = rep.itemVar === 'item' ? `_item_${rep.id}` : rep.itemVar;
+        if (codeReferences(directiveCalls, itemAlias)) lines.push(`        const ${itemAlias} = item;`);
         lines.push(...rowScope.head);
         for (const navStmt of signalNavStatements) {
           lines.push(`        ${navStmt};`);
@@ -1522,136 +1480,6 @@ export const generateInitBindingsFunction = (
           }
         }
         lines.push(...directiveCalls);
-        // Nested repeat codegen (Step 15)
-        for (const nr of rowLists) {
-          lines.push(`        const _nrC_${nr.id} = _nrA_${nr.id}.parentNode;`);
-          // Generate inner static template
-          const innerStaticInfo = generateStaticRepeatTemplate(
-            nr.itemTemplate,
-            nr.itemBindings,
-            nr.itemEvents,
-            nr.signalBindings,
-          );
-          const innerTplId = `__tpl_${nr.id}`;
-          staticTemplates.push(
-            `  const ${innerTplId} = ${use(BIND_FN.TEMPLATE)}(\`${escapeTemplateLiteral(stripMarks(emit.html(innerStaticInfo.staticHtml)))}\`);`,
-          );
-          const innerIndexVar = nr.indexVar || '_idx';
-          // The inner row's text nodes, by path from `_nrEl` (A1-4)
-          const innerModel = modelOf(innerStaticInfo.staticHtml, emit);
-          const innerScope = createScope(innerModel, '            ', [
-            { node: innerModel.roots[0]!, expr: '_nrEl', cost: 2 },
-          ]);
-          lines.push(`        const _nrTc_${nr.id} = ${innerTplId}.content.firstElementChild;`);
-          lines.push(`        const _nrRc_${nr.id} = ${use(BIND_FN.KEYED_RECONCILER)}(_nrC_${nr.id}, _nrA_${nr.id},`);
-          lines.push(`          (_nrItem, ${innerIndexVar}, _nrRef) => {`);
-          lines.push(`            const _nrEl = _cloneNode.call(_nrTc_${nr.id}, true);`);
-          // Inner comment-marker item bindings (mixed-content text bindings), and inner signal
-          // bindings (Step 13 for nested repeats)
-          const innerCommentFillStatements: string[] = [];
-          const innerCommentUpdateStatements: string[] = [];
-          nr.itemBindings
-            .filter((b) => b.type === 'text' && b.textBindingMode === 'commentMarker')
-            .forEach((cb, i) => {
-              const expr = renameIdentifierInExpression(cb.expression, nr.itemVar, '_nrItem');
-              const text = innerScope.text(cb.elementId, `_nrc${i}`);
-              innerCommentFillStatements.push(`${text}.data = (${expr}) ?? ''`);
-              innerCommentUpdateStatements.push(`${text}.data = (${expr}) ?? ''`);
-            });
-          const {
-            nav: innerSignalNavStatements,
-            fill: innerSignalFillStatements,
-            subscriptions: innerSignalSubscriptions,
-          } = emitRowSignalBindings(innerStaticInfo, {
-            row: '_nrEl',
-            prefix: '_nrs',
-            cleanups: '_nrCleanups',
-            nodes: innerScope,
-          });
-          lines.push(...innerScope.head);
-          // Inner item bindings fill & navigation (element-based), redundancy-guarded like the
-          // outer rows. Guards are allocated here in binding order and reused by the update path.
-          const innerGuards = createGuardAllocator('_nrp');
-          const innerWrites: GuardedWrite[] = [];
-          if (innerStaticInfo.elementBindings.length > 0) {
-            const innerNavLines: string[] = [];
-            const innerFillLines: string[] = [];
-            for (let bi = 0; bi < innerStaticInfo.elementBindings.length; bi++) {
-              const eb = innerStaticInfo.elementBindings[bi]!;
-              const nv = `_nre${bi}`;
-              if (eb.path.length === 0) {
-                innerNavLines.push(`            const ${nv} = _nrEl;`);
-              } else {
-                innerNavLines.push(`            const ${nv} = ${pathToSiblingNav('_nrEl', eb.path)};`);
-              }
-              eb.bindings.forEach((binding) => {
-                const expr = renameIdentifierInExpression(binding.expression, nr.itemVar, '_nrItem');
-                let gw: GuardedWrite | undefined;
-                if (binding.type === 'text') {
-                  const textVar = `_nrt${innerWrites.length}`;
-                  const guard = innerGuards.next();
-                  gw = {
-                    fill: `${nv}.textContent = (${guard} = ${expr}) ?? ''; let ${textVar}`,
-                    update: `if (${guard} !== (${guard} = ${expr})) (${textVar} ??= ${nv}.firstChild) ? (${textVar}.nodeValue = ${guard} ?? '') : (${nv}.textContent = ${guard} ?? '')`,
-                  };
-                } else if (binding.type === 'attr' && binding.property) {
-                  gw = guardedWrite(
-                    innerGuards.next(),
-                    (v) => attributeWrite(nv, binding, v),
-                    expr,
-                    binding.staticValue,
-                  );
-                }
-                if (gw) {
-                  innerWrites.push(gw);
-                  innerFillLines.push(`            ${gw.fill};`);
-                }
-              });
-            }
-            lines.push(...innerNavLines);
-            if (innerGuards.vars.length > 0) lines.push(`            ${innerGuards.declaration()}`);
-            lines.push(...innerFillLines);
-          }
-          if (innerCommentFillStatements.length > 0) {
-            lines.push(`            ${innerCommentFillStatements.join('; ')};`);
-          }
-          lines.push(`            _insertBefore.call(_nrC_${nr.id}, _nrEl, _nrRef);`);
-          const hasInnerSignalSubs = innerSignalSubscriptions.length > 0;
-          for (const navStmt of innerSignalNavStatements) {
-            lines.push(`            ${navStmt};`);
-          }
-          if (innerSignalFillStatements.length > 0) {
-            lines.push(`            ${innerSignalFillStatements.join('; ')};`);
-          }
-          // Inner update statements
-          const innerUpdateParts: string[] = innerWrites.map((gw) => gw.update);
-          // Add comment-marker update statements
-          innerUpdateParts.push(...innerCommentUpdateStatements);
-          if (hasInnerSignalSubs) {
-            lines.push(`            const _nrCleanups = [];`);
-            for (const sub of innerSignalSubscriptions) {
-              lines.push(`            ${sub};`);
-            }
-          }
-          lines.push(
-            `            return { el: _nrEl, cleanups: ${hasInnerSignalSubs ? '_nrCleanups' : '[]'}, value: _nrItem,`,
-          );
-          lines.push(
-            `              update: (_nrItem) => { ${innerUpdateParts.join('; ')}${innerUpdateParts.length ? ';' : ''} } };`,
-          );
-          lines.push(`          },`);
-          lines.push(`        ${keyArg(nr)});`);
-          // Check if the items expression references the outer item variable
-          const nrItemsExpr = renameIdentifierInExpression(nr.itemsExpression, rep.itemVar, 'item');
-          lines.push(`        _nrRc_${nr.id}.reconcile(${nrItemsExpr});`);
-          // If the nested repeat is driven by a signal, subscribe
-          if (nr.signalName) {
-            lines.push(
-              `        _cleanups.push(${nr.signalName}.subscribe(() => { _nrRc_${nr.id}.reconcile(${nrItemsExpr}); }, true));`,
-            );
-          }
-          lines.push(`        _cleanups.push(() => { _nrRc_${nr.id}.clearAll(); });`);
-        }
         // Lean rows: no per-row update closure. Guard state and lazily resolved text nodes live
         // on the managed record, and one update function per list re-navigates from the row
         // element. Rows with a mixed signal+item binding that is not lifted keep their closure.
@@ -1699,12 +1527,13 @@ export const generateInitBindingsFunction = (
         }
 
         // Empty template handling (inlined by compiler — not in reconciler)
-        emitListSource(rep, reconcilerVar, containerVar, anchorVar, lines);
+        emitListSource(rep, reconcilerVar, containerVar, anchorVar, lines, cleanups);
         // Emit delegated event listeners on the container (after reconciler is ready)
         for (const stmt of delegatedListenerStatements) {
           lines.push(`    ${stmt}`);
         }
 
+        rowStack.pop();
         return;
       } else {
         // No-bindings path: template clone with no fill/update
@@ -1744,7 +1573,8 @@ export const generateInitBindingsFunction = (
         lines.push(`    ${keyArg(rep)});`);
 
         // Empty template handling (inlined)
-        emitListSource(rep, reconcilerVar, containerVar, anchorVar, lines);
+        emitListSource(rep, reconcilerVar, containerVar, anchorVar, lines, cleanups);
+        rowStack.pop();
         return;
       }
     }
@@ -1841,38 +1671,9 @@ export const generateInitBindingsFunction = (
         initLines.push(`        ${sig}.subscribe(${updFn}, true),`);
       }
     });
-    for (const cond of nestedConds) {
-      const nestedBindingsCode = generateNestedInitializer(
-        cond.nestedBindings,
-        cond.nestedConditionals,
-        cond.nestedWhenElse,
-        cond.nestedRepeats,
-        cond.id,
-        cond.nestedEventBindings,
-        cond.templateContent,
-      );
-      initLines.push(`        ${whenCall(cond, nestedBindingsCode, scope)},`);
-    }
+    for (const cond of nestedConds) initLines.push(`        ${whenCall(cond, scope)},`);
     for (const nestedWe of nestedWE) {
-      const thenInitCode = generateNestedInitializer(
-        nestedWe.thenBindings,
-        nestedWe.thenConditionals,
-        nestedWe.thenWhenElse,
-        nestedWe.thenRepeats,
-        nestedWe.thenId,
-        nestedWe.thenEventBindings ?? [],
-        nestedWe.thenTemplate,
-      );
-      const elseInitCode = generateNestedInitializer(
-        nestedWe.elseBindings,
-        nestedWe.elseConditionals,
-        nestedWe.elseWhenElse,
-        nestedWe.elseRepeats,
-        nestedWe.elseId,
-        nestedWe.elseEventBindings ?? [],
-        nestedWe.elseTemplate,
-      );
-      for (const call of whenElseCalls(nestedWe, thenInitCode, elseInitCode, scope)) initLines.push(`        ${call},`);
+      for (const call of whenElseCalls(nestedWe, scope)) initLines.push(`        ${call},`);
     }
 
     for (const cleanupVar of nestedRepeatCleanupVars) {
@@ -1900,38 +1701,9 @@ export const generateInitBindingsFunction = (
   }
 
   // when() element content is a full sub-template — same initializer as a whenElse branch
-  for (const cond of conditionals) {
-    const nestedCode = generateNestedInitializer(
-      cond.nestedBindings,
-      cond.nestedConditionals,
-      cond.nestedWhenElse,
-      cond.nestedRepeats,
-      cond.id,
-      cond.nestedEventBindings,
-      cond.templateContent,
-    );
-    lines.push(`    _subs.push(${whenCall(cond, nestedCode, top)});`);
-  }
+  for (const cond of conditionals) lines.push(`    _subs.push(${whenCall(cond, top)});`);
   for (const we of whenElseBlocks) {
-    const thenCode = generateNestedInitializer(
-      we.thenBindings,
-      we.thenConditionals,
-      we.thenWhenElse,
-      we.thenRepeats,
-      we.thenId,
-      we.thenEventBindings ?? [],
-      we.thenTemplate,
-    );
-    const elseCode = generateNestedInitializer(
-      we.elseBindings,
-      we.elseConditionals,
-      we.elseWhenElse,
-      we.elseRepeats,
-      we.elseId,
-      we.elseEventBindings ?? [],
-      we.elseTemplate,
-    );
-    for (const call of whenElseCalls(we, thenCode, elseCode, top)) lines.push(`    _subs.push(${call});`);
+    for (const call of whenElseCalls(we, top)) lines.push(`    _subs.push(${call});`);
   }
   for (const rep of repeatBlocks) emitRepeat(rep, lines, top);
 
