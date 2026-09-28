@@ -20,7 +20,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 describe('Nested directives inside rows read the row through row-scoped signals', () => {

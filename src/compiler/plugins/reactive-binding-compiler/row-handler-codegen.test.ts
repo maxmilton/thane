@@ -20,7 +20,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 describe('Row event handlers of every shape run on the event', () => {

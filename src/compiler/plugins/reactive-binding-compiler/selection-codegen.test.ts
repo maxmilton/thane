@@ -17,7 +17,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 const count = (js: string, re: RegExp): number => (js.match(re) ?? []).length;

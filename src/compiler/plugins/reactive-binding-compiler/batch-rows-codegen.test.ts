@@ -20,7 +20,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 describe('Rows without cleanups are bound by a standalone function and created in batches', () => {

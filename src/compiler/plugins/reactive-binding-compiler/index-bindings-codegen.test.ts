@@ -13,7 +13,7 @@ export const App = defineComponent('test-app', () => {
     template: html\`<ul>${list}</ul>\`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 describe('Lists whose bindings read the index ask the reconciler to refresh moved rows', () => {

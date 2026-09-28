@@ -271,7 +271,7 @@ const fixture = (): string => {
     "  const items = signal([{ id: 1, a: 'John', b: 'Doe', c: 'Jr', on: true, kids: ['k'] }]);",
     '  return { template: html`<div>' + parts.join('\n  ') + '</div>` };',
     '});',
-    'mount(H52App);',
+    'mount({ component: H52App });',
   ].join('\n');
 };
 

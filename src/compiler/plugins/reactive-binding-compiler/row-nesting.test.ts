@@ -107,7 +107,7 @@ export const App = defineComponent('test-app', () => {
     template: html\`<ul>\${repeat(rows(), (r) => html\`<li><div class="w" \${when(show())}><ol>\${repeat(r.tags, (t) => html\`<li class="tag">\${t}</li>\`)}</ol></div></li>\`, null, (r) => r.id)}</ul>\`,
   };
 });
-mount(App);
+mount({ component: App });
 `,
       DEV,
     );

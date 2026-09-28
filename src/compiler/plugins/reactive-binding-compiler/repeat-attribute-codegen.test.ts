@@ -17,7 +17,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
 
 /** The static row template the optimised path clones, or null when the list uses the fallback renderer. */

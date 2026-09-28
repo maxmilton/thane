@@ -27,7 +27,7 @@ export const App = defineComponent('test-app', () => {
     \`,
   };
 });
-mount(App);
+mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // One walk up to the row, remembering the child the target came through
