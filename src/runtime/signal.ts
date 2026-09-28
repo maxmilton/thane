@@ -10,7 +10,8 @@
  *   - Mid-notification unsubscribes null the slot; compaction after outermost notify
  *   - A write inside a subscriber (a cascade) is applied at once and notified after the current
  *     notification; each waiting signal then drains its own cascades before the next one
- *   - No cycle detection: a cascade that never settles overflows the stack
+ *   - Cycle detection in development builds only: a cascade that never settles throws a clear
+ *     error there; a production build has no check (it would cost every app bytes) and overflows
  *
  * Batching:
  *   - Writes apply immediately; notifications deferred until outermost batch ends
@@ -24,6 +25,34 @@
  */
 
 import type { Signal, ReadonlySignal } from './types.js';
+
+/**
+ * False in a production build (`thane build --prod` defines it), which leaves the development checks
+ * out. Undefined everywhere else, which keeps them.
+ */
+declare const __THANE_DEV__: boolean | undefined;
+
+/**
+ * Development builds: how deeply cascade drains are nested. Signals that keep setting each other nest
+ * one drain inside the last until the stack overflows, after which writes can stop being notified; the
+ * check stops them long before that. No real cascade is nested this deep.
+ */
+let _drainDepth = 0;
+const MAX_DRAIN_DEPTH = 500;
+
+/** Development builds: count one more nested drain, or stop a cycle with an error that says what it is */
+function _enterDrain(): void {
+  if (++_drainDepth > MAX_DRAIN_DEPTH) {
+    // What is still queued would start the cycle again: dropped, so that later writes notify as usual
+    _pendingSignals.clear();
+    _computedPendingQueue.length = 0;
+    throw new Error(
+      "[thane] Signals keep setting each other: a subscriber's write triggers itself again, " +
+        MAX_DRAIN_DEPTH +
+        ' cascades deep. Look for two signals (or a computed and its source) whose subscribers set each other.',
+    );
+  }
+}
 
 /** @internal */
 type SignalInternal<T> = Signal<T> & {
@@ -167,6 +196,19 @@ const _pendingSignals = new Set<SignalInternal<unknown>>();
 
 /** @internal — one pass: at depth 0 each pending signal drains its own cascades before the next. */
 function _flushPending(): void {
+  if (typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) {
+    // The same drain, counted (development builds). A production build keeps only the loop below,
+    // byte for byte as it was
+    _enterDrain();
+    try {
+      const pending = Array.from(_pendingSignals);
+      _pendingSignals.clear();
+      for (let i = 0; i < pending.length; i++) _notifySubscribers(pending[i]!);
+    } finally {
+      _drainDepth--;
+    }
+    return;
+  }
   const pending = Array.from(_pendingSignals);
   _pendingSignals.clear();
   for (let i = 0; i < pending.length; i++) {
@@ -222,6 +264,20 @@ const _computedPendingQueue: (() => void)[] = [];
 export function computed<T>(derivation: () => T): ReadonlySignal<T> & { dispose: () => void } {
   // Install deferred-notification flush hook on first computed creation
   _computedFlushHook ??= () => {
+    if (typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) {
+      // Counted, as the pending-signal drain is: a computed whose subscriber sets the computed's own
+      // source runs this hook again from inside itself
+      _enterDrain();
+      try {
+        while (_computedPendingQueue.length > 0) {
+          const cbs = _computedPendingQueue.splice(0);
+          for (let i = 0; i < cbs.length; i++) cbs[i]!();
+        }
+      } finally {
+        _drainDepth--;
+      }
+      return;
+    }
     while (_computedPendingQueue.length > 0) {
       const cbs = _computedPendingQueue.splice(0);
       for (let i = 0; i < cbs.length; i++) cbs[i]!();

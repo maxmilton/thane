@@ -15,9 +15,13 @@
  *   queue that runs when the outermost notification ends. Read before its source has notified
  *   (inside a cascade or a batch), it returns its previous value.
  *
- * Throwing subscribers are re-thrown through queueMicrotask; the tests capture those.
+ * Throwing subscribers are re-thrown through queueMicrotask; the tests capture those. Signals that
+ * keep setting each other stop with an error in development builds and overflow the stack in production.
  */
 import { describe, expect, test } from 'bun:test';
+import { buildSync } from 'esbuild';
+import { rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { batch, computed, signal } from './signal.js';
@@ -196,33 +200,92 @@ describe('circular dependencies', () => {
     expect(log).toEqual(['b:2', 'a=3 ca()=30', 'b:4', 'b:6', 'ca:70', 'done']);
   });
 
-  // Runs in a child process: the overflow unwinds through the runtime's module state, which bun
-  // shares between test files, and where the stack runs out decides what is left behind.
-  test('a pair that never settles overflows the stack; "Circular signal dependency" is never thrown', () => {
-    const signalUrl = pathToFileURL(join(dirname(import.meta.path), 'signal.ts')).href;
-    const script = `
-      const { signal } = await import(${JSON.stringify(signalUrl)});
-      const a = signal(0), b = signal(0);
-      let calls = 0;
-      a.subscribe((v) => { calls++; b(v + 1); }, true);
-      b.subscribe((v) => { calls++; a(v + 1); }, true);
-      const queued = [];
-      globalThis.queueMicrotask = (cb) => void queued.push(cb);
-      const errors = [];
-      try { a(1); } catch (e) { errors.push({ name: e.name, message: e.message, sync: true }); }
-      for (const cb of queued) { try { cb(); } catch (e) { errors.push({ name: e.name, message: e.message, sync: false }); } }
-      console.log(JSON.stringify({ calls, errors: errors.slice(0, 5) }));
-    `;
-    const run = Bun.spawnSync([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' });
-    const out = run.stdout.toString().trim().split('\n').at(-1) ?? '';
-    const { calls, errors } = JSON.parse(out) as {
-      calls: number;
-      errors: Array<{ name: string; message: string; sync: boolean }>;
-    };
+  // The cycle tests run in a child process: a cycle unwinds through the runtime's module state, which
+  // bun shares between test files.
+  const runCycle = (script: string, define?: Record<string, string>) => {
+    const signalPath = join(dirname(import.meta.path), 'signal.ts');
+    const source = define
+      ? // the runtime as a production build bundles it: esbuild, with the build's constants
+        buildSync({ entryPoints: [signalPath], bundle: true, format: 'esm', write: false, define }).outputFiles[0]!.text
+      : null;
+    const file = source ? join(tmpdir(), `thane-signal-${process.pid}-${Date.now()}.mjs`) : signalPath;
+    if (source) writeFileSync(file, source);
+    try {
+      const run = Bun.spawnSync(
+        [
+          process.execPath,
+          '-e',
+          `const { signal, computed } = await import(${JSON.stringify(pathToFileURL(file).href)});\n` +
+            'const queued = []; globalThis.queueMicrotask = (cb) => void queued.push(cb);\n' +
+            'const errors = []; const note = (e, sync) => errors.push({ name: e.name, message: e.message, sync });\n' +
+            script +
+            '\nfor (const cb of queued) { try { cb(); } catch (e) { note(e, false); } }\n' +
+            'console.log(JSON.stringify({ calls, errors: errors.slice(0, 5), after }));',
+        ],
+        { stdout: 'pipe', stderr: 'pipe' },
+      );
+      const out = run.stdout.toString().trim().split('\n').at(-1) ?? '';
+      return JSON.parse(out) as {
+        calls: number;
+        errors: Array<{ name: string; message: string; sync: boolean }>;
+        after: string[];
+      };
+    } finally {
+      if (source) rmSync(file, { force: true });
+    }
+  };
 
+  const PAIR = `
+    const a = signal(0), b = signal(0);
+    let calls = 0;
+    a.subscribe((v) => { calls++; b(v + 1); }, true);
+    b.subscribe((v) => { calls++; a(v + 1); }, true);
+    try { a(1); } catch (e) { note(e, true); }
+    // afterwards another signal notifies as usual
+    const after = []; const c = signal(0); c.subscribe((v) => after.push('c:' + v), true); c(1);
+  `;
+
+  test('a pair that never settles stops with an error that says what it is; writes notify afterwards', () => {
+    const { calls, errors, after } = runCycle(PAIR);
+    expect(calls).toBe(501);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ name: 'Error', sync: true });
+    expect(errors[0]!.message).toContain('[thane] Signals keep setting each other');
+    expect(after).toEqual(['c:1']);
+  });
+
+  test("a computed whose subscriber sets the computed's own source stops with the same error", () => {
+    const { errors, after } = runCycle(`
+      const s = signal(0);
+      const c = computed(() => s());
+      let calls = 0;
+      c.subscribe((v) => { calls++; s(v + 1); }, true);
+      try { s(1); } catch (e) { note(e, true); }
+      const after = []; const d = signal(0); d.subscribe((v) => after.push('d:' + v), true); d(1);
+    `);
+    // Thrown inside the computed's subscriber, it is rethrown as every subscriber error is
+    expect(errors.some((e) => e.message.includes('[thane] Signals keep setting each other'))).toBe(true);
+    expect(errors.some((e) => e.name === 'RangeError')).toBe(false);
+    expect(after).toEqual(['d:1']);
+  });
+
+  test('a production build has no check: the pair overflows the stack', () => {
+    const { calls, errors } = runCycle(PAIR, { __THANE_DEV__: 'false' });
     expect(calls).toBeGreaterThan(1000);
     expect(errors.some((e) => e.name === 'RangeError')).toBe(true);
-    expect(errors.some((e) => e.message === 'Circular signal dependency')).toBe(false);
+    expect(errors.some((e) => e.message.includes('keep setting each other'))).toBe(false);
+  });
+
+  test('a long cascade that settles is no cycle', () => {
+    const { calls, errors } = runCycle(`
+      const chain = Array.from({ length: 300 }, () => signal(0));
+      let calls = 0;
+      chain.forEach((sig, i) => sig.subscribe((v) => { calls++; if (chain[i + 1]) chain[i + 1](v); }, true));
+      try { chain[0](1); } catch (e) { note(e, true); }
+      const after = [];
+    `);
+    expect(errors).toEqual([]);
+    expect(calls).toBe(300);
   });
 });
 

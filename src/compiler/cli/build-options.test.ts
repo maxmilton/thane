@@ -14,6 +14,7 @@ import { AnalyzePlugin, runBuild } from './build.js';
 import type { BuildConfig } from './types.js';
 import {
   PROD_BUILD,
+  buildAndReadJs,
   createTempProject,
   createTestBuildConfig,
   readBuiltJs,
@@ -135,5 +136,15 @@ describe('--analyze', () => {
     } finally {
       await ctx.dispose();
     }
+  });
+});
+
+describe('development checks', () => {
+  const APP = "import { signal } from 'thane';\nconst a = signal(0);\na.subscribe((v) => console.log(v));\na(1);\n";
+
+  test('a development build keeps the check for signals that keep setting each other; production leaves it out', async () => {
+    const message = '[thane] Signals keep setting each other';
+    expect(await buildAndReadJs(APP, { config: { strictTypeCheck: false } })).toContain(message);
+    expect(await buildAndReadJs(APP, { config: { strictTypeCheck: false, ...PROD_BUILD } })).not.toContain(message);
   });
 });

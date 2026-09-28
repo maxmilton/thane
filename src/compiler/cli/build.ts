@@ -69,10 +69,12 @@ export async function runBuild(config: BuildConfig): Promise<void> {
   // plugins/minification); esbuild minifies the JavaScript. Nothing edits the emitted files.
   buildContext.minify = config.isProd;
 
-  // A production build leaves the router's head renderer out when the routes use no head field but
-  // `title`. A development build keeps it, so a field added while `thane dev` runs works at once.
+  // The runtime's build constants. A production build leaves out the development checks (a cycle of
+  // signals), and the router's head renderer when the routes use no head field but `title`. A
+  // development build keeps both, so a head field added while `thane dev` runs works at once.
   const define: Record<string, string> = {
     ...config.define,
+    __THANE_DEV__: String(!config.isProd),
     __THANE_HEAD__: String(!config.isProd || (await routeTablesOf(config.entryPoints, projectRoot)).usesHead),
   };
 

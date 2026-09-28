@@ -8,7 +8,8 @@
  *    unless --no-build is given). Raw is the length in characters here, as in the plan's
  *    baseline table (the files hold some non-ASCII comment characters); elsewhere it is bytes;
  *  - bundles: esbuild bundles of src/runtime feature sets (ESM, es2022, minified, tree-shaken),
- *    that is, what an app that imports that set pays. The router rows define `__THANE_HEAD__` as a
+ *    that is, what an app that imports that set pays, built as production builds them (`__THANE_DEV__`
+ *    false: no development checks). The router rows define `__THANE_HEAD__` as a
  *    production build would: false for an app whose routes set nothing but titles, true with route heads;
  *  - apps: `thane build --prod` of the apps in the snapshot set (total of the emitted .js files).
  *    example-apps/benchmark is left out: it is the same source as bench/app, built from a tarball.
@@ -96,7 +97,8 @@ export async function measureSizes(runBuild = true): Promise<SizeReport> {
     const { contents, define } = typeof set === 'string' ? { contents: set, define: {} } : set;
     const r = await build({
       stdin: { contents, resolveDir: repoRoot, loader: 'ts', sourcefile: 'size-entry.ts' },
-      define,
+      // as a production build: no development checks
+      define: { __THANE_DEV__: 'false', ...define },
       bundle: true,
       minify: true,
       format: 'esm',

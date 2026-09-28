@@ -131,7 +131,7 @@ Only one router instance is supported. Calling `mount()` with a `router` option 
 
 ### Circular Signal Dependencies
 
-Cycles are not detected. When subscribers keep setting each other's signals, every round of the cascade runs one level deeper, so a cycle that never settles ends in a stack overflow (`RangeError: Maximum call stack size exceeded`), and afterwards later writes may never be notified. A cascade that settles runs to the end, but a very long one can overflow the stack as well. See [Signals](signals.md#circular-dependencies).
+Cycles are detected in development builds only: when subscribers keep setting each other's signals, a development build stops the cycle with an error after 500 rounds. A production build has no check, so there a cycle that never settles ends in a stack overflow (`RangeError: Maximum call stack size exceeded`), and afterwards later writes may never be notified. See [Signals](signals.md#circular-dependencies).
 
 ### Stale `computed` Reads in a Batch or a Cascade
 

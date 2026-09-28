@@ -221,13 +221,13 @@ display(); // still 'Count: 5' — label wasn't tracked
 
 ## Circular Dependencies
 
-Thane does not detect cycles. When subscribers keep setting each other's signals, each round of the cascade runs one level deeper on the call stack, so a cycle that never settles ends in a stack overflow:
+When subscribers keep setting each other's signals, each round of the cascade runs one level deeper on the call stack. In a development build (`thane dev`, `thane build` without `--prod`), a cycle that has not settled after 500 rounds stops with an error that says so, and later writes notify as usual:
 
 ```
-RangeError: Maximum call stack size exceeded
+Error: [thane] Signals keep setting each other: a subscriber's write triggers itself again, 500 cascades deep.
 ```
 
-After that the runtime's bookkeeping can be left broken, so that later writes are never notified: treat a cycle as a bug to fix, not an error to catch. A cascade that settles, such as two signals that set each other until a limit is reached, runs to the end; a very long one can still overflow the stack.
+The same holds for a `computed` whose subscriber sets the computed's own source; that error is reported the way any subscriber's error is, asynchronously. A production build has no check, which would cost every app bytes: there a cycle that never settles ends in a stack overflow (`RangeError: Maximum call stack size exceeded`), and the runtime's bookkeeping can be left broken, so that later writes are never notified. Treat a cycle as a bug to fix, not an error to catch. A cascade that settles, such as two signals that set each other until a limit is reached, runs to the end.
 
 ---
 
