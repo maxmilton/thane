@@ -10,13 +10,32 @@ const headedMode = process.env.PW_E2E_HEADED === '1';
 const repoRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 // Every e2e port derives from E2E_PORT_BASE (default 4173), so that several runs can share a machine:
-// contract base+0, router base+1, cart base+2, hardening base+3, browser-error dev server base+145
-// (server.ts and browser-error.spec.ts read the same variable).
+// contract base+0, router base+1, cart base+2, hardening base+3, their production builds base+10 to
+// base+13, and the browser-error dev server base+145 (server.ts and browser-error.spec.ts read the same
+// variable).
 const portBase = process.env.E2E_PORT_BASE ? Number(process.env.E2E_PORT_BASE) : 4173;
 if (!Number.isInteger(portBase) || portBase < 1024 || portBase + 145 > 65535) {
   throw new Error(`E2E_PORT_BASE must be an integer from 1024 to 65390, got "${process.env.E2E_PORT_BASE}"`);
 }
 const appUrl = (offset: number) => `http://127.0.0.1:${portBase + offset}`;
+
+// The apps under test, each built twice: for development into e2e/.build, and with --prod into
+// e2e/.build-prod, served PROD_OFFSET ports higher (server.ts).
+const PROD_OFFSET = 10;
+const apps = [
+  {
+    name: 'contract',
+    args: '--entry ./e2e/contract-app/main.ts --html ./e2e/contract-app/index.html --assets ./e2e/contract-app/assets',
+  },
+  { name: 'router', args: '--entry ./e2e/router-app/main.ts --html ./e2e/router-app/index.html' },
+  { name: 'cart', args: '--entry ./e2e/cart-app/main.ts --html ./e2e/cart-app/index.html' },
+  { name: 'hardening', args: '--entry ./e2e/hardening-app/main.ts --html ./e2e/hardening-app/index.html' },
+];
+const browsers = [
+  ['chromium', 'Desktop Chrome'],
+  ['firefox', 'Desktop Firefox'],
+  ['webkit', 'Desktop Safari'],
+] as const;
 
 export default defineConfig({
   testDir: './tests',
@@ -36,52 +55,45 @@ export default defineConfig({
     cwd: repoRoot,
     command: [
       'bun run build',
-      'bun ./dist/compiler/cli/thane.js build --entry ./e2e/contract-app/main.ts --out ./e2e/.build/contract --html ./e2e/contract-app/index.html --assets ./e2e/contract-app/assets',
-      'bun ./dist/compiler/cli/thane.js build --entry ./e2e/router-app/main.ts --out ./e2e/.build/router --html ./e2e/router-app/index.html',
-      'bun ./dist/compiler/cli/thane.js build --entry ./e2e/cart-app/main.ts --out ./e2e/.build/cart --html ./e2e/cart-app/index.html',
-      'bun ./dist/compiler/cli/thane.js build --entry ./e2e/hardening-app/main.ts --out ./e2e/.build/hardening --html ./e2e/hardening-app/index.html',
+      ...apps.flatMap((app) => [
+        `bun ./dist/compiler/cli/thane.js build ${app.args} --out ./e2e/.build/${app.name}`,
+        `bun ./dist/compiler/cli/thane.js build --prod ${app.args} --out ./e2e/.build-prod/${app.name}`,
+      ]),
       'bun ./e2e/server.ts',
     ].join(' && '),
     env: { E2E_PORT_BASE: String(portBase) },
     url: appUrl(0),
     reuseExistingServer: false,
-    timeout: 60_000,
+    timeout: 90_000,
   },
   projects: [
-    {
-      name: 'contract-chromium',
+    ...browsers.map(([browser, device]) => ({
+      name: `contract-${browser}`,
       testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts'],
-      use: { ...devices['Desktop Chrome'], baseURL: appUrl(0) },
-    },
-    {
-      name: 'contract-firefox',
-      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts'],
-      use: { ...devices['Desktop Firefox'], baseURL: appUrl(0) },
-    },
-    {
-      name: 'contract-webkit',
-      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts'],
-      use: { ...devices['Desktop Safari'], baseURL: appUrl(0) },
-    },
-    {
-      name: 'router-chromium',
-      testMatch: 'router.spec.ts',
-      use: { ...devices['Desktop Chrome'], baseURL: appUrl(1) },
-    },
-    {
-      name: 'cart-chromium',
-      testMatch: 'cart.spec.ts',
-      use: { ...devices['Desktop Chrome'], baseURL: appUrl(2) },
-    },
-    {
-      name: 'hardening-chromium',
-      testMatch: 'hardening.spec.ts',
-      use: { ...devices['Desktop Chrome'], baseURL: appUrl(3) },
-    },
+      use: { ...devices[device], baseURL: appUrl(0) },
+    })),
+    ...(['router', 'cart', 'hardening'] as const).flatMap((suite, i) =>
+      browsers.map(([browser, device]) => ({
+        name: `${suite}-${browser}`,
+        testMatch: `${suite}.spec.ts`,
+        use: { ...devices[device], baseURL: appUrl(i + 1) },
+      })),
+    ),
     {
       name: 'browser-error-chromium',
       testMatch: 'browser-error.spec.ts',
       use: { ...devices['Desktop Chrome'] },
     },
+    // The same apps built with --prod (minified templates, selectors and JavaScript), in Chromium.
+    {
+      name: 'contract-prod-chromium',
+      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts'],
+      use: { ...devices['Desktop Chrome'], baseURL: appUrl(PROD_OFFSET) },
+    },
+    ...(['router', 'cart', 'hardening'] as const).map((suite, i) => ({
+      name: `${suite}-prod-chromium`,
+      testMatch: `${suite}.spec.ts`,
+      use: { ...devices['Desktop Chrome'], baseURL: appUrl(PROD_OFFSET + i + 1) },
+    })),
   ],
 });
