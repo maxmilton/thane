@@ -188,9 +188,9 @@ const rewriteStatementAtRules = (css: string, file: string | undefined): string 
       const statement = css.slice(i, end + 1).replace(new RegExp(`${MASK_OPEN}\\d+${MASK_CLOSE}`, 'g'), '${…}');
       logger.warn(
         'css',
-        `${file ?? 'a stylesheet'}: ${statement.replace(/\s+/g, ' ')} was removed. @import is ignored in ` +
-          'component stylesheets (browsers drop it from constructed stylesheets): import that file globally ' +
-          'instead, with a <link> in index.html.',
+        `${file ?? 'a stylesheet'}: ${statement.replace(/\s+/g, ' ')} was removed. Thane applies every ` +
+          'stylesheet as a constructed stylesheet, and browsers ignore @import there: load that file with a ' +
+          '<link> in index.html instead.',
       );
     }
     out += css.slice(cursor, i) + replacement;

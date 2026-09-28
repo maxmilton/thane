@@ -260,9 +260,9 @@ describe('H-36c: statement at-rules never reach the runtime scoper', () => {
     expect(css).toBe('\n.a { }');
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(
-      'src/card.css: @import url("x.css") layer(base) supports(display: grid); was removed. @import is ignored in ' +
-        'component stylesheets (browsers drop it from constructed stylesheets): import that file globally ' +
-        'instead, with a <link> in index.html.',
+      'src/card.css: @import url("x.css") layer(base) supports(display: grid); was removed. Thane applies every ' +
+        'stylesheet as a constructed stylesheet, and browsers ignore @import there: load that file with a ' +
+        '<link> in index.html instead.',
     );
     expect(transform("@import 'y.css'; .a { }").css).toBe(' .a { }');
   });
