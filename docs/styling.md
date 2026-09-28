@@ -129,17 +129,7 @@ export const Card = defineComponent('ui-card', () => ({
 }));
 ```
 
-The compiler bundles the CSS file and exports its content as a string. Add `thane/client` to your `tsconfig.json` types to get proper TypeScript support for `.css` imports:
-
-```json
-{
-  "compilerOptions": {
-    "types": ["thane/client"]
-  }
-}
-```
-
-The `client.d.ts` file declares:
+The compiler bundles the CSS file and exports its content as a string. TypeScript knows `.css` imports as soon as the project imports `thane`: its declarations include `client.d.ts`, which declares:
 
 ```typescript
 declare module '*.css' {

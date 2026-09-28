@@ -11,18 +11,15 @@
 bun add thane
 ```
 
-Add the Thane client types to your `tsconfig.json` so TypeScript recognizes `.css` imports:
+Include Thane's generated types in your `tsconfig.json`:
 
 ```json
 {
-  "compilerOptions": {
-    "types": ["thane/client"]
-  },
   "include": ["src/**/*.ts", ".thane/types/**/*.d.ts"]
 }
 ```
 
-Every `thane` command writes hidden type files to `.thane/types`: the route types that make `navigate()` and `route.params` type-safe, and a reference to the same `.css` declarations. Including that folder lets your editor see them; Thane's own type check always includes it.
+Every `thane` command writes hidden type files to `.thane/types`: the route types that make `navigate()` and `route.params` type-safe. Including that folder lets your editor see them; Thane's own type check always includes it. The types of `.css` imports come with `thane` itself.
 
 ## Project Structure
 

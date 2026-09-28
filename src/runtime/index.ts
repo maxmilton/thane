@@ -1,3 +1,6 @@
+// The `.css` import declarations come with `thane`: a project needs no "types": ["thane/client"]. The
+// generated .thane/types/client.d.ts references the same file, so the declaration is in a program once.
+/// <reference path="../../client.d.ts" preserve="true" />
 /** Runtime entry point. */
 
 // Global type declarations for template tags and directives

@@ -8,7 +8,7 @@ Complete API surface for the Thane framework, covering all public exports, globa
 | :-------------- | :--------------------------------------------------------------------------------------------------------- |
 | `thane`         | Signals, components, mounting, global styles, and the types an app writes in its own code                  |
 | `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`, `setMeta`, and the head-field helpers `metaName`, `metaProperty`, `linkTag` |
-| `thane/client`  | Type declarations for `.css` imports (a `tsconfig.json` entry, not an import; see below)                   |
+| `thane/client`  | Type declarations for `.css` imports, which `thane` includes (see below)                                   |
 | `thane/runtime` | The helpers that compiled code calls. Only the compiler imports it: never import it in an app. It is not an API and changes with every version |
 
 ### `thane` (main entry)
@@ -209,7 +209,7 @@ interface UntypedRouteContext {
 
 ## CSS Module Declaration
 
-The `thane/client` subpath provides type declarations for CSS file imports:
+`thane` includes the type declarations for CSS file imports, from its `client.d.ts`:
 
 ```typescript
 // client.d.ts
@@ -219,14 +219,7 @@ declare module '*.css' {
 }
 ```
 
-Add to your `tsconfig.json`:
-
-```json
-{
-  "compilerOptions": {
-    "types": ["thane/client"]
-  }
-}
-```
+A project needs no `tsconfig.json` entry for them. The `thane/client` subpath is the same file: a project that lists
+`"types": ["thane/client"]` keeps working, with the declaration once.
 
 ← [Back to Docs](README.md)
