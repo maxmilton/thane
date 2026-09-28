@@ -274,10 +274,20 @@ describe('H-36c: statement at-rules never reach the runtime scoper', () => {
     expect(transform('@LAYER a; .b { }').css).toBe('@layer a{} .b { }');
   });
 
-  test('blocks, @namespace, strings and look-alike names are left alone', () => {
+  test('@namespace stays, followed by an empty block, so the rule after it is scoped', () => {
+    const css = '@namespace svg url(http://www.w3.org/2000/svg); svg|rect { fill: red; } .a { }';
+    expect(transform(css).css).toBe('@namespace svg url(http://www.w3.org/2000/svg);{} svg|rect { fill: red; } .a { }');
+    expect(transform(css, { minify: true }).css).toBe(
+      '@namespace svg url(http://www.w3.org/2000/svg);{}svg|rect{fill:red}.a{}',
+    );
+    expect(scopeCssRules(transform(css).css, '.sel')).toBe(
+      '@namespace svg url(http://www.w3.org/2000/svg);{}.sel svg|rect{ fill: red; }.sel .a{ }',
+    );
+  });
+
+  test('blocks, strings and look-alike names are left alone', () => {
     const untouched = [
       '@layer base { .a { } }',
-      '@namespace svg url(http://www.w3.org/2000/svg); .a { }',
       '.a::before { content: "@import x; @layer y;"; }',
       '@layer-x a; .b { }',
       '@importer a; .b { }',

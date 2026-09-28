@@ -1395,3 +1395,20 @@ test.describe('double quotes inside attribute expressions', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 });
+
+test.describe('@namespace in a component stylesheet', () => {
+  test('the namespace applies, and the rule after the statement stays scoped to the component', async ({ page }) => {
+    const probe = await mountProbe(page, 'cssnamespace');
+    await page.evaluate(() => {
+      const outside = document.createElement('p');
+      outside.className = 'ns-leak';
+      outside.dataset.testid = 'ns-outside';
+      outside.textContent = 'outside';
+      document.body.appendChild(outside);
+    });
+    await expect(page.locator('#app .ns-rect')).toHaveCSS('fill', 'rgb(255, 0, 0)');
+    await expect(page.locator('#app .ns-leak')).toHaveCSS('color', 'rgb(1, 2, 3)');
+    await expect(page.getByTestId('ns-outside')).not.toHaveCSS('color', 'rgb(1, 2, 3)');
+    expect(probe.pageErrors).toEqual([]);
+  });
+});

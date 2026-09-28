@@ -113,6 +113,7 @@ The simplification and hardening round fixed these defects in valid code:
 - An escape that only a tagged template allows, such as `` html`C:\users` `` (`\u` without hex digits, `\x1`, `\08`, `\9`), is shown as written. The template is emitted into an ordinary template literal, where such an escape failed the build.
 - An attribute expression that holds double quotes, such as `class=${sel() === it.id ? "on" : ""}` in a `repeat()` row or `data-x="${it.label + "!"}"`, builds and binds. The parser ended the attribute value at the first quote inside the expression, so the row failed the build with a misleading THANE006, and a double-quoted value lost its binding.
 - A setup variable named `r` or `ctx` is read as the setup declares it in the component's template: the compiled bindings called the component root `r` and their context `ctx`, so `${r()}` called the root element. The bindings' own names now start with `_`, and a template that still reads one of them (a name starting with `_`, an element name such as `b3`, or `e` in a row) is a build error, THANE012, instead of a wrong value.
+- `@namespace` in a component stylesheet no longer leaves the rule after it unscoped, applied to the whole page. The build writes an empty block after the statement, so the runtime scoper copies the statement and scopes the next rule; the namespace applies as usual.
 
 ### Removed
 

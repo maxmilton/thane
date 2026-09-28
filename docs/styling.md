@@ -112,7 +112,7 @@ styles: css`
 - `@charset` is removed: it means nothing in a stylesheet string.
 - `@import` is removed, and the build prints a warning. Thane applies every stylesheet as a constructed stylesheet (`adoptedStyleSheets`), and browsers ignore `@import` there. Load such a stylesheet with a `<link>` in `index.html` instead.
 - `@keyframes` and `@font-face` are copied as written, so keyframe names are global: give them a prefix of your own.
-- `@namespace` is not supported in component stylesheets: the rule after it is not scoped.
+- `@namespace svg url(http://www.w3.org/2000/svg);` works as usual, so `svg|rect` selects the SVG `rect` in the component. The compiler writes an empty `{}` after the statement, which the browser ignores, so the rule after it is scoped like any other.
 
 Comments are removed from stylesheets at build time, in development and production builds.
 
