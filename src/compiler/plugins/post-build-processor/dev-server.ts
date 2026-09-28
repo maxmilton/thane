@@ -34,6 +34,9 @@ export interface DevServerOptions {
 
 const BROWSER_ERROR_SENTINEL = 'THANE_BROWSER_ERROR';
 
+/** The topic every page's browser-event socket subscribes to; its one message is `reload` */
+const RELOAD_TOPIC = 'thane-reload';
+
 /**
  * The file a request path points at inside `distDir`, or null when the path is malformed or
  * leaves the directory. A URL pathname is percent-encoded (`My%20Logo.png`); it is decoded
@@ -73,7 +76,6 @@ type BrowserRelayMessage = {
 export class DevServer {
   private serverStarted = false;
   private server: Server<undefined> | null = null;
-  private currentPort: number;
   private readonly serverPort: number;
   private readonly serverHost: string;
   private readonly autoOpen: boolean;
@@ -82,7 +84,6 @@ export class DevServer {
   constructor(options: DevServerOptions) {
     this.options = options;
     this.serverPort = options.port ?? 4200;
-    this.currentPort = this.serverPort;
     this.serverHost = options.host ?? 'localhost';
     this.autoOpen = options.open ?? false;
   }
@@ -91,12 +92,13 @@ export class DevServer {
     return this.serverStarted;
   }
 
-  notifyLiveReloadClients(): void {
+  /** Reloads every page open on the development server (after a rebuild, or a changed asset or index.html) */
+  reloadPages(): void {
     if (!this.server || this.options.isProd) {
       return;
     }
 
-    this.server.reload(this.createServeOptions(this.currentPort));
+    this.server.publish(RELOAD_TOPIC, 'reload');
   }
 
   stop(): void {
@@ -299,6 +301,9 @@ export class DevServer {
         if (message) socket.send(message);
       }
     });
+    socket.addEventListener('message', (event) => {
+      if (event.data === 'reload') location.reload();
+    });
     socket.addEventListener('close', () => {
       setTimeout(connect, 500);
     });
@@ -417,11 +422,13 @@ export class DevServer {
           if (await file.exists()) {
             const stat = await file.stat();
             if (stat?.isFile()) {
+              // Development files are revalidated: an asset keeps its name when it is edited, and so
+              // does every output file under --no-hash-file-names, and a reloaded page must see the change
               return await compressAndRespond(
                 requestedPath,
                 req,
                 getContentType(requestedUrl),
-                'public, max-age=31536000, immutable',
+                isProd ? 'public, max-age=31536000, immutable' : 'no-cache',
               );
             }
           }
@@ -435,6 +442,9 @@ export class DevServer {
           : compressAndRespond(indexPath, req, 'text/html', 'no-cache');
       },
       websocket: {
+        open: (ws) => {
+          ws.subscribe(RELOAD_TOPIC);
+        },
         message: (_ws, rawMessage) => {
           try {
             const parsed = JSON.parse(rawMessage.toString()) as BrowserRelayMessage;
@@ -450,13 +460,14 @@ export class DevServer {
   }
 
   start(port: number = this.serverPort): void {
-    this.currentPort = port;
-
     try {
       this.server = Bun.serve(this.createServeOptions(port));
 
       if (!this.options.isProd) {
-        console.info(consoleColors.cyan, 'Bun development mode enabled; Thane browser error relay active');
+        console.info(
+          consoleColors.cyan,
+          'Development server: open pages reload after each rebuild; browser errors are relayed here',
+        );
         console.info(consoleColors.cyan, `Watch terminal for ${BROWSER_ERROR_SENTINEL}`);
       }
       console.info(consoleColors.yellow, `Server running at ${this.server.url.href}`);

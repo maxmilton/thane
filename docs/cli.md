@@ -16,7 +16,7 @@ thane dev --host 0.0.0.0
 
 Default port: `4200`. Always a development build (`--prod` is ignored). Source maps are enabled. All 12 lint rules are active. `console.*` calls are preserved.
 
-The build reruns when a source file changes; reload the page to load it. Errors in the browser (`console.error`, uncaught errors and unhandled promise rejections) are printed in the terminal, with their locations in the built files.
+The build reruns when a source file changes, and the open pages reload when it is done (and when an asset or `index.html` changes). Errors in the browser (`console.error`, uncaught errors and unhandled promise rejections) are printed in the terminal, with their locations in the built files.
 
 ### `thane build`
 

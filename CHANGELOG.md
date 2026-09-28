@@ -38,6 +38,7 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 - **New build error THANE009** for a template the compiler cannot bind reliably: markup the browser rebuilds where a binding needs a position (text directly in a table, an `<a>` inside an `<a>`, non-option content in a `<select>`), or a comment in the form of the compiler's own markers (`<!--b0-->`). THANE007 now also reports a `repeat()` row that is only a nested `repeat()`: the list could not move such a row with its inner rows.
 - **`thane/runtime` is the compiler's own entry.** Compiled components import their helpers from it, including `mountComponent`, `__batchRows`, `__T` and `__nc`. Apps must not import it: it is not an API, and it changes whenever the compiled output does.
 - **Route parameters are decoded.** `/users/ada%20lovelace` gives `route.params.id` the value `ada lovelace`, as other routers do; it was `ada%20lovelace`. A segment that is not valid percent-encoding is kept as written.
+- **`thane dev` reloads the open pages** after each rebuild, and when an asset or `index.html` changes. The server's socket, which relayed browser errors, also sends the reload. Development files are served with `Cache-Control: no-cache`, so a reloaded page sees an edited asset (`immutable` was sent, and assets keep their names).
 
 ### Fixed
 

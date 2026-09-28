@@ -1,6 +1,6 @@
 /**
  * Post-Build Processor — orchestrates file copying, compression, HTML templating,
- * dev server, live reload, and console reporting after esbuild completes.
+ * dev server, page reloads, and console reporting after esbuild completes.
  */
 
 import fs from 'node:fs';
@@ -89,12 +89,12 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
   };
 
   /**
-   * Re-process the HTML template and notify live reload clients.
+   * Re-process the HTML template and reload the open pages.
    * Used by file watchers when index.html or assets change.
    */
   const reprocessAndReloadHTML = async (): Promise<void> => {
     await fs.promises.writeFile(config.outputHTMLFilePath, await renderIndexHtml(cachedHashedFileNames), 'utf8');
-    devServer.notifyLiveReloadClients();
+    devServer.reloadPages();
   };
 
   const copyIndexHTMLIntoDistAndStartServer = async (
@@ -121,7 +121,7 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     if (serve && !devServer.isStarted) {
       devServer.start();
     } else if (serve && !isProd) {
-      devServer.notifyLiveReloadClients();
+      devServer.reloadPages();
     }
   };
 
@@ -182,7 +182,7 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
           if (serve && !watchersStarted) {
             cleanupCallbacks.add(
               watchAndRecursivelyCopyAssetsIntoDist(assetsInputDir, assetsOutputDir, () => {
-                devServer.notifyLiveReloadClients();
+                devServer.reloadPages();
               }),
             );
           } else {

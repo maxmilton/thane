@@ -85,10 +85,11 @@ const withServer = async (
   }
 };
 
-const IMMUTABLE = 'public, max-age=31536000, immutable';
-const file = (contentType: string, body: string, extra: Record<string, string> = {}): Served => ({
+/** A production server lets a file be cached for a year; a development server has it revalidated */
+const cacheOf = (isProd: boolean): string => (isProd ? 'public, max-age=31536000, immutable' : 'no-cache');
+const file = (isProd: boolean, contentType: string, body: string, extra: Record<string, string> = {}): Served => ({
   status: 200,
-  headers: { 'cache-control': IMMUTABLE, 'content-type': contentType, ...extra },
+  headers: { 'cache-control': cacheOf(isProd), 'content-type': contentType, ...extra },
   body,
 });
 const index = (extra: Record<string, string> = {}): Served => ({
@@ -99,10 +100,10 @@ const index = (extra: Record<string, string> = {}): Served => ({
 const status = (code: number, body: string): Served => ({ status: code, headers: {}, body });
 
 /** Routes whose outcome does not depend on the server options, apart from compression headers. */
-const routes = (vary: Record<string, string>): Array<[string, Served]> => [
+const routes = (isProd: boolean, vary: Record<string, string>): Array<[string, Served]> => [
   ['/', index(vary)],
-  ['/main.js', file('text/javascript', MAIN_JS, vary)],
-  ['/main.js?v=1', file('text/javascript', MAIN_JS, vary)],
+  ['/main.js', file(isProd, 'text/javascript', MAIN_JS, vary)],
+  ['/main.js?v=1', file(isProd, 'text/javascript', MAIN_JS, vary)],
   // A directory without an extension falls back to index.html; with an extension it is a 404
   ['/assets', index(vary)],
   ['/assets/', index(vary)],
@@ -114,8 +115,8 @@ const routes = (vary: Record<string, string>): Array<[string, Served]> => [
   ['/missing.js', status(404, 'Not Found')],
   ['/missing.css', status(404, 'Not Found')],
   // Percent-encoded names are decoded before the lookup
-  ['/assets/My%20Logo.png', file('image/png', 'PNGDATA')],
-  ['/caf%C3%A9.txt', file('text/plain', 'cafe', vary)],
+  ['/assets/My%20Logo.png', file(isProd, 'image/png', 'PNGDATA')],
+  ['/caf%C3%A9.txt', file(isProd, 'text/plain', 'cafe', vary)],
   // Traversal and malformed escapes are refused
   ['/..%2F..%2Fsecret.txt', status(403, 'Forbidden')],
   ['/..%2Fsecret.txt', status(403, 'Forbidden')],
@@ -125,19 +126,19 @@ const routes = (vary: Record<string, string>): Array<[string, Served]> => [
 describe('dev server routing without compression', () => {
   test('development server', async () => {
     await withServer({ isProd: false, useGzip: false }, async (get) => {
-      for (const [path, expected] of routes({})) {
+      for (const [path, expected] of routes(false, {})) {
         expect([path, await get(path)]).toEqual([path, expected]);
       }
       // The browser-event socket path refuses a plain request in development
       expect(await get('/__thane-browser-events')).toEqual(status(400, 'WebSocket upgrade failed'));
       // Compression is off: accept-encoding is ignored
-      expect(await get('/main.js', 'br, gzip')).toEqual(file('text/javascript', MAIN_JS));
+      expect(await get('/main.js', 'br, gzip')).toEqual(file(false, 'text/javascript', MAIN_JS));
     });
   });
 
   test('production server: the socket path is an ordinary client route', async () => {
     await withServer({ isProd: true, useGzip: false }, async (get) => {
-      for (const [path, expected] of routes({})) {
+      for (const [path, expected] of routes(true, {})) {
         expect([path, await get(path)]).toEqual([path, expected]);
       }
       expect(await get('/__thane-browser-events')).toEqual(index());
@@ -164,7 +165,7 @@ describe('dev server routing with useGzip', () => {
   for (const isProd of [false, true]) {
     test(`${isProd ? 'production' : 'development'}: routes, Vary on compressible responses`, async () => {
       await withServer({ isProd, useGzip: true }, async (get) => {
-        for (const [path, expected] of routes({ vary: 'Accept-Encoding' })) {
+        for (const [path, expected] of routes(isProd, { vary: 'Accept-Encoding' })) {
           expect([path, await get(path)]).toEqual([path, expected]);
         }
       });
@@ -174,22 +175,67 @@ describe('dev server routing with useGzip', () => {
       await withServer({ isProd, useGzip: true }, async (get) => {
         const vary = { vary: 'Accept-Encoding' };
         expect(await get('/main.js', 'br')).toEqual(
-          file('text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
+          file(isProd, 'text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
         );
         expect(await get('/main.js', 'gzip')).toEqual(
-          file('text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'gzip' }),
+          file(isProd, 'text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'gzip' }),
         );
         expect(await get('/main.js', 'gzip, deflate, br')).toEqual(
-          file('text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
+          file(isProd, 'text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
         );
-        expect(await get('/main.js', 'deflate')).toEqual(file('text/javascript', MAIN_JS, vary));
+        expect(await get('/main.js', 'deflate')).toEqual(file(isProd, 'text/javascript', MAIN_JS, vary));
         // The index.html fallback is compressed too
         expect(await get('/about', 'gzip')).toEqual(index({ ...vary, 'content-encoding': 'gzip' }));
         // Images are never compressed and carry no Vary
-        expect(await get('/assets/My%20Logo.png', 'br')).toEqual(file('image/png', 'PNGDATA'));
+        expect(await get('/assets/My%20Logo.png', 'br')).toEqual(file(isProd, 'image/png', 'PNGDATA'));
       });
     });
   }
+});
+
+describe('page reloads', () => {
+  /** A started server, and a page's browser-event socket connected to it */
+  const withSocket = async (fn: (server: DevServer, messages: string[]) => Promise<void>) => {
+    const info = console.info;
+    console.info = () => {};
+    const server = new DevServer({ distDir: dist, host: 'localhost', port: 0, isProd: false });
+    try {
+      server.start(0);
+    } finally {
+      console.info = info;
+    }
+    const url = (server as unknown as { server: { url: URL } }).server.url;
+    const socket = new WebSocket(`ws://${url.host}/__thane-browser-events`);
+    const messages: string[] = [];
+    socket.addEventListener('message', (event) => messages.push(String(event.data)));
+    try {
+      await new Promise((resolve, reject) => {
+        socket.addEventListener('open', resolve);
+        socket.addEventListener('error', reject);
+      });
+      await fn(server, messages);
+    } finally {
+      socket.close();
+      server.stop();
+    }
+  };
+
+  const waitFor = async (condition: () => boolean): Promise<void> => {
+    for (let i = 0; i < 100 && !condition(); i++) await Bun.sleep(10);
+  };
+
+  test('development: every open page is told to reload', async () => {
+    await withSocket(async (server, messages) => {
+      server.reloadPages();
+      await waitFor(() => messages.length > 0);
+      expect(messages).toEqual(['reload']);
+    });
+  });
+
+  test('the page script reloads when told to', () => {
+    const html = DevServer.injectBrowserRelayScript('<head></head>');
+    expect(html).toContain("if (event.data === 'reload') location.reload();");
+  });
 });
 
 describe('a request handler that fails', () => {
