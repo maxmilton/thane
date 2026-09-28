@@ -10,6 +10,10 @@ declare global {
    * Type-safe once Thane has generated the route types (any `thane` command does).
    */
   function navigate(path: import('./router.js').RoutePaths): void;
+  function navigate<P extends import('./router.js').RoutePatternWithParams>(
+    pattern: P,
+    params: import('./router.js').RouteParamValues<P>,
+  ): void;
 
   /**
    * Navigate back in history (router).

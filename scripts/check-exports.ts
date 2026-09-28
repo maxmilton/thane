@@ -48,7 +48,7 @@ const KEPT: Record<string, EntrySurface> = {
     types: ['Signal', 'ReadonlySignal', 'ComponentContext', 'ComponentHTMLSelector', 'MountHandle', 'RoutePaths'],
   },
   'thane/router': {
-    values: ['defineRoutes', 'linkTag', 'metaName', 'metaProperty', 'navigate', 'navigateBack', 'setMeta'],
+    values: ['defineRoutes', 'href', 'linkTag', 'metaName', 'metaProperty', 'navigate', 'navigateBack', 'setMeta'],
     types: ['AppRouteMeta', 'CustomMetaField', 'HeadTag', 'RouteImage', 'RouteMeta', 'SiteMeta'],
   },
   'thane/runtime': {

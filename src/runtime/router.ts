@@ -105,6 +105,14 @@ type RegisteredRoutePatterns = [ExplicitRegisterRoutePaths] extends [never]
 /** Resolves to the navigable path union when Register is augmented, else `string`. */
 export type RoutePaths = [RegisteredRoutePatterns] extends [never] ? string : RouteToPath<RegisteredRoutePatterns>;
 
+/** The registered patterns that have parameters (`/users/:id`), else `string`: what `href()` takes. */
+export type RoutePatternWithParams = [RegisteredRoutePatterns] extends [never]
+  ? string
+  : Extract<RegisteredRoutePatterns, `${string}:${string}`>;
+
+/** A value for each of a pattern's parameters: `{ id: 7 }` for `/users/:id`. */
+export type RouteParamValues<P extends string> = { readonly [K in ExtractRouteParams<P>]: string | number };
+
 /** Resolves to the route param name union when Register is augmented, else `string`. */
 export type RouteParamNames = [ExplicitRegisterRouteParamNames] extends [never]
   ? [RegisteredRoutePatterns] extends [never]
@@ -694,12 +702,28 @@ const loadRoute = async (): Promise<void> => {
 //  Navigation API — generic, zero knowledge of user routes
 // ─────────────────────────────────────────────────────────────
 
+const fillParams = (pattern: string, params: Record<string, string | number>): string =>
+  pattern.replace(/\/:([^/]+)/g, (_, name: string) => '/' + encodeURIComponent(params[name]!));
+
 /**
- * Navigate to the given path using HTML5 History pushState.
+ * A route's path with its parameters filled in, each one URL-encoded: `href('/users/:id', { id: 7 })`
+ * is `'/users/7'`. The pattern and the parameters are typed from the app's routes.
+ */
+export const href = fillParams as <P extends RoutePatternWithParams>(
+  pattern: P,
+  params: RouteParamValues<P>,
+) => RouteToPath<P>;
+
+/**
+ * Navigate to the given path using HTML5 History pushState: `navigate('/about')`, or a pattern and its
+ * parameters, `navigate('/users/:id', { id: 7 })` (see `href()`).
  *
  * Type-safe when the Register interface is augmented with `routes`.
  */
-export function navigate(path: RoutePaths): void {
+export function navigate(path: RoutePaths): void;
+export function navigate<P extends RoutePatternWithParams>(pattern: P, params: RouteParamValues<P>): void;
+export function navigate(path: string, params?: Record<string, string | number>): void {
+  if (params) path = fillParams(path, params);
   // Nothing to do when the whole URL, query and hash included, is already the current one
   const target = new URL(path, window.location.href);
   if (target.pathname + target.search + target.hash === locationUrl() + window.location.hash) return;

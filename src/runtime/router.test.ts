@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { matchRoute, defineRoutes } from './router.js';
+import { matchRoute, defineRoutes, href } from './router.js';
 import type { Route, RoutesMap } from './router.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -165,6 +165,20 @@ describe('matchRoute', () => {
     expect(result).not.toBeNull();
     expect(titleOf(result!.route)).toBe('API Status');
     expect(result!.params).toEqual({ version: 'v2' });
+  });
+});
+
+describe('href', () => {
+  test('fills in every parameter, URL-encoded, and keeps the static segments', () => {
+    expect(href('/users/:id', { id: 42 })).toBe('/users/42');
+    expect(href('/users/:id/posts/:post', { id: 'a b', post: 'x/y?z' })).toBe('/users/a%20b/posts/x%2Fy%3Fz');
+    expect(href('/:lang/about', { lang: 'en' })).toBe('/en/about');
+  });
+
+  test('what it gives, matchRoute reads back as the same params', () => {
+    const routes: RoutesMap = { '/users/:id/posts/:post': stubRoute('Post') };
+    const params = { id: 'café & co', post: '100%' };
+    expect(matchRoute(href('/users/:id/posts/:post', params), routes)!.params).toEqual(params);
   });
 });
 

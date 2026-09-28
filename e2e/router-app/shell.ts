@@ -1,4 +1,5 @@
 import { defineComponent, html } from 'thane';
+import { href } from 'thane/router';
 import { visitCount, sharedMessage } from './store.js';
 
 export const Shell = defineComponent('router-shell', () => {
@@ -54,6 +55,12 @@ export const Shell = defineComponent('router-shell', () => {
               navigate('/users/42?tab=b');
             }}
             >Tab B</a
+          >
+          <a
+            data-testid="nav-user-params"
+            href=${href('/users/:id', { id: 'ada lovelace' })}
+            @click.prevent=${navigate('/users/:id', { id: 'ada lovelace' })}
+            >Ada</a
           >
         </nav>
         <div data-testid="current-path">${currentPath()}</div>

@@ -104,6 +104,23 @@ template: html`
 
 `navigate()` is **type-safe** when you register your routes (see [Type-Safe Routes](#type-safe-routes) below).
 
+### `navigate(pattern, params)` and `href()`
+
+For a route with parameters, pass its pattern and a value for each parameter, rather than building the path
+by hand. Each value is URL-encoded, and a page reads it back decoded from `route.params`:
+
+```typescript
+import { href } from 'thane/router';
+
+navigate('/users/:id', { id: user.id });
+
+template: html`<a href=${href('/users/:id', { id: user.id })} @click.prevent=${navigate('/users/:id', { id: user.id })}>${user.name}</a>`;
+```
+
+`href(pattern, params)` gives the path (`/users/7`) as a value: for an `href` attribute, or to keep in a
+`RoutePaths` variable. Both are typed from the routes: the pattern must be one of them, with parameters,
+and `params` must give each of its parameters a string or a number and nothing else.
+
 ### `navigateBack()`
 
 Go back in browser history:
@@ -369,6 +386,7 @@ Thane generates type definitions for your routes automatically. After running `t
 1. Make `navigate()` autocomplete valid paths
 2. Type `route.params` correctly for each page component
 3. Reject invalid paths at compile time
+4. Type the patterns and parameters of `href()` and `navigate(pattern, params)`
 
 The types are generated at the start of every build, and by `thane types`, from your `defineRoutes()` call. Include `.thane/types` in your `tsconfig.json` so your editor sees them (see [Getting Started](getting-started.md#installation)).
 

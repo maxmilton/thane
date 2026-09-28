@@ -528,6 +528,26 @@ describe('route context', () => {
     expect(g.document.title).toBe('User');
   });
 
+  test('navigate(pattern, params) pushes the filled-in path, and the page gets the params back decoded', async () => {
+    const seen: { route?: any } = {};
+    install('http://app.test/');
+    startRouter(
+      {
+        routes: { '/': { component: page('H') }, '/users/:id/posts/:post': { component: page('P', seen) } },
+        notFound: { component: page('NF') },
+      },
+      new FakeElement('outlet') as any,
+      { scrollRestoration: false },
+    );
+    await settle();
+    log = [];
+    navigate('/users/:id/posts/:post', { id: 'a b/c', post: 7 });
+    await settle();
+    expect(log[0]).toBe('pushState null /users/a%20b%2Fc/posts/7');
+    expect(seen.route.params).toEqual({ id: 'a b/c', post: '7' });
+    expect(seen.route.pattern).toBe('/users/:id/posts/:post');
+  });
+
   test('a route without a title reports the document title and leaves it alone', async () => {
     const seen: { route?: any } = {};
     install('http://app.test/a');

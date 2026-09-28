@@ -167,6 +167,16 @@ test.describe('3. Route Parameters', () => {
     await goto(page, '/users/alice');
     await expect(page.getByTestId('user-id')).toHaveText('alice');
   });
+
+  test('href() and navigate(pattern, params) fill in the parameter, encoded; the page reads it decoded', async ({
+    page,
+  }) => {
+    await goto(page, '/');
+    await expect(page.getByTestId('nav-user-params')).toHaveAttribute('href', '/users/ada%20lovelace');
+    await page.getByTestId('nav-user-params').click();
+    await expect(page.getByTestId('user-id')).toHaveText('ada lovelace');
+    expect(new URL(page.url()).pathname).toBe('/users/ada%20lovelace');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────

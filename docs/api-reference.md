@@ -7,7 +7,7 @@ Complete API surface for the Thane framework, covering all public exports, the t
 | Entry           | What it holds                                                                                              |
 | :-------------- | :--------------------------------------------------------------------------------------------------------- |
 | `thane`         | Signals, components, mounting, global styles, the template markers, and the types an app writes in its own code |
-| `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`, `setMeta`, and the head-field helpers `metaName`, `metaProperty`, `linkTag` |
+| `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`, `href`, `setMeta`, and the head-field helpers `metaName`, `metaProperty`, `linkTag` |
 | `thane/client`  | Type declarations for `.css` imports, which `thane` includes (see below)                                   |
 | `thane/runtime` | The helpers that compiled code calls. Only the compiler imports it: never import it in an app. It is not an API and changes with every version |
 
@@ -54,7 +54,8 @@ Complete API surface for the Thane framework, covering all public exports, the t
 | Export         | Signature                                               | Description                                                              |
 | :------------- | :------------------------------------------------------ | :----------------------------------------------------------------------- |
 | `defineRoutes` | `(routes: { [pattern: string]: Route; notFound: Route }, options?: RouterOptions) => typeof routes` | Define the route map with type-safe keys; required before `mount()` with a `router` option. `options` gives the site's head and the app's own head fields ([Route Heads](routing.md#route-heads)) |
-| `navigate`     | `(path: RoutePaths) => void`                            | Navigate to a path (also available as a global)                          |
+| `navigate`     | `(path: RoutePaths) => void`, `(pattern, params) => void` | Navigate to a path, or to a route pattern with its parameters filled in (also available as a global) |
+| `href`         | `(pattern, params) => RoutePaths`                       | A route pattern's path with its parameters filled in, URL-encoded: `href('/users/:id', { id: 7 })` is `/users/7` |
 | `navigateBack` | `() => void`                                            | Navigate back in browser history (also available as a global)            |
 | `setMeta`      | `(meta: AppRouteMeta) => void`                          | Set head fields of the page on screen, until the next route loads         |
 | `metaName`     | `(name: string) => CustomMetaField<string>`             | A custom head field for `<meta name="…">`                                |
@@ -76,7 +77,7 @@ The router installs these as globals when it starts, so a template calls them wi
 
 | Global         | Signature                | Description                                               |
 | :------------- | :----------------------- | :-------------------------------------------------------- |
-| `navigate`     | `(path: RoutePaths) => void` | Navigate to a path (type-safe when routes are registered) |
+| `navigate`     | `(path: RoutePaths) => void`, `(pattern, params) => void` | Navigate to a path, or to a route pattern with its parameters (type-safe when routes are registered) |
 | `navigateBack` | `() => void`             | Navigate back in browser history                          |
 | `currentPath`  | `ReadonlySignal<string>` | Read-only signal with the current pathname                |
 
