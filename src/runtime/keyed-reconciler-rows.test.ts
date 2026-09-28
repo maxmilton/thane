@@ -115,27 +115,16 @@ const setup = (layout: { before?: FakeNode[]; after?: FakeNode[]; trackIndex?: b
 
 const rows = (...ids: string[]): Row[] => ids.map((id) => ({ id, v: 0 }));
 
-describe('general path: a row element that is no longer in the container', () => {
-  // A when() on a row's root element replaces that element with a placeholder when it hides (and
-  // with a fresh clone when it shows again), so the row's record keeps an element that left the
-  // container. The general path then starts its order walk at the container's first element
-  // child, not at the first wanted row's element (checked in Chromium on simplify-w0: the detached
-  // rows are inserted before a static first element). RT-5 keeps this start.
-  test('the order walk starts at the first element child of the container', () => {
-    const head = new FakeNode('head');
-    const { list, reconcile, order } = setup({ before: [head] });
+describe('general path: the order walk starts at the first wanted row', () => {
+  // Every row element is in the container: a when() on a row's root element, which replaced the row
+  // element with a placeholder, is a build error (THANE008). So the walk starts at the first row the
+  // new order wants, and a static element before the rows is never moved.
+  test('a static element before the rows stays first', () => {
+    const { reconcile, order } = setup({ before: [new FakeNode('head')] });
     const [a, b, c] = rows('A', 'B', 'C');
     reconcile([a!, b!, c!]);
-    // what a hidden when() on each row root does: the row element leaves, a placeholder takes its place
-    for (const id of ['A', 'B', 'C']) {
-      const el = list.childNodes.find((n) => n.name === id)!;
-      list.insertBefore(new FakeNode(`tpl-${id}`), el);
-      el.remove();
-    }
-    expect(order()).toEqual(['head', 'tpl-A', 'tpl-B', 'tpl-C', 'anchor']);
-
-    expect(reconcile([c!, a!])).toEqual(['cleanup B', 'insert C before head', 'insert A before head']);
-    expect(order()).toEqual(['C', 'A', 'head', 'tpl-A', 'tpl-B', 'tpl-C', 'anchor']);
+    expect(reconcile([c!, a!])).toEqual(['cleanup B', 'remove B', 'insert A before anchor']);
+    expect(order()).toEqual(['head', 'C', 'A', 'anchor']);
   });
 });
 

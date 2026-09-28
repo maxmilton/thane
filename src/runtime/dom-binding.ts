@@ -430,7 +430,7 @@ export function createKeyedReconciler<T>(
         const newManagedItems: ManagedItem<T>[] = new Array(newLength);
         const byKey = keys();
         for (let i = 0; i < newLength; i++) newManagedItems[i] = byKey.get(keyFn(newItems[i]!, i))!;
-        applyOrder(newManagedItems, managedItems[0]?.el || null);
+        applyOrder(newManagedItems, managedItems[0]!.el);
         return;
       }
 
@@ -476,11 +476,8 @@ export function createKeyedReconciler<T>(
       }
     }
 
-    // Not newManagedItems[0].el: a row whose root a when() replaced is outside the container
-    applyOrder(
-      newManagedItems,
-      newManagedItems[0]?.el.previousElementSibling?.nextElementSibling || container.firstElementChild,
-    );
+    // Every row element is in the container: a when() on a row's root, which replaced it, is THANE008
+    applyOrder(newManagedItems, newManagedItems[0]!.el);
   };
 
   return { reconcile, clearAll, get: find };
