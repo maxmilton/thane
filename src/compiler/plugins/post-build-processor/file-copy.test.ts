@@ -107,11 +107,10 @@ describe('watchAndRecursivelyCopyAssetsIntoDist', () => {
       renameSync(join(src, 'moved'), join(staging, 'moved-out'));
       await waitFor('moved-out folder removed', () => !existsSync(join(dest, 'moved')));
 
-      // A deleted folder: its files are removed. Whether the emptied folder goes too depends on
-      // the order of the folder's own events (a trailing `change` for a missing path is ignored),
-      // so it is not asserted.
+      // A deleted folder is removed with its files, whatever order its events arrive in (Windows can
+      // report a `change` for the folder after its `rename`)
       rmSync(join(src, 'sub'), { recursive: true });
-      await waitFor('deleted folder emptied', () => !existsSync(join(dest, 'sub', 'b.txt')));
+      await waitFor('deleted folder removed', () => !existsSync(join(dest, 'sub')));
 
       // Nothing else was touched
       expect(read(join(dest, 'a.txt'))).toBe('a2');
