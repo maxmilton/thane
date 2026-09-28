@@ -2,7 +2,7 @@
  * Thane Build Runner
  */
 
-import { build, context, type BuildOptions } from 'esbuild';
+import { build, context, type BuildOptions, type Plugin } from 'esbuild';
 import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -16,6 +16,19 @@ import { ThaneLinterPlugin } from '../plugins/thane-linter/thane-linter.js';
 import { GlobalCSSBundlerPlugin } from '../plugins/global-css-bundler/global-css-bundler.js';
 import { MinificationPlugin } from '../plugins/minification/minification.js';
 import { PostBuildPlugin } from '../plugins/post-build-processor/post-build-processor.js';
+
+/** `--analyze`: esbuild's metafile, written to the output folder after every build and rebuild */
+export const AnalyzePlugin = (outDir: string): Plugin => ({
+  name: 'analyze',
+  setup(build) {
+    build.onEnd(async (result) => {
+      if (!result.metafile) return;
+      const metafilePath = join(outDir, 'metafile.json');
+      await writeFile(metafilePath, JSON.stringify(result.metafile, null, 2), 'utf8');
+      console.info(consoleColors.blue, `📊 Metafile written to ${metafilePath}`);
+    });
+  },
+});
 
 export async function runBuild(config: BuildConfig): Promise<void> {
   // Validate that entry files exist before starting the build
@@ -78,6 +91,7 @@ export async function runBuild(config: BuildConfig): Promise<void> {
       emptyOutDir: config.emptyOutDir,
       base: config.base,
     }),
+    ...(config.analyze ? [AnalyzePlugin(config.outDir)] : []),
   ];
 
   // Resolve esbuild targets: user-specified or built-in defaults
@@ -119,15 +133,8 @@ export async function runBuild(config: BuildConfig): Promise<void> {
 
   try {
     if (!config.serve) {
-      const result = await build(buildConfig);
+      await build(buildConfig);
       console.info(consoleColors.green, `\n⏱️  Build completed in ${(performance.now() - startTime).toFixed(2)}ms`);
-
-      // Write metafile for bundle analysis when --analyze is enabled
-      if (config.analyze && result.metafile) {
-        const metafilePath = join(config.outDir, 'metafile.json');
-        await writeFile(metafilePath, JSON.stringify(result.metafile, null, 2), 'utf8');
-        console.info(consoleColors.blue, `📊 Metafile written to ${metafilePath}`);
-      }
     } else {
       const ctx = await context(buildConfig);
       await ctx.watch({});

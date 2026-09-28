@@ -7,8 +7,10 @@
  * It calls runBuild directly (not buildAndReadJs), so the snapshot preload does not record it.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { readdir } from 'node:fs/promises';
-import { runBuild } from './build.js';
+import { readdir, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { context } from 'esbuild';
+import { AnalyzePlugin, runBuild } from './build.js';
 import type { BuildConfig } from './types.js';
 import {
   PROD_BUILD,
@@ -101,5 +103,37 @@ describe('runBuild esbuild options', () => {
   test('entry and chunk names without hashes', async () => {
     expect((await build({ hashFileNames: false })).files).toEqual(['lazy.js', 'main.js']);
     expect((await build({ ...PROD_BUILD, hashFileNames: false })).files).toEqual(['lazy.js', 'main.js']);
+  });
+});
+
+describe('--analyze', () => {
+  const metafileOf = async (outDir: string) =>
+    JSON.parse(await readFile(join(outDir, 'metafile.json'), 'utf8')) as { outputs: Record<string, unknown> };
+
+  test('thane build writes metafile.json to the output folder', async () => {
+    await runBuild(createTestBuildConfig(project, { strictTypeCheck: false, analyze: true }));
+    expect(Object.keys((await metafileOf(project.outDir)).outputs).some((file) => file.endsWith('.js'))).toBe(true);
+  });
+
+  test('a watch context, as thane dev and thane serve use, writes it after every rebuild', async () => {
+    const outdir = join(project.outDir, '..', 'analyze-watch');
+    const ctx = await context({
+      entryPoints: [project.entryPath],
+      bundle: true,
+      outdir,
+      write: true,
+      metafile: true,
+      logLevel: 'silent',
+      plugins: [AnalyzePlugin(outdir)],
+    });
+    try {
+      await ctx.rebuild();
+      expect(Object.keys((await metafileOf(outdir)).outputs).length).toBeGreaterThan(0);
+      await rm(join(outdir, 'metafile.json'));
+      await ctx.rebuild();
+      expect(Object.keys((await metafileOf(outdir)).outputs).length).toBeGreaterThan(0);
+    } finally {
+      await ctx.dispose();
+    }
   });
 });
