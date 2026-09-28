@@ -144,9 +144,20 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           ),
       );
       const mountCalls: ts.CallExpression[] = [];
+      // Any other reference (`const m = mount`, `export { mount }`) still needs the import
+      let otherReferences = 0;
       const findMount = (node: ts.Node): void => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'mount') {
           mountCalls.push(node);
+          node.arguments.forEach(findMount);
+          return;
+        }
+        if (ts.isIdentifier(node) && node.text === 'mount' && !ts.isImportSpecifier(node.parent)) {
+          const parent = node.parent;
+          const isPropertyName =
+            (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+            (ts.isPropertyAssignment(parent) && parent.name === node);
+          if (!isPropertyName) otherReferences++;
         }
         ts.forEachChild(node, findMount);
       };
@@ -154,7 +165,14 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
 
       const mc = mountCalls[0];
       const objArg = mc?.arguments[0];
-      if (!mountImport || mountCalls.length !== 1 || !mc || !objArg || !ts.isObjectLiteralExpression(objArg)) {
+      if (
+        !mountImport ||
+        mountCalls.length !== 1 ||
+        otherReferences > 0 ||
+        !mc ||
+        !objArg ||
+        !ts.isObjectLiteralExpression(objArg)
+      ) {
         return null;
       }
 

@@ -160,6 +160,28 @@ mount({ component: App });
     expect(js).not.toContain('mountComponent');
   });
 
+  test('mount also used as a value: the import stays and the call is left alone', async () => {
+    const js = await build(`import { mount } from 'thane';
+import { App } from './app';
+const start = mount;
+mount({ component: App });
+console.log(start);
+`);
+    expect(js).toContain('\nmount({ component: App });\n');
+    expect(js).not.toContain('mountComponent(App');
+    expect(hasMountWrapper(js)).toBe(true);
+  });
+
+  test('mount also exported: the import stays and the call is left alone', async () => {
+    const js = await build(`import { mount } from 'thane';
+import { App } from './app';
+mount({ component: App });
+export { mount };
+`);
+    expect(js).toContain('\nmount({ component: App });\n');
+    expect(hasMountWrapper(js)).toBe(true);
+  });
+
   test('H-13: mount imported from another module', async () => {
     const js = await build(
       `import { mount } from './my-mount';
