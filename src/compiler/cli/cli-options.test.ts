@@ -103,7 +103,12 @@ describe('config files', () => {
       command: 'dev',
     };
     const { dir, result, warnings } = resolveWith({ 'thane.config.json': JSON.stringify(cfg) }, []);
-    expect(warnings).toEqual([]);
+    // The CLI-only keys are not read from a config file, and each is reported
+    expect(warnings).toEqual(
+      ['logLevel', 'configPath', 'exitRequested', 'serve', 'command'].map(
+        (key) => `Warning: Unknown key '${key}' in thane.config.json is ignored.`,
+      ),
+    );
     expect(result).toEqual({
       command: 'build',
       prod: false,
@@ -250,5 +255,39 @@ describe('H-34: --help and --version with a config file', () => {
       log.mockRestore();
       info.mockRestore();
     }
+  });
+});
+
+describe('config file keys nothing reads are reported', () => {
+  const warningsFor = (cfg: unknown) => resolveWith({ 'thane.config.json': JSON.stringify(cfg) }, []).warnings;
+
+  test('a misspelled key, with the key it most likely means', () => {
+    expect(warningsFor({ outdir: 'dist', portt: 1, dropconsole: false })).toEqual([
+      "Warning: Unknown key 'outdir' in thane.config.json is ignored; did you mean 'outDir'?",
+      "Warning: Unknown key 'portt' in thane.config.json is ignored; did you mean 'port'?",
+      "Warning: Unknown key 'dropconsole' in thane.config.json is ignored; did you mean 'dropConsole'?",
+    ]);
+  });
+
+  test('the removed app key, and a key that is nothing like an option', () => {
+    expect(warningsFor({ app: 'x', whatever: 1 })).toEqual([
+      "Warning: Unknown key 'app' in thane.config.json is ignored.",
+      "Warning: Unknown key 'whatever' in thane.config.json is ignored.",
+    ]);
+  });
+
+  test('commands: an unknown command, a section that is not an object, a misspelled key in a section', () => {
+    expect(warningsFor({ commands: { biuld: {}, dev: 5, serve: { hots: 'x' }, types: null } })).toEqual([
+      "Warning: Unknown command 'biuld' in 'commands' in thane.config.json is ignored; did you mean 'build'?",
+      "Warning: 'commands.dev', which is not an object, in thane.config.json is ignored.",
+      "Warning: Unknown key 'hots' in 'commands.serve' in thane.config.json is ignored; did you mean 'host'?",
+    ]);
+    expect(warningsFor({ commands: ['build'] })).toEqual([
+      "Warning: 'commands', which is not an object of command names, in thane.config.json is ignored.",
+    ]);
+  });
+
+  test('$schema and every option are read without a warning', () => {
+    expect(warningsFor({ $schema: './schema.json', prod: true, commands: { build: { outDir: 'd' } } })).toEqual([]);
   });
 });

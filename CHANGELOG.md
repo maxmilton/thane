@@ -118,6 +118,7 @@ The simplification and hardening round fixed these defects in valid code:
 - `thane serve --prod` answers a request that fails with a plain 500. It started Bun's server without `development: false`, so a failing request showed Bun's development error page with the stack trace.
 - Template parse warnings, such as a duplicate attribute, are reported for `whenElse()` branches and `repeat()` rows too, once each; only the component template's were.
 - A missing space after a tag name, `<button@click=${go}>` or `<div${when(on())}>`, is reported, and the rest of the tag is read as its attributes. The character was dropped and the name went on, so the example became a `<buttonclick>` element with no handler.
+- A config file key that nothing reads, such as a misspelled `outdir`, prints a warning with the key it most likely means; so do an unknown command in `commands` and a section that is not an object. They were ignored silently.
 
 ### Removed
 

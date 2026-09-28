@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import type { CLIOptions, BuildConfig, ThaneBuildOptions, ThaneConfigFile } from './types.js';
@@ -163,11 +163,65 @@ const loadConfigFile = (configPath?: string): { path: string; config: ThaneConfi
   return { path: resolvedPath, config: value as ThaneConfigFile };
 };
 
+/** The known name closest to `name`: the same letters in another case, or one or two edits away. */
+const closestName = (name: string, known: Iterable<string>): string | undefined => {
+  const distance = (a: string, b: string): number => {
+    const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      let diagonal = row[0]!;
+      row[0] = i;
+      for (let j = 1; j <= b.length; j++) {
+        const above = row[j]!;
+        row[j] = Math.min(row[j]! + 1, row[j - 1]! + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+        diagonal = above;
+      }
+    }
+    return row[b.length]!;
+  };
+  let best: { name: string; score: number } | undefined;
+  for (const candidate of known) {
+    const score = candidate.toLowerCase() === name.toLowerCase() ? 0 : distance(name, candidate);
+    if (score <= 2 && (!best || score < best.score)) best = { name: candidate, score };
+  }
+  return best?.name;
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * Warn about what a config file holds that nothing reads: a misspelled key (`outdir`), an unknown
+ * command in `commands`, or a section that is not an object. Each would otherwise be ignored silently.
+ */
+const warnAboutUnreadConfig = (config: Record<string, unknown>, file: string): void => {
+  const name = basename(file);
+  const warn = (what: string, near?: string) =>
+    console.warn(`Warning: ${what} in ${name} is ignored${near ? `; did you mean '${near}'?` : '.'}`);
+  const checkKeys = (section: Record<string, unknown>, where: string) => {
+    for (const key of Object.keys(section)) {
+      if (!CONFIG_KEYS.includes(key as keyof ThaneBuildOptions)) {
+        warn(`Unknown key '${key}'${where}`, closestName(key, CONFIG_KEYS));
+      }
+    }
+  };
+  const { commands, $schema: _schema, ...topLevel } = config;
+  checkKeys(topLevel, '');
+  if (commands == null) return;
+  if (!isPlainObject(commands)) return warn("'commands', which is not an object of command names,");
+  for (const [command, section] of Object.entries(commands)) {
+    if (!COMMANDS.has(command)) warn(`Unknown command '${command}' in 'commands'`, closestName(command, COMMANDS));
+    else if (section == null) continue;
+    else if (!isPlainObject(section)) warn(`'commands.${command}', which is not an object,`);
+    else checkKeys(section, ` in 'commands.${command}'`);
+  }
+};
+
 const mergeCLIAndConfig = (args: string[], parsedCLI: CLIOptions): CLIOptions => {
   const loaded = loadConfigFile(parsedCLI.configPath);
   if (!loaded) {
     return applyCommandModeDefaults(parsedCLI);
   }
+  warnAboutUnreadConfig(loaded.config as Record<string, unknown>, loaded.path);
 
   const cfgDir = dirname(loaded.path);
   const topLevel = absolutizeConfigPaths(coerceConfigToCLIOptions(loaded.config), cfgDir);

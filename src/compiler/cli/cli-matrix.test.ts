@@ -26,7 +26,6 @@ const GOLDEN = join(import.meta.dir, 'cli-matrix.golden.json');
 const CONFIG_TRUE = {
   prod: true,
   gzip: true,
-  app: 'cfg-app',
   entry: './cfg/main.ts',
   outDir: './cfg-dist',
   assetsDir: './cfg-assets',
@@ -47,7 +46,6 @@ const CONFIG_TRUE = {
   splitting: true,
   legalComments: 'linked',
   analyze: true,
-  notAnOption: 1,
   commands: {
     build: { base: '/cfg-build/' },
     dev: { port: 5001, entry: './cfg/dev.ts', prod: true },
@@ -59,7 +57,6 @@ const CONFIG_FALSE_JSONC = `{
   // every boolean false, every value different from the other config
   "prod": false,
   "gzip": false,
-  "app": "cfg2-app",
   "entry": "./cfg2/main.ts",
   "outDir": "./cfg2-dist",
   "assetsDir": "./cfg2-assets",
