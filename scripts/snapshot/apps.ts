@@ -34,6 +34,8 @@ export const apps: AppSpec[] = [
   },
   { name: 'e2e-router', cwd: '.', entry: './e2e/router-app/main.ts', html: './e2e/router-app/index.html' },
   { name: 'e2e-cart', cwd: '.', entry: './e2e/cart-app/main.ts', html: './e2e/cart-app/index.html' },
+  { name: 'e2e-hardening', cwd: '.', entry: './e2e/hardening-app/main.ts', html: './e2e/hardening-app/index.html' },
+  { name: 'e2e-meta', cwd: '.', entry: './e2e/meta-app/main.ts', html: './e2e/meta-app/index.html' },
   {
     name: 'e2e-browser-error',
     cwd: '.',
