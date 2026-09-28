@@ -79,8 +79,11 @@ export interface SubTemplateResult {
   nextId: number;
 }
 
-/** Processes a directive sub-template; `parentId` is the directive's (or branch's) id. */
-export type SubTemplateProcessor = (template: string, parentId: string) => SubTemplateResult;
+/**
+ * Processes a directive sub-template; `parentId` is the directive's (or branch's) id. `report` shows its
+ * parse diagnostics: a whenElse() branch is a template of its own, a when() element's content is not.
+ */
+export type SubTemplateProcessor = (template: string, parentId: string, report?: boolean) => SubTemplateResult;
 
 // ============================================================================
 // Directive nesting helpers
@@ -245,9 +248,9 @@ export const collectWhenElseBlocks = (
     const elseId = `b${state.idCounter++}`;
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
 
-    const thenProcessed = processSubTemplate(binding.thenTemplate, thenId);
+    const thenProcessed = processSubTemplate(binding.thenTemplate, thenId, true);
     state.idCounter = thenProcessed.nextId;
-    const elseProcessed = processSubTemplate(binding.elseTemplate, elseId);
+    const elseProcessed = processSubTemplate(binding.elseTemplate, elseId, true);
     state.idCounter = elseProcessed.nextId;
 
     whenElseBlocks.push({

@@ -18,6 +18,7 @@ import {
   attributeDomProperty,
   escapeRawTemplateLiteral,
   type HtmlElement,
+  type ParsedTemplate,
   type BindingInfo as ParsedBindingInfo,
 } from '../../utils/html-parser/index.js';
 import {
@@ -133,9 +134,24 @@ interface ProcessedTemplate {
 }
 
 /**
+ * Show a template's parse diagnostics to the developer: an error as a warning, a warning as info.
+ * Every template string is reported where it is parsed first: the component template, a whenElse()
+ * branch and a row template. A when() element's content is part of its parent's markup, reported
+ * with it.
+ */
+export const reportParseDiagnostics = (parsed: ParsedTemplate): void => {
+  for (const diag of parsed.diagnostics) {
+    const message = `Template parse ${diag.severity}: ${diag.message} (at position ${diag.position})`;
+    if (diag.severity === 'error') logger.warn(NAME, message);
+    else logger.info(NAME, message);
+  }
+};
+
+/**
  * Process a template: the component template (`parentId` null) or the content of a directive,
  * a when() element or a whenElse() branch (`parentId` its id), whose bindings are owned by that
- * directive's initializer.
+ * directive's initializer. `report` shows the template's parse diagnostics (see
+ * reportParseDiagnostics); the component template's always are.
  */
 const processTemplate = (
   templateContent: string,
@@ -144,19 +160,10 @@ const processTemplate = (
   parentId: string | null,
   options: { detectNonSignalBindings?: boolean } | undefined,
   eventIdCounter: { value: number },
+  report = false,
 ): ProcessedTemplate => {
   const parsed = parseHtmlTemplate(templateContent, options);
-
-  // Surface any parse diagnostics to the developer
-  if (parentId === null) {
-    for (const diag of parsed.diagnostics) {
-      if (diag.severity === 'error') {
-        logger.warn(NAME, `Template parse ${diag.severity}: ${diag.message} (at position ${diag.position})`);
-      } else {
-        logger.info(NAME, `Template parse ${diag.severity}: ${diag.message} (at position ${diag.position})`);
-      }
-    }
-  }
+  if (parentId === null || report) reportParseDiagnostics(parsed);
 
   const bindings: BindingInfo[] = [];
   const repeatBlocks: RepeatBlock[] = [];
@@ -167,8 +174,8 @@ const processTemplate = (
   const scope =
     parentId === null ? { isInsideConditional: false } : { isInsideConditional: true, conditionalId: parentId };
 
-  const processSubTemplate: SubTemplateProcessor = (template, id) =>
-    processTemplate(template, signalInitializers, state.idCounter, id, options, state.eventIdCounter);
+  const processSubTemplate: SubTemplateProcessor = (template, id, report) =>
+    processTemplate(template, signalInitializers, state.idCounter, id, options, state.eventIdCounter, report);
 
   // ── Conditionals — each when() element's content is processed as a sub-template ──
   //    Bindings inside a nested when() are owned by that conditional's initializer. Only the
@@ -415,5 +422,14 @@ export const processSubTemplateWithNesting = (
   parentId: string,
   options?: { detectNonSignalBindings?: boolean },
   eventIdCounter?: { value: number },
+  report?: boolean,
 ): ProcessedTemplate =>
-  processTemplate(templateContent, signalInitializers, startingId, parentId, options, eventIdCounter ?? { value: 0 });
+  processTemplate(
+    templateContent,
+    signalInitializers,
+    startingId,
+    parentId,
+    options,
+    eventIdCounter ?? { value: 0 },
+    report,
+  );

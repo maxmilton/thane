@@ -16,7 +16,7 @@ import type {
 } from './types.js';
 import { isSimpleBinding } from './types.js';
 import { ErrorCode } from '../../errors.js';
-import { processSubTemplateWithNesting } from './template-processing.js';
+import { processSubTemplateWithNesting, reportParseDiagnostics } from './template-processing.js';
 import {
   parseHtmlTemplate,
   walkElements,
@@ -694,6 +694,7 @@ export const processItemTemplate = (
   nextId: number;
 } => {
   const parsed = parseHtmlTemplate(templateContent);
+  reportParseDiagnostics(parsed);
   // The reconciler holds each row by its root element, which a when() would replace (H-47)
   if (parsed.roots.some((root) => root.whenDirective !== undefined)) {
     throw new Error(
@@ -720,7 +721,7 @@ export const processItemTemplate = (
 
   // ── Nested directives read the row's item and index through row-scoped signals ──
   const rowRefs = createRowRefRewriter(itemVar, indexVar);
-  const processRowSubTemplate = (template: string, id: string) =>
+  const processRowSubTemplate = (template: string, id: string, report?: boolean) =>
     processSubTemplateWithNesting(
       rowRefs.html(template),
       signalInitializers,
@@ -728,6 +729,7 @@ export const processItemTemplate = (
       id,
       undefined,
       state.eventIdCounter,
+      report,
     );
 
   // ── Conditionals: compiled as sub-templates, like at component level ──

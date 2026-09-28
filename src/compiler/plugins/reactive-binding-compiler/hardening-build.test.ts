@@ -207,6 +207,34 @@ describe('H-46 duplicate attributes', () => {
     const main = cooked(new RegExp(`\\b__tpl = __T\\(${LITERAL}\\)`).exec(js)?.[1]);
     expect(main).toMatch(/^<div><input class="k" checked><button disabled disabled=\$\{d\(\)\}>b<\/button><\/div>$/);
   });
+
+  test('the duplicate is reported once for every template it is in: component, whenElse() branch and row', async () => {
+    const logged: string[] = [];
+    const capture = (...args: unknown[]) => void logged.push(args.map(String).join(' '));
+    const { info, log, warn } = console;
+    console.info = capture;
+    console.log = capture;
+    console.warn = capture;
+    try {
+      await buildAndReadJs(
+        app(
+          '  const on = signal(true);\n  const rows = signal([1]);\n' +
+            '  return { template: html`<div><p title="a" title="b">c</p>' +
+            '<section ${when(on())}><i lang="a" lang="b">w</i></section>' +
+            '${whenElse(on(), html`<b dir="a" dir="b">t</b>`, html`<u>e</u>`)}' +
+            '<ul>${repeat(rows(), (r) => html`<li id="a" id="b">${r}</li>`)}</ul></div>` };',
+        ),
+        DEV,
+      );
+    } finally {
+      console.info = info;
+      console.log = log;
+      console.warn = warn;
+    }
+    const duplicates = logged.filter((line) => line.includes('Duplicate attribute'));
+    const count = (name: string) => duplicates.filter((line) => line.includes(`"${name}"`)).length;
+    expect([count('title'), count('lang'), count('dir'), count('id')]).toEqual([1, 1, 1, 1]);
+  });
 });
 
 describe('H-42 a literal < in template text', () => {

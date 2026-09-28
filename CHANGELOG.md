@@ -116,6 +116,7 @@ The simplification and hardening round fixed these defects in valid code:
 - `@namespace` in a component stylesheet no longer leaves the rule after it unscoped, applied to the whole page. The build writes an empty block after the statement, so the runtime scoper copies the statement and scopes the next rule; the namespace applies as usual.
 - The mount-call optimiser leaves an entry alone when it also uses `mount` as a value (`const m = mount`, `export { mount }`); it removed the import, and the file broke.
 - `thane serve --prod` answers a request that fails with a plain 500. It started Bun's server without `development: false`, so a failing request showed Bun's development error page with the stack trace.
+- Template parse warnings, such as a duplicate attribute, are reported for `whenElse()` branches and `repeat()` rows too, once each; only the component template's were.
 
 ### Removed
 
