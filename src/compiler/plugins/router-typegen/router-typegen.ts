@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { collectFilesRecursively, extractComponentDefinitions, sourceCache } from '../../utils/index.js';
+import { createModuleResolver, type ModuleResolver } from '../../utils/module-graph.js';
+import { readRouteTableHeads } from './route-head.js';
 
 const GENERATED_ROOT_DIR = '.thane';
 const GENERATED_TYPES_DIR = 'types';
@@ -163,7 +165,11 @@ const getRouteComponentSelector = async (
   return null;
 };
 
-const generateFileContent = (routePaths: string[], selectorEntries: Array<[string, string]>): string => {
+const generateFileContent = (
+  routePaths: string[],
+  selectorEntries: Array<[string, string]>,
+  customMeta: Array<[string, string]>,
+): string => {
   // The paths are written out as string literals. Deriving them from `typeof Routes` made the
   // global `navigate()` depend on the type of the route table, which depends on the type of
   // every page a lazy loader returns — so a page that called `navigate()` in its own template
@@ -183,6 +189,12 @@ const generateFileContent = (routePaths: string[], selectorEntries: Array<[strin
     '  namespace ThaneTypeRegistry {',
     '    interface Register {',
     `      routePaths: ${routePathUnion};`,
+    // The app's own head fields, for setMeta(): written out too, for the same reason as the paths
+    ...(customMeta.length > 0
+      ? [
+          `      customMeta: { ${customMeta.map(([key, type]) => `'${escapeTypeLiteral(key)}'?: ${type};`).join(' ')} };`,
+        ]
+      : []),
     '    }',
     '',
     '    interface RouteComponentRegister {',
@@ -242,9 +254,10 @@ const writeGeneratedFile = async (
   filePath: string,
   routePaths: Set<string>,
   selectorMap: Map<string, string>,
+  customMeta: Array<[string, string]>,
 ): Promise<void> => {
   const sortedSelectorEntries = Array.from(selectorMap.entries()).sort(([left], [right]) => left.localeCompare(right));
-  const nextContent = generateFileContent(Array.from(routePaths), sortedSelectorEntries);
+  const nextContent = generateFileContent(Array.from(routePaths), sortedSelectorEntries, customMeta);
   const previousContent = await fs.readFile(filePath, 'utf8').catch(() => null);
 
   if (previousContent === nextContent) {
@@ -267,7 +280,13 @@ const writeGeneratedClientTypesFile = async (filePath: string, content: string):
 
 const collectRouteTyping = async (
   routesFilePath: string,
-): Promise<{ routePaths: Set<string>; selectorMap: Map<string, string> } | null> => {
+  generatedFile: string,
+  resolve: ModuleResolver,
+): Promise<{
+  routePaths: Set<string>;
+  selectorMap: Map<string, string>;
+  customMeta: Array<[string, string]>;
+} | null> => {
   const cached = await sourceCache.get(routesFilePath);
   if (!cached || !cached.source.includes('defineRoutes(')) {
     return null;
@@ -321,7 +340,16 @@ const collectRouteTyping = async (
       selectorMap.set(selector, routeKey);
     }
   }
-  return foundRoutes ? { routePaths, selectorMap } : null;
+  if (!foundRoutes) return null;
+
+  // Helpers take a string; a function takes what its parameter's type says
+  const customMeta: Array<[string, string]> = [];
+  for (const table of await readRouteTableHeads(routesFilePath, resolve, generatedFile)) {
+    for (const [key, field] of Object.entries(table.custom)) {
+      customMeta.push([key, field.kind === 'function' ? field.valueType : 'string']);
+    }
+  }
+  return { routePaths, selectorMap, customMeta };
 };
 
 /**
@@ -359,20 +387,21 @@ export const syncProjectTypes = async (projectRoot: string = process.cwd()): Pro
     await writeGeneratedClientTypesFile(clientTypesPath, clientTypesReference(clientTypesPath));
   }
 
+  const resolve = createModuleResolver(projectRoot);
   for (const filePath of tsFiles) {
-    const routeTyping = await collectRouteTyping(filePath);
-    if (!routeTyping) {
-      continue;
-    }
-
     const projectConfigPath = getProjectConfigPath(filePath, projectRoot);
     if (!projectConfigPath) {
       continue;
     }
 
     const outputPath = getGeneratedOutputPath(projectConfigPath, filePath);
+    const routeTyping = await collectRouteTyping(filePath, outputPath, resolve);
+    if (!routeTyping) {
+      continue;
+    }
+
     nextGeneratedFiles.add(outputPath);
-    await writeGeneratedFile(outputPath, routeTyping.routePaths, routeTyping.selectorMap);
+    await writeGeneratedFile(outputPath, routeTyping.routePaths, routeTyping.selectorMap, routeTyping.customMeta);
     generatedCount++;
   }
 

@@ -23,6 +23,7 @@ import { ThaneLinterPlugin } from '../plugins/thane-linter/thane-linter.js';
 import { GlobalCSSBundlerPlugin } from '../plugins/global-css-bundler/global-css-bundler.js';
 import { MinificationPlugin } from '../plugins/minification/minification.js';
 import { PostBuildPlugin } from '../plugins/post-build-processor/post-build-processor.js';
+import { routeTablesOf } from '../plugins/router-typegen/route-head.js';
 
 /** `--analyze`: esbuild's metafile, written to the output folder after every build and rebuild */
 export const AnalyzePlugin = (outDir: string): Plugin => ({
@@ -67,6 +68,13 @@ export async function runBuild(config: BuildConfig): Promise<void> {
   // Templates, stylesheets and selectors are minified by the compiler as it emits them (see
   // plugins/minification); esbuild minifies the JavaScript. Nothing edits the emitted files.
   buildContext.minify = config.isProd;
+
+  // A production build leaves the router's head renderer out when the routes use no head field but
+  // `title`. A development build keeps it, so a field added while `thane dev` runs works at once.
+  const define: Record<string, string> = {
+    ...config.define,
+    __THANE_HEAD__: String(!config.isProd || (await routeTablesOf(config.entryPoints, projectRoot)).usesHead),
+  };
 
   const plugins = [
     TSCTypeCheckerPlugin({ strict: config.strictTypeCheck, projectRoot }),
@@ -132,7 +140,7 @@ export async function runBuild(config: BuildConfig): Promise<void> {
     entryNames: names,
     chunkNames: names,
     legalComments: config.legalComments,
-    ...(Object.keys(config.define).length > 0 && { define: config.define }),
+    define,
     // `minify` implies minifyWhitespace, minifyIdentifiers and minifySyntax.
     minify: config.isProd,
     ...(config.isProd && prodDrop.length > 0 && { drop: prodDrop }),

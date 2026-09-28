@@ -107,9 +107,9 @@ Type-safe client-side routing with `defineRoutes()`, lazy loading, route paramet
 
 ```typescript
 const Routes = defineRoutes({
-  '/':          { component: () => import('./pages/home.js'), title: 'Home' },
-  '/users/:id': { component: () => import('./pages/user.js'), title: 'User' },
-  notFound:     { component: () => import('./pages/404.js'), title: '404' },
+  '/':          { component: () => import('./pages/home.js'), meta: { title: 'Home' } },
+  '/users/:id': { component: () => import('./pages/user.js'), meta: { title: 'User' } },
+  notFound:     { component: () => import('./pages/404.js'), meta: { title: '404' } },
 });
 ```
 

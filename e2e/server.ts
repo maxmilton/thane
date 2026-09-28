@@ -19,16 +19,22 @@ function createHandler(root: string) {
       return new Response(file);
     }
 
+    // A static route's own page (a production build writes one with the route's head)
+    const routePage = Bun.file(resolve(filePath, 'index.html'));
+    if (await routePage.exists()) {
+      return new Response(routePage);
+    }
+
     // SPA fallback — return index.html for unmatched routes
     return new Response(Bun.file(resolve(root, 'index.html')));
   };
 }
 
-// Each app is served twice: its development build from e2e/.build on base+0 to base+3, and its production
+// Each app is served twice: its development build from e2e/.build on base+0 to base+4, and its production
 // build from e2e/.build-prod ten ports higher. Ports derive from E2E_PORT_BASE (default 4173), as in
 // playwright.config.ts.
 const portBase = process.env.E2E_PORT_BASE ? Number(process.env.E2E_PORT_BASE) : 4173;
-const apps = ['contract', 'router', 'cart', 'hardening'];
+const apps = ['contract', 'router', 'cart', 'hardening', 'meta'];
 const builds = [
   { dir: '.build', offset: 0 },
   { dir: '.build-prod', offset: 10 },

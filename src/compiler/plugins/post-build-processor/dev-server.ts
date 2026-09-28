@@ -436,7 +436,13 @@ export class DevServer {
           // Not a readable file: answered below like a missing one
         }
 
-        // Anything that is not a file: a missing asset, or a client route served by index.html (if there is one)
+        // A static route's own page, which a production build writes with the route's head in it
+        if (!hasFileExtension) {
+          const routePage = join(requestedPath, 'index.html');
+          if (await Bun.file(routePage).exists()) return compressAndRespond(routePage, req, 'text/html', 'no-cache');
+        }
+
+        // Anything else that is not a file: a missing asset, or a client route served by index.html (if there is one)
         return hasFileExtension || !(await Bun.file(indexPath).exists())
           ? new Response('Not Found', { status: 404 })
           : compressAndRespond(indexPath, req, 'text/html', 'no-cache');

@@ -10,8 +10,8 @@ const headedMode = process.env.PW_E2E_HEADED === '1';
 const repoRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 // Every e2e port derives from E2E_PORT_BASE (default 4173), so that several runs can share a machine:
-// contract base+0, router base+1, cart base+2, hardening base+3, their production builds base+10 to
-// base+13, and the browser-error dev server base+145 (server.ts and browser-error.spec.ts read the same
+// contract base+0, router base+1, cart base+2, hardening base+3, meta base+4, their production builds
+// base+10 to base+14, and the browser-error dev server base+145 (server.ts and browser-error.spec.ts read the same
 // variable).
 const portBase = process.env.E2E_PORT_BASE ? Number(process.env.E2E_PORT_BASE) : 4173;
 if (!Number.isInteger(portBase) || portBase < 1024 || portBase + 145 > 65535) {
@@ -30,6 +30,7 @@ const apps = [
   { name: 'router', args: '--entry ./e2e/router-app/main.ts --html ./e2e/router-app/index.html' },
   { name: 'cart', args: '--entry ./e2e/cart-app/main.ts --html ./e2e/cart-app/index.html' },
   { name: 'hardening', args: '--entry ./e2e/hardening-app/main.ts --html ./e2e/hardening-app/index.html' },
+  { name: 'meta', args: '--entry ./e2e/meta-app/main.ts --html ./e2e/meta-app/index.html' },
 ];
 const browsers = [
   ['chromium', 'Desktop Chrome'],
@@ -69,10 +70,10 @@ export default defineConfig({
   projects: [
     ...browsers.map(([browser, device]) => ({
       name: `contract-${browser}`,
-      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts'],
+      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts', 'meta.spec.ts'],
       use: { ...devices[device], baseURL: appUrl(0) },
     })),
-    ...(['router', 'cart', 'hardening'] as const).flatMap((suite, i) =>
+    ...(['router', 'cart', 'hardening', 'meta'] as const).flatMap((suite, i) =>
       browsers.map(([browser, device]) => ({
         name: `${suite}-${browser}`,
         testMatch: `${suite}.spec.ts`,
@@ -87,10 +88,10 @@ export default defineConfig({
     // The same apps built with --prod (minified templates, selectors and JavaScript), in Chromium.
     {
       name: 'contract-prod-chromium',
-      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts'],
+      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts', 'meta.spec.ts'],
       use: { ...devices['Desktop Chrome'], baseURL: appUrl(PROD_OFFSET) },
     },
-    ...(['router', 'cart', 'hardening'] as const).map((suite, i) => ({
+    ...(['router', 'cart', 'hardening', 'meta'] as const).map((suite, i) => ({
       name: `${suite}-prod-chromium`,
       testMatch: `${suite}.spec.ts`,
       use: { ...devices['Desktop Chrome'], baseURL: appUrl(PROD_OFFSET + i + 1) },

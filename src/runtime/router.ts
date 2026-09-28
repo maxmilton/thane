@@ -26,6 +26,14 @@ import { mountComponent, unmount, __setRouteContextProvider, __setRouterMount } 
 import type { MountOptions } from './component.js';
 import { signal } from './signal.js';
 import type { ReadonlySignal, Signal } from './types.js';
+import { applyHead, resolveHead } from './router-head.js';
+import type { CustomMetaFields, CustomMetaValues, RouteMeta, SiteMeta } from './router-head.js';
+
+/**
+ * False in a production build of an app whose routes use no head field but `title` (the build reads
+ * them): the head renderer is then left out. Undefined everywhere else, which keeps it.
+ */
+declare const __THANE_HEAD__: boolean | undefined;
 
 // ─────────────────────────────────────────────────────────────
 //  Route type registry — augmented by generated files
@@ -145,21 +153,41 @@ export type LazyRouteComponent = () => Promise<any>;
 export type EagerRouteComponent = ComponentHTMLSelector<any>;
 export type RouteComponent = LazyRouteComponent | EagerRouteComponent;
 
+/** A route's head: its fields, or a function of the route that returns them (for a route with parameters) */
+export type RouteMetaInput<M = RouteMeta> = M | ((route: UntypedRouteContext) => M);
+
 /**
  * A single route definition.
  *
  * ```ts
  * const Routes = defineRoutes({
- *   '/':      { component: () => import('./pages/home.js'), title: 'Home' },
- *   notFound: { component: () => import('./pages/404.js'), title: '404' },
+ *   '/':      { component: () => import('./pages/home.js'), meta: { title: 'Home' } },
+ *   notFound: { component: () => import('./pages/404.js'), meta: { title: 'Not found', robots: 'noindex' } },
  * });
  * ```
  */
 export interface Route {
   /** Lazy loader or eager page component (return value of defineComponent). */
   component: RouteComponent;
-  /** Optional document title to set when this route is active. */
-  title?: string | undefined;
+  /** The document head while this route is active: its title, description, preview image and more */
+  meta?: RouteMetaInput<RouteMeta & Record<string, unknown>> | undefined;
+}
+
+/**
+ * The second argument of `defineRoutes()`: the site's head, and the app's own head fields.
+ *
+ * ```ts
+ * defineRoutes(routes, {
+ *   meta: { siteUrl: 'https://example.com', titleTemplate: '%s | Example', description: '…' },
+ *   customMeta: { author: metaName('author') },
+ * });
+ * ```
+ */
+export interface RouterOptions<C extends CustomMetaFields = {}> {
+  /** The site's URL, the title template, and the default of every head field */
+  meta?: (SiteMeta & CustomMetaValues<NoInfer<C>>) | undefined;
+  /** The app's own head fields: `metaName('…')`, `metaProperty('…')`, `linkTag('…')`, or a function from the value to tags */
+  customMeta?: C | undefined;
 }
 
 /**
@@ -222,9 +250,18 @@ export interface RouterConfig {
  * `/:anything` is rejected — every route must begin with a static segment.
  * The special `notFound` key is exempt from path validation.
  */
-type ValidateRoutes<T extends Record<string, Route>> = {
-  [K in keyof T]: K extends 'notFound' ? T[K] : K extends `/:${string}` ? never : T[K];
+type ValidateRoutes<T extends Record<string, Route>, C extends CustomMetaFields> = {
+  [K in keyof T]: K extends 'notFound' ? CheckRoute<T[K], C> : K extends `/:${string}` ? never : CheckRoute<T[K], C>;
 };
+
+/** Each head field a route sets, typed as the field is: a field that does not exist is `never` */
+type CheckMeta<M, F> = { [K in keyof M]: K extends keyof F ? F[K] : never };
+/** A route whose head fields are checked against the built-in and the custom ones */
+type CheckRoute<R, C extends CustomMetaFields> = R extends { meta: infer M }
+  ? M extends (route: UntypedRouteContext) => infer Out
+    ? { meta: (route: UntypedRouteContext) => CheckMeta<Out, RouteMeta & CustomMetaValues<C>> }
+    : { meta: CheckMeta<M, RouteMeta & CustomMetaValues<C>> }
+  : unknown;
 
 /**
  * Define the application's route map with type-safe keys.
@@ -234,21 +271,34 @@ type ValidateRoutes<T extends Record<string, Route>> = {
  * preserve literal string keys so that `navigate()` gets
  * full autocomplete and compile-time checking via the Register pattern.
  *
+ * The second argument gives the site's head (its URL, a title template, and defaults for every
+ * field) and the app's own head fields, which routes and `setMeta()` then accept, typed.
+ *
  * ```ts
- * const Routes = defineRoutes({
- *   '/':          { component: () => import('./pages/home.js'), title: 'Home' },
- *   '/about':     { component: () => import('./pages/about.js') },
- *   '/users/:id': { component: () => import('./pages/user.js') },
- *   notFound:     { component: () => import('./pages/not-found.js'), title: '404' },
- * });
- * type Routes = typeof Routes;
+ * const Routes = defineRoutes(
+ *   {
+ *     '/':          { component: () => import('./pages/home.js') },
+ *     '/about':     { component: () => import('./pages/about.js'), meta: { title: 'About', author: 'Ada' } },
+ *     '/users/:id': { component: () => import('./pages/user.js'), meta: (route) => ({ title: `User ${route.params.id}` }) },
+ *     notFound:     { component: () => import('./pages/not-found.js'), meta: { title: 'Not found', robots: 'noindex' } },
+ *   },
+ *   {
+ *     meta: { siteUrl: 'https://example.com', title: 'Example', titleTemplate: '%s | Example', description: '…' },
+ *     customMeta: { author: metaName('author') },
+ *   },
+ * );
  * ```
  *
  * @throws {Error} At runtime if any route key is a root-level param (`/:...`).
  */
-export function defineRoutes<const T extends RoutesConfig>(
-  routes: ValidateRoutes<T> & T,
+export function defineRoutes<const T extends RoutesConfig, const C extends CustomMetaFields = {}>(
+  routes: ValidateRoutes<T, NoInfer<C>> & T,
+  options?: RouterOptions<C>,
 ): RegisteredRoutes<keyof T & string> {
+  if (typeof __THANE_HEAD__ === 'undefined' || __THANE_HEAD__) {
+    _siteMeta = options?.meta ?? {};
+    _customMeta = options?.customMeta;
+  }
   // Register the router mount handler with component.ts so mount() can delegate.
   // This is the entry point that activates routing — if defineRoutes is never called,
   // mount() won't find a router and the entire router module is tree-shaken away.
@@ -314,6 +364,12 @@ let _currentHandle: MountHandle | null = null;
 let _currentRoutePattern = typeof window !== 'undefined' ? window.location.pathname : '';
 let _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
 let _routeParams: Record<string, string> = {};
+/** The site's head and the app's own fields, from the last defineRoutes() call */
+let _siteMeta: SiteMeta & Record<string, unknown> = {};
+let _customMeta: CustomMetaFields | undefined;
+/** The current route's head, and the fields setMeta() has set since it loaded */
+let _routeMeta: RouteMeta & Record<string, unknown> = {};
+let _metaOverrides: RouteMeta & Record<string, unknown> = {};
 let _started = false;
 let _popstateHandler: ((event: PopStateEvent) => void) | null = null;
 /** Path and query of the mounted route; a change in either loads the route again */
@@ -485,6 +541,9 @@ const decodeParam = (segment: string): string => {
 
 /** @internal — exported for unit testing only. */
 export const matchRoute = (pathname: string, routes: RoutesMap, notFound?: Route): MatchResult | null => {
+  // `/about/` is `/about`: a host serves a route's own page (about/index.html) there, and may redirect to it
+  if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);
+
   // 1. Exact match (fastest path)
   if (routes[pathname]) {
     return { pattern: pathname, route: routes[pathname]!, params: {} };
@@ -526,6 +585,12 @@ export const matchRoute = (pathname: string, routes: RoutesMap, notFound?: Route
 // ─────────────────────────────────────────────────────────────
 //  Route loading
 // ─────────────────────────────────────────────────────────────
+
+/** The current route's head, with what setMeta() has set, applied to the document */
+const applyRouteMeta = (): void => {
+  applyHead(resolveHead(_siteMeta, { ..._routeMeta, ..._metaOverrides }, window.location.pathname, _customMeta));
+  _currentRouteTitle = document.title;
+};
 
 const loadRoute = async (): Promise<void> => {
   if (!_config || !_target) return;
@@ -596,11 +661,18 @@ const loadRoute = async (): Promise<void> => {
   _currentRoutePattern = match.pattern;
   _routeParams = match.params;
 
-  // Set document title if provided
-  if (match.route.title) {
-    document.title = match.route.title;
+  // The route's head goes on before the page mounts, so the page reads its title and may add to it
+  if (typeof __THANE_HEAD__ === 'undefined' || __THANE_HEAD__) {
+    const meta = match.route.meta;
+    _routeMeta = (typeof meta === 'function' ? meta(createCurrentRouteContext()) : meta) ?? {};
+    _metaOverrides = {};
+    applyRouteMeta();
+  } else {
+    // Without head support (the build found no field but titles), a route's head is its title
+    const title = (match.route.meta as RouteMeta | undefined)?.title;
+    if (title) document.title = title;
+    _currentRouteTitle = document.title;
   }
-  _currentRouteTitle = match.route.title ?? document.title;
 
   // The component failed to load (reported above): the outlet stays empty
   if (!component) return;
@@ -647,6 +719,25 @@ export function navigate(path: RoutePaths): void {
  */
 export function navigateBack(): void {
   window.history.back();
+}
+
+/** The app's own head fields, as the generated route types give them (from `customMeta`) */
+type RegisteredCustomMeta = EffectiveRegister extends { customMeta: infer C extends object } ? C : {};
+
+/** The head fields a page may set: the built-in ones and the app's own */
+export type AppRouteMeta = RouteMeta & RegisteredCustomMeta;
+
+/**
+ * Set head fields of the page on screen, for what is known only once its data has arrived (a
+ * product's name and photo). They are applied over the route's own and hold until the next route loads.
+ *
+ * ```ts
+ * setMeta({ title: product.name, description: product.summary, image: product.photo });
+ * ```
+ */
+export function setMeta(meta: AppRouteMeta): void {
+  _metaOverrides = { ..._metaOverrides, ...meta };
+  applyRouteMeta();
 }
 
 // ─────────────────────────────────────────────────────────────

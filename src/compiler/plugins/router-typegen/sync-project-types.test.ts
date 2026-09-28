@@ -36,7 +36,7 @@ export const Routes = defineRoutes({
   '/multi': { component: Multi },
   '/lazy': { componentModule: () => import('./pages/lazy') },
   '/folder': { component: () => import('./pages/folder') },
-  '/users/:id': { component: () => import('./pages/user.js').then((m) => m.UserPage), title: 'User' },
+  '/users/:id': { component: () => import('./pages/user.js').then((m) => m.UserPage), meta: { title: 'User' } },
   '/ext': { component: External },
   '/missing': { component: () => import('./pages/nope.js').then((m) => m.Nope) },
   "/it's": { component: Home },

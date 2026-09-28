@@ -117,13 +117,13 @@ import ProductDetailsPage from './pages/ProductDetails/ProductDetails.js';
 import NotFound from './pages/NotFound/NotFound.js';
 
 const Routes = defineRoutes({
-  '/':            { component: ProductsPage,        title: 'Products' },
-  '/my-cart':     { component: CartPage,             title: 'My Cart' },
+  '/':            { component: ProductsPage,        meta: { title: 'Products' } },
+  '/my-cart':     { component: CartPage,             meta: { title: 'My Cart' } },
   '/product-details/:productID': {
     component: ProductDetailsPage,
-    title: 'Product Details',
+    meta: { title: 'Product Details' },
   },
-  'notFound':     { component: NotFound,             title: 'Not Found' },
+  'notFound':     { component: NotFound,             meta: { title: 'Not Found' } },
 });
 
 export default Routes;

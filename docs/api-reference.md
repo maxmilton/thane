@@ -7,7 +7,7 @@ Complete API surface for the Thane framework, covering all public exports, globa
 | Entry           | What it holds                                                                                              |
 | :-------------- | :--------------------------------------------------------------------------------------------------------- |
 | `thane`         | Signals, components, mounting, global styles, and the types an app writes in its own code                  |
-| `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`                                                                 |
+| `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`, `setMeta`, and the head-field helpers `metaName`, `metaProperty`, `linkTag` |
 | `thane/client`  | Type declarations for `.css` imports (a `tsconfig.json` entry, not an import; see below)                   |
 | `thane/runtime` | The helpers that compiled code calls. Only the compiler imports it: never import it in an app. It is not an API and changes with every version |
 
@@ -39,9 +39,16 @@ Complete API surface for the Thane framework, covering all public exports, globa
 
 | Export         | Signature                                               | Description                                                              |
 | :------------- | :------------------------------------------------------ | :----------------------------------------------------------------------- |
-| `defineRoutes` | `(routes: { [pattern: string]: Route; notFound: Route }) => typeof routes` | Define the route map with type-safe keys; required before `mount()` with a `router` option |
+| `defineRoutes` | `(routes: { [pattern: string]: Route; notFound: Route }, options?: RouterOptions) => typeof routes` | Define the route map with type-safe keys; required before `mount()` with a `router` option. `options` gives the site's head and the app's own head fields ([Route Heads](routing.md#route-heads)) |
 | `navigate`     | `(path: RoutePaths) => void`                            | Navigate to a path (also available as a global)                          |
 | `navigateBack` | `() => void`                                            | Navigate back in browser history (also available as a global)            |
+| `setMeta`      | `(meta: AppRouteMeta) => void`                          | Set head fields of the page on screen, until the next route loads         |
+| `metaName`     | `(name: string) => CustomMetaField<string>`             | A custom head field for `<meta name="…">`                                |
+| `metaProperty` | `(property: string) => CustomMetaField<string>`         | A custom head field for `<meta property="…">`                            |
+| `linkTag`      | `(rel: string, attributes?: Record<string, string>) => CustomMetaField<string>` | A custom head field for `<link rel="…" href="…">`       |
+
+Its types: `RouteMeta` (the built-in head fields), `SiteMeta` (those and `siteUrl`, `titleTemplate`), `RouteImage`,
+`HeadTag`, `CustomMetaField`, and `AppRouteMeta` (the built-in fields and the app's own, as `setMeta()` takes them).
 
 ### `thane/runtime`
 
@@ -159,7 +166,12 @@ interface MountOptions {
 ```typescript
 interface Route {
   component: (() => Promise<any>) | ComponentHTMLSelector<any>; // Lazy or eager component
-  title?: string; // Document title
+  meta?: RouteMeta | ((route: UntypedRouteContext) => RouteMeta); // The document head (routing.md, Route Heads)
+}
+
+interface RouterOptions {
+  meta?: SiteMeta; // siteUrl, titleTemplate, and the default of every head field
+  customMeta?: Record<string, CustomMetaField>; // The app's own head fields
 }
 
 interface RouterConfig {

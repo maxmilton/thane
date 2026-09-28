@@ -508,7 +508,10 @@ describe('route context', () => {
     const seen: { route?: any } = {};
     install('http://app.test/users/42?x=1#h', { k: 1 });
     startRouter(
-      { routes: { '/users/:id': { component: page('U', seen), title: 'User' } }, notFound: { component: page('NF') } },
+      {
+        routes: { '/users/:id': { component: page('U', seen), meta: { title: 'User' } } },
+        notFound: { component: page('NF') },
+      },
       new FakeElement('outlet') as any,
       { scrollRestoration: false },
     );
@@ -542,7 +545,7 @@ describe('route context', () => {
     const seen: { route?: any } = {};
     install('http://app.test/nope');
     startRouter(
-      { routes: { '/a': { component: page('A') } }, notFound: { component: page('NF', seen), title: '404' } },
+      { routes: { '/a': { component: page('A') } }, notFound: { component: page('NF', seen), meta: { title: '404' } } },
       new FakeElement('outlet') as any,
       { scrollRestoration: false },
     );
@@ -585,7 +588,10 @@ describe('route context', () => {
   test('provider, with a window: the live location, the loaded route pattern and title', async () => {
     install('http://app.test/users/7?y=2#k', { s: 1 });
     startRouter(
-      { routes: { '/users/:id': { component: page('U'), title: 'User' } }, notFound: { component: page('NF') } },
+      {
+        routes: { '/users/:id': { component: page('U'), meta: { title: 'User' } } },
+        notFound: { component: page('NF') },
+      },
       new FakeElement('outlet') as any,
       { scrollRestoration: false },
     );

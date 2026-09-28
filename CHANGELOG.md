@@ -29,6 +29,14 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
   - `--port` accepts digits only: `--port abc` (which gave `NaN`) and `--port 3000x` (which gave 3000) stop with an error;
   - an argument that is neither a command nor a flag's value (`thane biuld`) prints "Unknown command"; the build then runs as before.
 
+- **A route's `title` moves into `meta`:** `'/about': { component, meta: { title: 'About' } }`. `meta` holds every head field a route sets (see Added). A route with `title` at its top level is a type error.
+
+### Added
+
+- **Route heads, typed, in the router.** A route's `meta` sets the document head while it is active: `title`, `description`, `image`, `canonical`, `robots`, `type`, `siteName`, `locale`, `twitter` and `jsonLd`. The Open Graph and Twitter tags that search engines and link previews read are derived from them, and canonical and image URLs are made absolute with the site's `siteUrl` (with a slash at the end when `trailingSlash` is set). `defineRoutes(routes, { meta, customMeta })` gives the site's defaults and a `titleTemplate`, and the app's own fields: `metaName('author')`, `metaProperty('fb:app_id')`, `linkTag('alternate', { … })`, or a function from the value to tags. Routes and `setMeta()` accept them, typed. A route with parameters can compute its fields from the route, and `setMeta()` sets fields once a page's data has arrived. Tags are updated in place on every navigation, so a tag already in `index.html` is taken over rather than duplicated. See `docs/routing.md`, Route Heads.
+- **A production build writes each static route's page with its head,** `about/index.html` for `/about`, for crawlers and link-preview bots that do not run JavaScript; the root `index.html` gets the head of `/`. The values are read from the source. `thane serve --prod` serves a route's own page before the root one.
+- The head renderer costs about 1 KB gzipped, and a production build leaves it out when the routes set nothing but titles.
+
 ### Changed
 
 - **`whenElse()` branches may have any number of root nodes, text included.** A branch is everything between two comment anchors, and showing or hiding it moves the whole range. A branch with several roots used to leave its extra roots on screen when it hid, and a text-only branch never toggled.
@@ -37,6 +45,7 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 - **`@import` in a stylesheet is removed at build time, with a warning.** Thane applies every stylesheet as a constructed stylesheet, and browsers ignore `@import` there; load such a file with a `<link>` in `index.html`. `@charset` is removed too, and `@layer a, b;` is written as empty `@layer` blocks, so none of them unscopes the rule after it any more.
 - **New build error THANE009** for a template the compiler cannot bind reliably: markup the browser rebuilds where a binding needs a position (text directly in a table, an `<a>` inside an `<a>`, non-option content in a `<select>`), or a comment in the form of the compiler's own markers (`<!--b0-->`). THANE007 now also reports a `repeat()` row that is only a nested `repeat()`: the list could not move such a row with its inner rows.
 - **`thane/runtime` is the compiler's own entry.** Compiled components import their helpers from it, including `mountComponent`, `__batchRows`, `__T` and `__nc`. Apps must not import it: it is not an API, and it changes whenever the compiled output does.
+- **A path with a trailing slash matches its route:** `/about/` shows `/about`, where it showed `notFound`. A host that serves a route's own page from `about/index.html` often redirects to `/about/`.
 - **Route parameters are decoded.** `/users/ada%20lovelace` gives `route.params.id` the value `ada lovelace`, as other routers do; it was `ada%20lovelace`. A segment that is not valid percent-encoding is kept as written.
 - **`thane dev` reloads the open pages** after each rebuild, and when an asset or `index.html` changes. The server's socket, which relayed browser errors, also sends the reload. Development files are served with `Cache-Control: no-cache`, so a reloaded page sees an edited asset (`immutable` was sent, and assets keep their names).
 
