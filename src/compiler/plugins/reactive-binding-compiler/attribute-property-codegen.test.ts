@@ -31,10 +31,10 @@ mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Component-level signal binding: el.className = tone()
-    expect(js).toMatch(/\.className\s*=\s*\w+\(\)/);
+    expect(js).toMatch(/\.className\s*=\s*[\w$]+\(\)/);
     // Row binding: the guarded write `… && (el.className = _p)` (the guard variable holds the
     // evaluated `selected() === item.id ? 'danger' : ''`)
-    expect(js).toMatch(/\.className\s*=\s*\w+\)/);
+    expect(js).toMatch(/\.className\s*=\s*[\w$]+\)/);
     expect(js).not.toMatch(/setAttribute\("class"/);
   });
 
@@ -55,7 +55,7 @@ mount({ component: App });
     const js = await buildAndReadJs(source);
     expect(js).toMatch(/setAttribute\("class"/);
     // (the runtime's mount teardown also assigns className, so match the binding shape only)
-    expect(js).not.toMatch(/\.className\s*=\s*\w+\(\)/);
+    expect(js).not.toMatch(/\.className\s*=\s*[\w$]+\(\)/);
   });
 
   test('attributes other than class keep setAttribute', async () => {
