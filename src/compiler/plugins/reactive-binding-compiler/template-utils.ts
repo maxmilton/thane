@@ -15,6 +15,7 @@ import {
   walkElements,
   getElementHtml,
   escapeRawTemplateLiteral,
+  parseHtmlTemplate,
   type HtmlElement,
   type ParsedTemplate,
   type BindingInfo as ParsedBindingInfo,
@@ -297,9 +298,12 @@ const componentRowOf = (rowTemplate: string): RepeatBlock['componentRow'] => {
 };
 
 /**
- * A repeat()'s empty template, its third argument, collapsed. A function there is a key function
- * written third, which would become the empty template's markup and leave the list keyed by index:
- * it is a build error (H-54).
+ * A repeat()'s empty template, its third argument, collapsed. It is inserted as one static element
+ * while the list is empty, so anything else is a build error:
+ * - a function: a key function written third, which would become the markup and leave the list keyed
+ *   by index (THANE010);
+ * - more than one root, or text outside an element: only the first element was shown, and text alone
+ *   threw when the list emptied; a `${…}`, which was shown as written (THANE011).
  */
 const emptyTemplateOf = (binding: ParsedBindingInfo): string | undefined => {
   if (!binding.emptyTemplate) return undefined;
@@ -311,7 +315,21 @@ const emptyTemplateOf = (binding: ParsedBindingInfo): string | undefined => {
       `${ErrorCode.REPEAT_EMPTY_TEMPLATE_FUNCTION}: the third argument of repeat() is the empty template, shown while the list is empty, not a key function. Pass the key function fourth: repeat(items, row, null, ${third.getText()}).`,
     );
   }
-  return collapseEmptyTemplate(binding.emptyTemplate);
+  const template = collapseEmptyTemplate(binding.emptyTemplate);
+  if (/(^|[^\\])\$\{/.test(template)) {
+    throw new Error(
+      `${ErrorCode.REPEAT_EMPTY_TEMPLATE_SHAPE}: repeat()'s empty template is static, so a \${…} in it would be shown as written: ${template}. Compute the text outside the template, or put a when() next to the list.`,
+    );
+  }
+  const { roots } = parseHtmlTemplate(template);
+  const root = roots[0];
+  const end = root ? (root.isSelfClosing || root.closeTagEnd === 0 ? root.openTagEnd : root.closeTagEnd) : 0;
+  if (roots.length !== 1 || template.slice(0, root!.tagStart).trim() || template.slice(end).trim()) {
+    throw new Error(
+      `${ErrorCode.REPEAT_EMPTY_TEMPLATE_SHAPE}: repeat()'s empty template must be one element, like a row: ${template}. Wrap its content in one element, for example html\`<li class="empty">No items</li>\`.`,
+    );
+  }
+  return template;
 };
 
 /**

@@ -77,7 +77,7 @@ ${repeat(
 
 When the array transitions from empty to non-empty, the empty template is removed and list items are created. When the array becomes empty again, all items are removed and the empty template is shown.
 
-The empty template is static markup with one root element, like a row. It holds no bindings or event handlers: a `${…}` inside it is shown as written.
+The empty template is static markup with one root element, like a row. It holds no bindings or event handlers; a `${…}` in it, more than one root, or text outside an element is a build error (THANE011).
 
 ## Signal Items
 

@@ -324,6 +324,7 @@ These are reported by the compiler while it compiles a template, as build errors
 | THANE008 | A `when()` on the root element of a `repeat()` row. Filter the list, or put `when()` on an inner element        |
 | THANE009 | A template the compiler cannot bind reliably: markup the browser rebuilds (text directly in a table, an `<a>` inside an `<a>`, non-option content in a `<select>`), or a comment written like one of the compiler's own markers (`<!--b0-->`) |
 | THANE010 | A function as `repeat()`'s third argument, which is the empty template. Pass the key function fourth: `repeat(items, row, null, (it) => it.id)` |
+| THANE011 | A `repeat()` empty template that is not one static element: two roots, text outside an element, or a `${…}` in it. It is inserted as one element while the list is empty |
 
 ### THANE007 — one root element per row
 
@@ -353,6 +354,18 @@ ${repeat(items(), (item) => html`<li>${item.name}</li>`, (item) => item.id)}
 
 // ✅ GOOD
 ${repeat(items(), (item) => html`<li>${item.name}</li>`, null, (item) => item.id)}
+```
+
+### THANE011 — the empty template is one static element
+
+```typescript
+// ❌ BAD — text alone, two roots, a binding
+${repeat(items(), (item) => html`<li>${item.name}</li>`, html`No items`)}
+${repeat(items(), (item) => html`<li>${item.name}</li>`, html`<li>No</li><li>items</li>`)}
+${repeat(items(), (item) => html`<li>${item.name}</li>`, html`<li>No ${noun()}</li>`)}
+
+// ✅ GOOD
+${repeat(items(), (item) => html`<li>${item.name}</li>`, html`<li class="empty">No items</li>`)}
 ```
 
 ← [Back to Docs](README.md)

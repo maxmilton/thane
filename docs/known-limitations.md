@@ -63,7 +63,7 @@ Inside the row, anything a component template can hold works, at any depth: bind
 
 ### Empty Templates Are Static
 
-The empty template of a `repeat()`, its third argument, is inserted as written: it holds no bindings or event handlers, and a `${…}` inside it is shown as text. It must be a single element, like a row.
+The empty template of a `repeat()`, its third argument, is inserted as written, as one element: it holds no bindings or event handlers. An empty template with a `${…}`, more than one root, or text outside an element is a build error (THANE011). For an empty state that changes, put a `when()` next to the list.
 
 ### Whitespace Between Elements
 

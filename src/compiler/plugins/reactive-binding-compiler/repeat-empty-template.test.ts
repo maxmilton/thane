@@ -84,3 +84,31 @@ describe('H-54 the empty template argument of repeat()', () => {
     TIMEOUT,
   );
 });
+
+describe('THANE011 the empty template is one static element', () => {
+  // It is inserted as one element while the list is empty: only a first element ever showed, text
+  // alone threw when the list emptied, and a ${…} showed as written
+  for (const [what, empty, markup] of [
+    ['a void element', 'html`<hr>`', '<hr>'],
+    ['one element with whitespace around it', 'html`  <li class="none">none</li>  `', '<li class="none">none</li>'],
+  ] as const) {
+    test(
+      `${what} builds`,
+      async () => expect(emptyTemplateOf(await build(`repeat(items(), ${ROW}, ${empty})`))).toBe(markup),
+      TIMEOUT,
+    );
+  }
+
+  for (const [what, empty, message] of [
+    ['two elements', 'html`<li>no</li><li>items</li>`', /THANE011: repeat\(\)'s empty template must be one element/],
+    ['text alone', 'html`No items`', /THANE011: repeat\(\)'s empty template must be one element/],
+    ['text next to an element', 'html`No <b>items</b>`', /THANE011: repeat\(\)'s empty template must be one element/],
+    ['a binding', 'html`<li>${items().length} items</li>`', /THANE011: repeat\(\)'s empty template is static/],
+  ] as const) {
+    test(
+      `${what} is a build error`,
+      () => expect(build(`repeat(items(), ${ROW}, ${empty})`)).rejects.toThrow(message),
+      TIMEOUT,
+    );
+  }
+});

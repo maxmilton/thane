@@ -909,7 +909,7 @@ export const ContractApp = defineComponent('contract-app', () => {
                     ${repeat(
                       item.children,
                       (child, childIndex) => html`<li data-testid="nested-child">${child}-${childIndex}</li>`,
-                      html`<li data-testid="nested-child-empty">empty-${item.id}</li>`,
+                      html`<li data-testid="nested-child-empty">empty</li>`,
                     )}
                   </ol>
                 </li>
