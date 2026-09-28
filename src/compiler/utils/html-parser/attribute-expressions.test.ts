@@ -40,3 +40,25 @@ describe('attribute values with expressions', () => {
     expect(attributesOf('<li title="\\${x}">x</li>')).toEqual({ title: '\\${x}' });
   });
 });
+
+describe('a missing space after the tag name', () => {
+  test('<button@click=…>: reported, and the attribute is read', () => {
+    const parsed = parseHtmlTemplate('<button@click=${go}>x</button>');
+    const button = parsed.roots[0]!;
+    expect(button.tagName).toBe('button');
+    expect([...button.attributes.keys()]).toEqual(['@click']);
+    expect(parsed.diagnostics.map((d) => [d.severity, d.message])).toEqual([
+      [
+        'error',
+        'Missing space after <button: "@" cannot be part of a tag name, and is read as the start of an attribute',
+      ],
+    ]);
+  });
+
+  test('<div${when(…)}>: the directive is read', () => {
+    const parsed = parseHtmlTemplate('<div${when(on())}>x</div>');
+    expect(parsed.roots[0]!.tagName).toBe('div');
+    expect(parsed.roots[0]!.whenDirective).toBe('${when(on())}');
+    expect(parsed.diagnostics).toHaveLength(1);
+  });
+});

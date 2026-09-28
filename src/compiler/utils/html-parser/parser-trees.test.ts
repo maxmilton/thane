@@ -370,11 +370,14 @@ describe('more tag and attribute paths (added before HP-1)', () => {
     '  text "t" 13-14',
     'error @0: Unclosed tag <my-el> (reached end of template)',
   ]);
-  tree('characters a tag name cannot hold are dropped', '<p${when(x())}>y</p>', [
-    '<pwhenx> tag 0-14 open-end 15 close 0-0',
+  // They were dropped and the name went on (`<pwhenx>`); a missing space is reported now, and the rest
+  // is read as the tag's attributes
+  tree('a character a tag name cannot hold starts the attributes, reported', '<p${when(x())}>y</p>', [
+    '<p> tag 0-2 open-end 15 close 16-20',
+    '  when "${when(x())}" 2-14',
     '  text "y" 15-16',
-    'error @16: Orphaned closing tag </p> with no matching open tag',
-    'error @0: Unclosed tag <pwhenx> (reached end of template)',
+    'binding when on <p@0> signalName="x" signalNames=["x"] expressionStart=2 expressionEnd=14 fullExpression="${when(x())}" jsExpression="x()"',
+    'error @2: Missing space after <p: "$" cannot be part of a tag name, and is read as the start of an attribute',
   ]);
   tree(
     'event bindings with modifiers, and an event value that is not an expression',

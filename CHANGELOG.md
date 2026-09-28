@@ -117,6 +117,7 @@ The simplification and hardening round fixed these defects in valid code:
 - The mount-call optimiser leaves an entry alone when it also uses `mount` as a value (`const m = mount`, `export { mount }`); it removed the import, and the file broke.
 - `thane serve --prod` answers a request that fails with a plain 500. It started Bun's server without `development: false`, so a failing request showed Bun's development error page with the stack trace.
 - Template parse warnings, such as a duplicate attribute, are reported for `whenElse()` branches and `repeat()` rows too, once each; only the component template's were.
+- A missing space after a tag name, `<button@click=${go}>` or `<div${when(on())}>`, is reported, and the rest of the tag is read as its attributes. The character was dropped and the name went on, so the example became a `<buttonclick>` element with no handler.
 
 ### Removed
 

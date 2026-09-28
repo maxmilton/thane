@@ -243,6 +243,17 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
           currentElement = createEmptyElement(tagName, tagStart, pos);
           finishOpenTag(pos + 2, true);
           pos++;
+        } else {
+          // A character that cannot continue a tag name, most likely after a missing space
+          // (`<button@click=…>`): it is reported, and read again as the start of the attributes
+          diagnostics.push({
+            message: `Missing space after <${tagName}: "${char}" cannot be part of a tag name, and is read as the start of an attribute`,
+            position: pos,
+            severity: 'error',
+          });
+          currentElement = createEmptyElement(tagName, tagStart, pos);
+          state = PARSER_STATE.TAG_SPACE;
+          continue;
         }
         break;
 
