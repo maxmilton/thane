@@ -1077,7 +1077,18 @@ export const generateInitBindingsFunction = (
   // block-scoped `_subs` collects them; a list inside a row writes into the row factory, into the
   // row's `_cleanups`. A row factory is a function of its own, and its item has the source's
   // name, so an inner list's `_el`, item and guards shadow the outer row's, as the source's scoping does.
-  const emitRepeat = (rep: RepeatBlock, lines: string[], scope: NavScope, cleanups = '_subs'): void => {
+  /**
+   * A list inside a row can be given `hoist`: the statements that are the same for every outer row (its
+   * template's root, its bind and update functions, its batch helper) go there, before the outer row's
+   * factory, when none of the list's bindings or handlers reads the outer row (`outerNames`).
+   */
+  const emitRepeat = (
+    rep: RepeatBlock,
+    lines: string[],
+    scope: NavScope,
+    cleanups = '_subs',
+    hoist?: { lines: string[]; outerNames: string[] },
+  ): void => {
     // The list's anchor comment, reached through the scope, which declares it in its head
     const anchorLine = (anchorVar: string): void => void scope.at(`${rep.id}.`, anchorVar);
     const indexVar = rep.indexVar || '_idx';
@@ -1343,6 +1354,7 @@ export const generateInitBindingsFunction = (
         const containerVar = `_ct_${rep.id}`;
         const reconcilerVar = `_rc_${rep.id}`;
 
+        const tplContentLine = lines.length;
         lines.push(`    const ${tplContentVar} = ${templateId}.content.firstElementChild;`);
         anchorLine(anchorVar);
         lines.push(`    const ${containerVar} = ${anchorVar}.parentNode;`);
@@ -1409,6 +1421,20 @@ export const generateInitBindingsFunction = (
         // are bound by a standalone function, so the reconciler can clone them in batches of
         // ROW_BATCH_SIZE and bind each cloned row; the single-row factory clones, binds and inserts.
         const batchRows = !needsCleanups;
+        // Statements hoisted out of nested lists go before this row's factory
+        const factoryStart = lines.length;
+        const hoisted: string[] = [];
+        // Rows with no cleanups inside a list inside a row, reading nothing of the outer row: the bind and
+        // update functions, the template root and the batch helper are created once for every outer row
+        const hoistRows =
+          !!hoist &&
+          batchRows &&
+          !hoist.outerNames.some(
+            (name) =>
+              rep.itemBindings.some((b) => expressionReferencesIdentifier(b.expression, name)) ||
+              rep.itemEvents.some((e) => expressionReferencesIdentifier(e.handlerExpression, name)),
+          );
+        const bindStart = lines.length;
         if (batchRows) {
           lines.push(`    const _bind_${rep.id} = (_el, ${itemName}, ${indexVar}) => {`);
         } else {
@@ -1439,9 +1465,10 @@ export const generateInitBindingsFunction = (
         }
         // A list inside the row is generated like any other list, its unsubscribes in the row's
         // cleanups
+        const outerNames = [rep.itemVar, itemName, rep.indexVar, ...rowSignalVars].filter((n): n is string => !!n);
         for (const nr of rep.nestedRepeats) {
           const listLines: string[] = [];
-          emitRepeat(nr, listLines, rowScope, '_cleanups');
+          emitRepeat(nr, listLines, rowScope, '_cleanups', { lines: hoisted, outerNames });
           directiveCalls.push(...listLines.map((line) => `    ${line}`));
         }
         // The directives read the item and index through the row signals, except where they read the
@@ -1524,17 +1551,23 @@ export const generateInitBindingsFunction = (
         }
         if (batchRows) {
           if (!leanRows) lines.push(`    };`);
+          const batchHelper = `${use(BIND_FN.BATCH_ROWS)}(${ROW_BATCH_SIZE}, ${tplContentVar}, _bind_${rep.id}${leanRows ? `, _update_${rep.id}` : ''})`;
+          if (hoistRows) {
+            // The template root, bind and update functions and batch helper move out of the outer row
+            const bindLines = lines.splice(bindStart, lines.length - bindStart);
+            const [tplLine] = lines.splice(tplContentLine, 1);
+            hoist!.lines.push(tplLine!, ...bindLines, `    const _br_${rep.id} = ${batchHelper};`);
+          }
           lines.push(`    const ${reconcilerVar} = ${use(BIND_FN.KEYED_RECONCILER)}(${containerVar}, ${anchorVar},`);
           lines.push(
             `      (${itemName}, ${indexVar}, _ref) => { const _el = _cloneNode.call(${tplContentVar}, true); const _m = _bind_${rep.id}(_el, ${itemName}, ${indexVar}); _insertBefore.call(${containerVar}, _el, _ref); return _m; },`,
           );
-          lines.push(
-            `    ${keyFnExpr}, ${use(BIND_FN.BATCH_ROWS)}(${ROW_BATCH_SIZE}, ${tplContentVar}, _bind_${rep.id}${leanRows ? `, _update_${rep.id}` : ''})${usesIndex ? ', true' : ''});`,
-          );
+          lines.push(`    ${keyFnExpr}, ${hoistRows ? `_br_${rep.id}` : batchHelper}${usesIndex ? ', true' : ''});`);
         } else {
           lines.push(`      },`);
           lines.push(`    ${keyFnExpr}${usesIndex ? ', undefined, true' : ''});`);
         }
+        if (hoisted.length > 0) lines.splice(factoryStart, 0, ...hoisted);
         for (const sub of selectionSubscriptions) {
           lines.push(`    ${sub}`);
         }

@@ -1870,6 +1870,20 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
+    const _tc_b1 = __tpl_b1.content.firstElementChild;
+    const _bind_b1 = (_el, it, _idx) => {
+        const _c0 = _el.firstChild.nextSibling;
+        const _c1 = _el.lastChild.previousSibling;
+        let _p0, _p1;
+        ;
+        _c0.data = (_p0 = it.a) ?? ''; _c1.data = (_p1 = it.b) ?? '';
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, p1: _p1, c0: _c0, c1: _c1 };
+    };
+    const _update_b1 = (_m, it, _idx) => {
+      const _el = _m.el;
+      if (_m.p0 !== (_m.p0 = it.a)) _m.c0.data = (_m.p0) ?? ''; if (_m.p1 !== (_m.p1 = it.b)) _m.c1.data = (_m.p1) ?? '';
+    };
+    const _br_b1 = __batchRows(16, _tc_b1, _bind_b1, _update_b1);
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (g, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
@@ -1878,23 +1892,10 @@
         ;
         _insertBefore.call(_ct_b0, _el, _ref);
         const _cleanups = [];
-        const _tc_b1 = __tpl_b1.content.firstElementChild;
         const _ct_b1 = _a_b1.parentNode;
-        const _bind_b1 = (_el, it, _idx) => {
-            const _c0 = _el.firstChild.nextSibling;
-            const _c1 = _el.lastChild.previousSibling;
-            let _p0, _p1;
-            ;
-            _c0.data = (_p0 = it.a) ?? ''; _c1.data = (_p1 = it.b) ?? '';
-            return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, p1: _p1, c0: _c0, c1: _c1 };
-        };
-        const _update_b1 = (_m, it, _idx) => {
-          const _el = _m.el;
-          if (_m.p0 !== (_m.p0 = it.a)) _m.c0.data = (_m.p0) ?? ''; if (_m.p1 !== (_m.p1 = it.b)) _m.c1.data = (_m.p1) ?? '';
-        };
         const _rc_b1 = createKeyedReconciler(_ct_b1, _a_b1,
           (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b1, true); const _m = _bind_b1(_el, it, _idx); _insertBefore.call(_ct_b1, _el, _ref); return _m; },
-        (_, i) => i, __batchRows(16, _tc_b1, _bind_b1, _update_b1));
+        (_, i) => i, _br_b1);
         const _items_b1 = () => g$().items;
         _rc_b1.reconcile(_items_b1());
         const _rsrc_b1_0 = g$;
@@ -2039,6 +2040,18 @@
     const _a_b0 = _ns[0].lastChild;
     const _tc_b0 = __tpl_b0.content.firstElementChild;
     const _ct_b0 = _a_b0.parentNode;
+    const _tc_b3 = __tpl_b3.content.firstElementChild;
+    const _bind_b3 = (_el, it, _idx) => {
+        const _e0 = _el;
+        let _p0;
+        _e0.textContent = (_p0 = it.label) ?? ''; let _t0;
+        return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, t0: undefined };
+    };
+    const _update_b3 = (_m, it, _idx) => {
+      const _el = _m.el;
+      if (_m.p0 !== (_m.p0 = it.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
+    };
+    const _br_b3 = __batchRows(16, _tc_b3, _bind_b3, _update_b3);
     const _rc_b0 = createKeyedReconciler(_ct_b0, _a_b0,
       (g, _idx, _ref) => {
         const _el = _cloneNode.call(_tc_b0, true);
@@ -2058,21 +2071,10 @@
         lbl.subscribe(v => { b2.data = v ?? ''; }, true),
       ];
     }));
-        const _tc_b3 = __tpl_b3.content.firstElementChild;
         const _ct_b3 = _a_b3.parentNode;
-        const _bind_b3 = (_el, it, _idx) => {
-            const _e0 = _el;
-            let _p0;
-            _e0.textContent = (_p0 = it.label) ?? ''; let _t0;
-            return { el: _el, cleanups: __nc, value: it, key: undefined, p0: _p0, t0: undefined };
-        };
-        const _update_b3 = (_m, it, _idx) => {
-          const _el = _m.el;
-          if (_m.p0 !== (_m.p0 = it.label)) (_m.t0 ??= _el.firstChild) ? (_m.t0.nodeValue = _m.p0 ?? '') : (_el.textContent = _m.p0 ?? '');
-        };
         const _rc_b3 = createKeyedReconciler(_ct_b3, _a_b3,
           (it, _idx, _ref) => { const _el = _cloneNode.call(_tc_b3, true); const _m = _bind_b3(_el, it, _idx); _insertBefore.call(_ct_b3, _el, _ref); return _m; },
-        (_, i) => i, __batchRows(16, _tc_b3, _bind_b3, _update_b3));
+        (_, i) => i, _br_b3);
         const _items_b3 = () => g$().items;
         _rc_b3.reconcile(_items_b3());
         const _rsrc_b3_0 = g$;
