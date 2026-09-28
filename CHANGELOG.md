@@ -111,6 +111,7 @@ The simplification and hardening round fixed these defects in valid code:
 - A child component call in a template, `${Kid(…)}`, mounts the component the file declares or imports under that name. It was matched by name against every component in the project, so two components exported under one name from different folders collided, and a plain function named like a component elsewhere was compiled as a child mount. Imports are followed through re-exports, aliases and tsconfig `paths`.
 - In nested lists, an inner row reads an outer row's item under the name the source gives it, whatever that name is. Compiled rows called every item `item`, so with a list of signal items named `item`, `item()` in an inner row read the inner item and threw.
 - An escape that only a tagged template allows, such as `` html`C:\users` `` (`\u` without hex digits, `\x1`, `\08`, `\9`), is shown as written. The template is emitted into an ordinary template literal, where such an escape failed the build.
+- An attribute expression that holds double quotes, such as `class=${sel() === it.id ? "on" : ""}` in a `repeat()` row or `data-x="${it.label + "!"}"`, builds and binds. The parser ended the attribute value at the first quote inside the expression, so the row failed the build with a misleading THANE006, and a double-quoted value lost its binding.
 
 ### Removed
 

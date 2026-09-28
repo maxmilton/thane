@@ -1368,3 +1368,30 @@ test.describe('RW nested lists in rows: an outer item named item', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 });
+
+test.describe('double quotes inside attribute expressions', () => {
+  test('row and component attributes whose expression holds double quotes render and update', async ({ page }) => {
+    const probe = await mountProbe(page, 'quotes');
+    const rows = page.locator('.hardening-quotes li');
+    await expect(page.locator('.quotes-top')).toHaveAttribute('title', 'one');
+    await expect(rows.nth(0)).toHaveAttribute('class', 'on');
+    await expect(rows.nth(0)).toHaveAttribute('title', 'yes');
+    await expect(rows.nth(0)).toHaveAttribute('data-x', 'A!');
+    await expect(rows.nth(1)).toHaveAttribute('title', 'no');
+
+    await page.evaluate(() => {
+      const q = (window as any).__probe.quotes;
+      q.sel(2);
+      q.flag(false);
+      q.items([
+        { id: 1, on: false, label: 'A' },
+        { id: 2, on: true, label: 'C' },
+      ]);
+    });
+    await expect(page.locator('.quotes-top')).toHaveAttribute('title', 'two');
+    await expect(rows.nth(1)).toHaveAttribute('class', 'on');
+    await expect(rows.nth(0)).toHaveAttribute('title', 'no');
+    await expect(rows.nth(1)).toHaveAttribute('data-x', 'C!');
+    expect(probe.pageErrors).toEqual([]);
+  });
+});

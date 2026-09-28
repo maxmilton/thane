@@ -311,15 +311,24 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
         break;
 
       case PARSER_STATE.ATTR_VALUE_Q:
-        if (char === quoteChar) {
-          setAttribute(attrValue, pos + 1, attrValueStart, pos);
-          state = PARSER_STATE.TAG_SPACE;
-        } else {
-          attrValue += char;
-        }
-        break;
-
       case PARSER_STATE.ATTR_VALUE_UQ:
+        if (char === '$' && nextChar === '{' && !isEscaped(html, pos)) {
+          // An expression is part of the value up to its closing brace, whatever quotes it holds:
+          // `class="${on() ? "a" : "b"}"` is one value
+          const end = templateExpressionEnd(html, pos);
+          attrValue += html.slice(pos, end === -1 ? html.length : end);
+          pos = end === -1 ? html.length : end;
+          continue;
+        }
+        if (state === PARSER_STATE.ATTR_VALUE_Q) {
+          if (char === quoteChar) {
+            setAttribute(attrValue, pos + 1, attrValueStart, pos);
+            state = PARSER_STATE.TAG_SPACE;
+          } else {
+            attrValue += char;
+          }
+          break;
+        }
         if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
           setAttribute(attrValue, pos, attrValueStart, pos);
           state = PARSER_STATE.TAG_SPACE;
