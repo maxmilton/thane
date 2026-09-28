@@ -291,6 +291,22 @@ export function createKeyedReconciler<T>(
     if (trackIndex) syncIndexes();
   };
 
+  /**
+   * Match rows in place, from `from` up to `to`: the new item at i against the row `offset` places
+   * further. An identical item needs nothing, one with the row's key is updated at i. Returns the
+   * first index whose key differs, or `to`.
+   */
+  const matchInPlace = (newItems: T[], from: number, to: number, offset: number): number => {
+    for (let i = from; i < to; i++) {
+      const managed = managedItems[i + offset]!;
+      const newItem = newItems[i]!;
+      if (managed.value === newItem) continue;
+      if (keyFn(newItem, i) !== managed.key) return i;
+      updateRow(managed, newItem, i);
+    }
+    return to;
+  };
+
   const reconcile = (newItems: T[]) => {
     const newLength = newItems?.length ?? 0;
     const oldLength = managedItems.length;
@@ -329,26 +345,9 @@ export function createKeyedReconciler<T>(
     // Fast path: single item removed — find missing old key by linear scan. As in the in-place
     // pass below, an identical item needs nothing and a changed one is updated at its new index.
     if (oldLength === newLength + 1) {
-      let removedIdx = 0;
-      for (; removedIdx < newLength; removedIdx++) {
-        const managed = managedItems[removedIdx]!;
-        const newItem = newItems[removedIdx]!;
-        if (managed.value === newItem) continue;
-        if (keyFn(newItem, removedIdx) !== managed.key) break;
-        updateRow(managed, newItem, removedIdx);
-      }
-
+      const removedIdx = matchInPlace(newItems, 0, newLength, 0);
       // Every later key must be the next old row's, or this is not one row removed
-      let i = removedIdx;
-      for (; i < newLength; i++) {
-        const managed = managedItems[i + 1]!;
-        const newItem = newItems[i]!;
-        if (managed.value === newItem) continue;
-        if (keyFn(newItem, i) !== managed.key) break;
-        updateRow(managed, newItem, i);
-      }
-
-      if (i === newLength) {
+      if (matchInPlace(newItems, removedIdx, newLength, 1) === newLength) {
         const removedManaged = managedItems[removedIdx]!;
         removeItem(removedManaged);
         if (keyMap !== null) keyMap.delete(removedManaged.key!);
@@ -366,15 +365,7 @@ export function createKeyedReconciler<T>(
       // touches the key map. The first position whose key differs means something moved,
       // and the keyed paths below take over from the start (rows already updated here are
       // skipped there because their value now matches).
-      let inPlace = 0;
-      for (; inPlace < newLength; inPlace++) {
-        const managed = managedItems[inPlace]!;
-        const newItem = newItems[inPlace]!;
-        if (managed.value === newItem) continue;
-        if (keyFn(newItem, inPlace) !== managed.key) break;
-        updateRow(managed, newItem, inPlace);
-      }
-      if (inPlace === newLength) return;
+      if (matchInPlace(newItems, 0, newLength, 0) === newLength) return;
 
       // Fast path: reorder with same keys (fused allKeysExist + update in single pass)
       let allKeysExist = true;
