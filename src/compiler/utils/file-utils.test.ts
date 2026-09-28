@@ -59,8 +59,9 @@ test('createBuildContext scans the working directory', async () => {
     'src/main.ts',
     'src/widgets/card.ts',
   ]);
-  expect(Object.keys(ctx).sort()).toEqual(['componentsByName', 'componentsBySelector', 'tsFiles']);
-  const byName = Object.fromEntries([...ctx.componentsByName].map(([k, d]) => [k, [d.selector, rel(d.filePath)]]));
+  expect(Object.keys(ctx).sort()).toEqual(['components', 'componentsBySelector', 'projectRoot', 'tsFiles']);
+  expect(relative(root, ctx.projectRoot)).toBe('');
+  const byName = Object.fromEntries(ctx.components.map((d) => [d.name, [d.selector, rel(d.filePath)]]));
   const bySelector = Object.fromEntries([...ctx.componentsBySelector].map(([k, d]) => [k, [d.name, rel(d.filePath)]]));
   expect(byName).toEqual({
     AppShell: ['app-shell', 'src/app-shell.ts'],

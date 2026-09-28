@@ -77,8 +77,10 @@ export interface ImportInfo {
 export interface BuildContext {
   /** All .ts files discovered by the shared scan */
   tsFiles: string[];
-  /** Component definitions found during the scan, keyed by component name */
-  componentsByName: Map<string, ComponentDefinition>;
+  /** The project folder: its tsconfig.json decides how imports resolve */
+  projectRoot: string;
+  /** Every component definition the scan found; several may share a name in different files */
+  components: ComponentDefinition[];
   /** Component definitions found during the scan, keyed by selector */
   componentsBySelector: Map<string, ComponentDefinition>;
   /** Production build: templates and stylesheets are minified where the compiler emits them */

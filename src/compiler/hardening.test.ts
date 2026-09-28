@@ -178,9 +178,8 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     // The same project built twice: from the repository (an ancestor of the project), then from a
     // folder that is not an ancestor. Child components must be compiled and the entry script injected
     // either way.
-    // The child's name is unique in the repository: components are looked up by name over the whole
-    // scan, so a `Kid` elsewhere in the repository (e2e/hardening-app) would lend it its selector in
-    // the build from the repository (a finding of H-15, not fixed here).
+    // Child components resolve through the file's imports, so other components with the same name in
+    // the repository (e2e/hardening-app has a `Kid`) cannot lend it their selector.
     const project = await createTempProject(mainFor('Par', 'par'), {
       'src/par.ts':
         "import { defineComponent } from 'thane';\n" +

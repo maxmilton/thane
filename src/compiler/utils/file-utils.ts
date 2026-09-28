@@ -78,7 +78,7 @@ export const createBuildContext = async (projectRoot?: string): Promise<BuildCon
   const workspaceRoot = process.cwd();
   const tsFilter = (name: string) => name.endsWith('.ts') && !name.endsWith('.d.ts');
 
-  const componentsByName = new Map<string, ComponentDefinition>();
+  const components: ComponentDefinition[] = [];
   const componentsBySelector = new Map<string, ComponentDefinition>();
 
   sourceCache.clear();
@@ -94,13 +94,13 @@ export const createBuildContext = async (projectRoot?: string): Promise<BuildCon
     if (cached) {
       const definitions = extractComponentDefinitions(cached.sourceFile, filePath);
       for (const def of definitions) {
-        componentsByName.set(def.name, def);
+        components.push(def);
         componentsBySelector.set(def.selector, def);
       }
     }
   }
 
-  return { tsFiles, componentsByName, componentsBySelector };
+  return { tsFiles, projectRoot: projectRoot ?? workspaceRoot, components, componentsBySelector };
 };
 
 /**

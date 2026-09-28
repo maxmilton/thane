@@ -12,6 +12,7 @@ import {
   createBuildContext,
   applyEdits,
 } from '../../utils/index.js';
+import { createComponentResolver, type ComponentResolver } from '../../utils/component-resolver.js';
 import { transformDefineComponentSource } from '../reactive-binding-compiler/index.js';
 import { anchorMark } from '../reactive-binding-compiler/template-utils.js';
 import type { CompileOptions } from '../reactive-binding-compiler/index.js';
@@ -104,29 +105,17 @@ const findComponentCallsCTFE = (
 export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
   name: NAME,
   setup(build) {
-    const componentDefinitions = new Map<string, ComponentDefinition>();
+    // Which components each file can call; made anew for every build, so it sees the current sources
+    let resolver: ComponentResolver | null = null;
 
     // Read per file: a production build plans its selector renames in onStart, before any load
     const compileOptions = (): CompileOptions => ({ minify: ctx?.minify, selectorMap: ctx?.selectorMap });
 
     build.onStart(async () => {
-      componentDefinitions.clear();
-
-      if (ctx) {
-        // Use shared context from BuildContext
-        for (const [name, def] of ctx.componentsByName) {
-          componentDefinitions.set(name, def);
-        }
-      } else {
-        // Fallback: reuse createBuildContext to avoid duplicating the scan logic
-        const fallbackCtx = await createBuildContext();
-        for (const [name, def] of fallbackCtx.componentsByName) {
-          componentDefinitions.set(name, def);
-        }
-      }
-
-      if (componentDefinitions.size > 0) {
-        logger.info(NAME, `Found ${componentDefinitions.size} component(s) for CTFE`);
+      const buildContext = ctx ?? (await createBuildContext());
+      resolver = createComponentResolver(buildContext.projectRoot, buildContext.components);
+      if (buildContext.components.length > 0) {
+        logger.info(NAME, `Found ${buildContext.components.length} component(s) for CTFE`);
       }
     });
 
@@ -302,22 +291,16 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           return undefined;
         }
 
-        // ── CTFE: inline component calls if definitions are available ──
+        // ── Child component calls: the components this file declares or imports ──
         let modifiedSource = source;
-        let hasComponentCalls = false;
-        for (const [componentName] of componentDefinitions) {
-          if (source.includes(componentName + '(')) {
-            hasComponentCalls = true;
-            break;
-          }
-        }
 
         // Child mount data to pass to the binding compiler
         let childMounts: ChildMountInfo[] | undefined;
 
-        if (hasComponentCalls) {
-          const sourceFile = sourceCache.parse(args.path, source);
-          const componentCalls = findComponentCallsCTFE(source, sourceFile, componentDefinitions);
+        const sourceFile = sourceCache.parse(args.path, source);
+        const componentsInScope = resolver ? await resolver.componentsInScope(sourceFile) : new Map();
+        if (componentsInScope.size > 0) {
+          const componentCalls = findComponentCallsCTFE(source, sourceFile, componentsInScope);
 
           if (componentCalls.length > 0) {
             // CTFE counter — allocates b0, b1, … for child component placeholders, comments the
@@ -329,7 +312,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
             const sortedCalls = [...componentCalls].sort((a, b) => b.startIndex - a.startIndex);
 
             for (const call of sortedCalls) {
-              const componentDef = componentDefinitions.get(call.componentName);
+              const componentDef = componentsInScope.get(call.componentName);
               if (componentDef) {
                 const anchorId = `b${childIdCounter++}`;
                 const compiledHTML = anchorMark(anchorId, '.');
