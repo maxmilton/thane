@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { collectFilesRecursively, extractComponentDefinitions, sourceCache } from '../../utils/index.js';
 
@@ -195,9 +196,13 @@ const generateFileContent = (routePaths: string[], selectorEntries: Array<[strin
   ].join('\n');
 };
 
-const readClientTypesTemplate = async (): Promise<string> => {
-  const clientTypesUrl = new URL('../../../../client.d.ts', import.meta.url);
-  return fs.readFile(clientTypesUrl, 'utf8');
+/**
+ * The generated client types: one line referencing the package's own client.d.ts, so its `*.css`
+ * declaration exists once however a project includes it (`"types": ["thane/client"]` is that file).
+ */
+const clientTypesReference = (generatedFile: string): string => {
+  const packaged = fileURLToPath(new URL('../../../../client.d.ts', import.meta.url));
+  return `/// <reference path="${path.relative(path.dirname(generatedFile), packaged).replace(/\\/g, '/')}" />\n`;
 };
 
 /** The tsconfig.json that owns `filePath`, searching upwards but never above `projectRoot`. */
@@ -339,7 +344,6 @@ export const syncProjectTypes = async (projectRoot: string = process.cwd()): Pro
     : [];
   const nextGeneratedFiles = new Set<string>();
   const projectConfigPaths = new Set<string>();
-  const clientTypesContent = await readClientTypesTemplate();
   let generatedCount = 0;
 
   for (const filePath of tsFiles) {
@@ -352,7 +356,7 @@ export const syncProjectTypes = async (projectRoot: string = process.cwd()): Pro
   for (const projectConfigPath of projectConfigPaths) {
     const clientTypesPath = getGeneratedClientTypesPath(projectConfigPath);
     nextGeneratedFiles.add(clientTypesPath);
-    await writeGeneratedClientTypesFile(clientTypesPath, clientTypesContent);
+    await writeGeneratedClientTypesFile(clientTypesPath, clientTypesReference(clientTypesPath));
   }
 
   for (const filePath of tsFiles) {

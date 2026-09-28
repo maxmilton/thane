@@ -92,22 +92,6 @@ const buildRepeatSubscriptionSources = (rep: RepeatBlock): string[] => {
   return sources;
 };
 
-const _directRepeatComponentRe = /^\s*([A-Za-z_$][\w$]*)\((.*)\)\s*$/s;
-
-const parseDirectRepeatComponentTemplate = (
-  itemTemplate: string,
-): { componentName: string; propsExpression: string } | null => {
-  const match = _directRepeatComponentRe.exec(itemTemplate.trim());
-  if (!match) {
-    return null;
-  }
-
-  return {
-    componentName: match[1]!,
-    propsExpression: match[2]?.trim() || '{}',
-  };
-};
-
 // ============================================================================
 // Navigation Helper
 // ============================================================================
@@ -125,13 +109,6 @@ const pathToSiblingNav = (root: string, path: number[]): string => {
   }
   return expr;
 };
-
-/**
- * Escape a row template for a template literal: backslashes, backticks and line breaks. The
- * main, empty and conditional templates use other escapers (making them agree is H-02).
- */
-const rowTemplateLiteral = (html: string): string =>
-  html.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
 
 /**
  * A row statement that maps every comment marker under `rootVar` by its text (`<!--b3-->` →
@@ -522,11 +499,14 @@ const compileKeyGuard = (modifiers: string[]): string | null => {
 };
 
 /**
- * The DOM write of a simple binding, writing `value`: a camel-cased style property, an
- * attribute, or, for text bindings, the text node after the comment marker.
+ * The DOM write of a simple binding, writing `value`: a camel-cased style property (a custom
+ * property, which has no camel-cased name, through setProperty), an attribute, or, for text
+ * bindings, the text node after the comment marker.
  */
 const simpleWrite = (binding: SimpleBinding, value: string): string => {
   const elRef = elVar(binding.id);
+  if (binding.type === 'style' && binding.property!.startsWith('--'))
+    return `${elRef}.style.setProperty('${binding.property}', ${value})`;
   if (binding.type === 'style') return `${elRef}.style.${toCamelCase(binding.property!)} = ${value}`;
   if (binding.type === 'attr') return attributeWrite(elRef, binding, value);
   return `${elRef}.nextSibling.data = ${value} ?? ''`;
@@ -738,7 +718,7 @@ export const generateInitBindingsFunction = (
   emit: EmitOptions,
   childMountsByDirective?: Map<string, { cm: ChildMountInfo; globalIndex: number }[]>,
   topLevelChildMounts: { cm: ChildMountInfo; globalIndex: number }[] = [],
-): GeneratedInitBindingsArtifact & { helpers: Set<RuntimeHelperName> } => {
+): GeneratedInitBindingsArtifact => {
   const lines: string[] = [];
   const staticTemplates: string[] = []; // Collect static templates for repeat optimizations
   const helpers = new Set<RuntimeHelperName>();
@@ -754,7 +734,7 @@ export const generateInitBindingsFunction = (
   const generateMountInfo = (
     directiveId: string,
     indent: string,
-    repeatCtx?: { itemVar: string; indexVar: string },
+    repeatCtx?: { itemVar: string },
   ): { setupLines: string[]; cleanupExprs: string[] } => {
     const mounts = childMountsByDirective?.get(directiveId);
     if (!mounts || mounts.length === 0) return { setupLines: [], cleanupExprs: [] };
@@ -764,12 +744,9 @@ export const generateInitBindingsFunction = (
       const varName = `_cm${globalIndex}`;
       const anchorVar = `_cma${globalIndex}`;
       let propsExpr = cm.propsExpression;
-      // Step 10: Rename repeat-context variables in props expression
+      // Step 10: the row's item is `item` in the row factory; its index keeps the developer's name
       if (repeatCtx) {
         propsExpr = renameIdentifierInExpression(propsExpr, repeatCtx.itemVar, 'item');
-        if (repeatCtx.indexVar && repeatCtx.indexVar !== '_idx') {
-          propsExpr = renameIdentifierInExpression(propsExpr, repeatCtx.indexVar, '_idx');
-        }
       }
       setupLines.push(`${indent}const ${varName} = document.createElement('${emit.selector(cm.selector)}');`);
       if (repeatCtx) {
@@ -905,7 +882,8 @@ export const generateInitBindingsFunction = (
   };
 
   // A list's source, after its reconciler: the `_items_` thunk, the optional empty-template
-  // sync, the initial reconcile, and one subscription per source signal into `_subs`.
+  // sync, the initial reconcile, one subscription per source signal into `_subs`, and the
+  // reconciler's clearAll.
   const emitListSource = (
     rep: RepeatBlock,
     reconcilerVar: string,
@@ -918,7 +896,7 @@ export const generateInitBindingsFunction = (
     const syncVar = `_syncEmpty_${rep.id}`;
     lines.push(`    const ${itemsVar} = () => ${rep.itemsExpression};`);
     if (rep.emptyTemplate) {
-      const escapedEmptyTemplate = emit.html(rep.emptyTemplate).replace(/`/g, '\\`');
+      const escapedEmptyTemplate = escapeTemplateLiteral(emit.html(rep.emptyTemplate));
       lines.push(`    let ${emptyVar};`);
       lines.push(
         `    const ${syncVar} = (items) => { items.length ? ${emptyVar}?.remove() : ${containerVar}.insertBefore(${emptyVar} ??= _T(\`${escapedEmptyTemplate}\`).content.firstElementChild, ${anchorVar}); };`,
@@ -936,6 +914,8 @@ export const generateInitBindingsFunction = (
         `    _subs.push(typeof ${sourceVar}?.subscribe === 'function' ? ${sourceVar}.subscribe(() => { ${onChange} }, true) : () => {});`,
       );
     });
+    // When the scope ends (destroy, or a branch hiding), the rows' own cleanups run too (H-28)
+    lines.push(`    _subs.push(() => ${reconcilerVar}.clearAll());`);
   };
 
   // A row's bindings to component signals: navigation to each bound element (`<prefix>N`), the
@@ -988,9 +968,7 @@ export const generateInitBindingsFunction = (
 
     // A row that is a child component call (`(item) => Card({ item })`) has no markup of its
     // own: each row mounts the component into a host element.
-    const directRepeatComponent = childMountsByDirective?.get(rep.id)
-      ? null
-      : parseDirectRepeatComponentTemplate(rep.itemTemplate);
+    const directRepeatComponent = childMountsByDirective?.get(rep.id) ? null : rep.componentRow;
     if (directRepeatComponent) {
       const anchorVar = `_a_${rep.id}`;
       const containerVar = `_ct_${rep.id}`;
@@ -1060,7 +1038,7 @@ export const generateInitBindingsFunction = (
 
         // Generate static template IIFE
         staticTemplates.push(
-          `  const ${templateId} = _T(\`${rowTemplateLiteral(emit.html(staticInfo.staticHtml))}\`);`,
+          `  const ${templateId} = _T(\`${escapeTemplateLiteral(emit.html(staticInfo.staticHtml))}\`);`,
         );
 
         // Fully inlined repeat — inline navigation code, no runtime navigatePath
@@ -1290,10 +1268,7 @@ export const generateInitBindingsFunction = (
         // Always use createKeyedReconciler — when no trackBy, inject (_, i) => i
         const keyFnExpr = keyArg(rep);
 
-        const repMountInfo = generateMountInfo(rep.id, '        ', {
-          itemVar: rep.itemVar,
-          indexVar: rep.indexVar || '_idx',
-        });
+        const repMountInfo = generateMountInfo(rep.id, '        ', { itemVar: rep.itemVar });
         const hasRepMounts = repMountInfo.setupLines.length > 0;
         const hasSignalSubs = signalSubscriptions.length > 0;
         const needsCleanups =
@@ -1424,7 +1399,7 @@ export const generateInitBindingsFunction = (
           );
           const innerTplId = `__tpl_${nr.id}`;
           staticTemplates.push(
-            `  const ${innerTplId} = _T(\`${rowTemplateLiteral(emit.html(innerStaticInfo.staticHtml))}\`);`,
+            `  const ${innerTplId} = _T(\`${escapeTemplateLiteral(emit.html(innerStaticInfo.staticHtml))}\`);`,
           );
           const innerIndexVar = nr.indexVar || '_idx';
           lines.push(`        const _nrTc_${nr.id} = ${innerTplId}.content.firstElementChild;`);
@@ -1615,7 +1590,7 @@ export const generateInitBindingsFunction = (
 
         const templateId = `__tpl_${rep.id}`;
         staticTemplates.push(
-          `  const ${templateId} = _T(\`${rowTemplateLiteral(emit.html(staticInfo.staticHtml))}\`);`,
+          `  const ${templateId} = _T(\`${escapeTemplateLiteral(emit.html(staticInfo.staticHtml))}\`);`,
         );
 
         const tplContentVar = `_tc_${rep.id}`;
@@ -1632,10 +1607,7 @@ export const generateInitBindingsFunction = (
         lines.push(`        const _el = _cloneNode.call(${tplContentVar}, true);`);
         lines.push(`        _insertBefore.call(${containerVar}, _el, _ref);`);
         // Child component mounts inside repeat items (Step 7 + Step 10)
-        const fbRepMountInfo = generateMountInfo(rep.id, '        ', {
-          itemVar: rep.itemVar,
-          indexVar: rep.indexVar || '_idx',
-        });
+        const fbRepMountInfo = generateMountInfo(rep.id, '        ', { itemVar: rep.itemVar });
         for (const sl of fbRepMountInfo.setupLines) {
           lines.push(sl);
         }
@@ -1762,7 +1734,7 @@ export const generateInitBindingsFunction = (
         nestedWe.thenConditionals,
         nestedWe.thenWhenElse,
         nestedWe.thenRepeats,
-        undefined,
+        nestedWe.thenId,
         nestedWe.thenEventBindings ?? [],
       );
       const elseInitCode = generateNestedInitializer(
@@ -1770,7 +1742,7 @@ export const generateInitBindingsFunction = (
         nestedWe.elseConditionals,
         nestedWe.elseWhenElse,
         nestedWe.elseRepeats,
-        undefined,
+        nestedWe.elseId,
         nestedWe.elseEventBindings ?? [],
       );
       for (const call of whenElseCalls(nestedWe, thenInitCode, elseInitCode)) initLines.push(`        ${call},`);
@@ -1865,7 +1837,7 @@ export const generateInitBindingsFunction = (
  * Generate a static template property for pre-compiled HTML
  */
 export const generateStaticTemplate = (content: string, emit: EmitOptions): string => {
-  const escapedContent = emit.html(content).replace(/`/g, '\\`');
+  const escapedContent = escapeTemplateLiteral(emit.html(content));
   return `
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
   const __tpl = _T(\`${escapedContent}\`);`;
@@ -1884,9 +1856,12 @@ export const generateUpdatedImport = (importInfo: ImportInfo, requiredBindFuncti
   const internalImports = requiredBindFunctions;
 
   // Resolve the internal specifier from the user's module specifier.
-  // 'thane' → 'thane/runtime', relative paths stay unchanged (dev/test).
+  // 'thane' or 'thane/…' → 'thane/runtime', relative paths stay unchanged (dev/test).
   const spec = importInfo.moduleSpecifier;
-  const internalSpec = spec === PUBLIC_RUNTIME_SPECIFIER ? INTERNAL_RUNTIME_SPECIFIER : spec;
+  const internalSpec =
+    spec === PUBLIC_RUNTIME_SPECIFIER || spec.startsWith(`${PUBLIC_RUNTIME_SPECIFIER}/`)
+      ? INTERNAL_RUNTIME_SPECIFIER
+      : spec;
 
   const lines: string[] = [];
   if (userImports.length > 0) {

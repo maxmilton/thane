@@ -1,7 +1,5 @@
 /** Reactive binding compiler — source transformation and template processing. */
 
-import fs from 'node:fs';
-import type { Plugin } from 'esbuild';
 import ts from 'typescript';
 import type { ImportInfo, TemplateInfo } from '../../types.js';
 import {
@@ -12,11 +10,6 @@ import {
   applyEdits,
   type SourceEdit,
   sourceCache,
-  logger,
-  hasHtmlTemplates,
-  extendsComponentQuick,
-  createLoaderResult,
-  PLUGIN_NAME,
   BIND_FN,
 } from '../../utils/index.js';
 import { getSetupFunction, unwrapParens } from '../../utils/component-ast.js';
@@ -53,9 +46,9 @@ const isEmptyArrowFunction = (node: ts.Node): boolean => {
  * The setup function's return objects, in source order (H-07): every `return {…}` in its body,
  * at any depth, but not inside a nested function-like (arrow, function expression or
  * declaration, method, accessor, constructor). A concise body's object literal is its single
- * return. With several, the last one is the component's.
+ * return. With several, the last one is the component's (THANE412 reports the others).
  */
-const findReturnObjects = (setup: ts.ArrowFunction | ts.FunctionExpression): ts.ObjectLiteralExpression[] => {
+export const findReturnObjects = (setup: ts.ArrowFunction | ts.FunctionExpression): ts.ObjectLiteralExpression[] => {
   if (!ts.isBlock(setup.body)) {
     const body = unwrapParens(setup.body);
     return ts.isObjectLiteralExpression(body) ? [body] : [];
@@ -161,9 +154,6 @@ const deadPropertyRemovals = (
   return removals;
 };
 import { generateInitBindingsFunction, generateStaticTemplate, generateUpdatedImport } from './codegen.js';
-import { ErrorCode, createError } from '../../errors.js';
-
-const NAME = PLUGIN_NAME.REACTIVE;
 
 /** The order a compiled component imports runtime helpers in; a helper not listed here goes last. */
 const HELPER_IMPORT_ORDER: readonly string[] = [
@@ -211,53 +201,23 @@ const computeInitialIdSeed = (filePath: string, source: string): number => {
   return Math.max(blockBase, maxExisting + 1);
 };
 
-/** Check if a module specifier refers to the Thane runtime. */
-export const isThaneRuntimeImport = (specifier: string): boolean => {
-  return (
-    specifier.includes('shadow-dom') ||
-    specifier.includes('dom/index') ||
-    specifier === 'thane' ||
-    specifier.startsWith('thane/')
-  );
-};
-
-/** Find the Thane runtime import in a source file. */
+/** The import declaration that imports `defineComponent`: the compiler's helpers are imported next to it (H-10). */
 export const findServicesImport = (sourceFile: ts.SourceFile): ImportInfo | null => {
   for (const statement of sourceFile.statements) {
-    if (
-      ts.isImportDeclaration(statement) &&
-      statement.moduleSpecifier &&
-      ts.isStringLiteral(statement.moduleSpecifier)
-    ) {
-      const specifier = statement.moduleSpecifier.text;
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    const namedBindings = statement.importClause?.namedBindings;
+    if (!namedBindings || !ts.isNamedImports(namedBindings)) continue;
+    const namedImports = namedBindings.elements.map((element) => element.name.text);
+    if (!namedImports.includes('defineComponent')) continue;
 
-      if (isThaneRuntimeImport(specifier)) {
-        const namedImports: string[] = [];
-
-        if (statement.importClause?.namedBindings && ts.isNamedImports(statement.importClause.namedBindings)) {
-          for (const element of statement.importClause.namedBindings.elements) {
-            namedImports.push(element.name.text);
-          }
-        }
-
-        const fullText = statement.moduleSpecifier.getFullText(sourceFile);
-        const quoteChar = fullText.includes("'") ? "'" : '"';
-        const normalizedSpecifier =
-          specifier === 'thane' || specifier.startsWith('thane/')
-            ? specifier
-            : specifier.includes('shadow-dom')
-              ? specifier.replace('shadow-dom.js', 'index.js').replace('shadow-dom', 'index')
-              : specifier;
-
-        return {
-          namedImports,
-          moduleSpecifier: normalizedSpecifier,
-          start: statement.getStart(sourceFile),
-          end: statement.getEnd(),
-          quoteChar,
-        };
-      }
-    }
+    const fullText = statement.moduleSpecifier.getFullText(sourceFile);
+    return {
+      namedImports,
+      moduleSpecifier: statement.moduleSpecifier.text,
+      start: statement.getStart(sourceFile),
+      end: statement.getEnd(),
+      quoteChar: fullText.includes("'") ? "'" : '"',
+    };
   }
   return null;
 };
@@ -269,6 +229,8 @@ export const findServicesImport = (sourceFile: ts.SourceFile): ImportInfo | null
 /**
  * Recursively extract template content from an html tagged template,
  * inlining any ${identifier} references that resolve to other html`` fragment variables.
+ * The text is taken as written (raw), like every directive template the parser cuts from it:
+ * the escape sequences stay in place until the template is emitted (H-02).
  */
 const extractAndInlineFragment = (
   tplNode: ts.TaggedTemplateExpression,
@@ -279,12 +241,12 @@ const extractAndInlineFragment = (
   const templateLiteral = tplNode.template;
 
   if (ts.isNoSubstitutionTemplateLiteral(templateLiteral)) {
-    return templateLiteral.text;
+    return templateLiteral.rawText!;
   }
 
   if (!ts.isTemplateExpression(templateLiteral)) return '';
 
-  let content = templateLiteral.head.text;
+  let content = templateLiteral.head.rawText!;
   for (const span of templateLiteral.templateSpans) {
     const expr = span.expression;
     if (ts.isIdentifier(expr) && !visited.has(expr.text)) {
@@ -292,13 +254,13 @@ const extractAndInlineFragment = (
       if (resolved) {
         visited.add(expr.text);
         content += extractAndInlineFragment(resolved, sourceFile, scopeRoot, visited);
-        content += span.literal.text;
+        content += span.literal.rawText!;
         continue;
       }
     }
     const exprText = span.expression.getText(sourceFile);
     content += '${' + exprText + '}';
-    content += span.literal.text;
+    content += span.literal.rawText!;
   }
   return content;
 };
@@ -370,7 +332,6 @@ const findHtmlTemplates = (
       seen.add(start);
       templates.push({
         node: tplNode,
-        expressions: [],
         templateStart: start,
         templateEnd: tplNode.getEnd(),
       });
@@ -564,48 +525,42 @@ export const transformDefineComponentSource = (
       return null;
     };
 
+    // A list whose rows hold the marker: the row's own when()/whenElse() if the marker is in one,
+    // otherwise the list, whose row factory mounts the child.
+    const findInLists = (marker: string, reps: RepeatBlock[]): string | null => {
+      const rep = reps.find((r) => r.itemTemplate.includes(marker));
+      if (!rep) return null;
+      return findInConditionals(marker, rep.nestedConditionals) ?? findInWhenElse(marker, rep.nestedWhenElse) ?? rep.id;
+    };
+
+    // A list inside a when() or whenElse() branch, at any depth of branches (H-40)
+    const findInBranchLists = (marker: string, conds: ConditionalBlock[], wes: WhenElseBlock[]): string | null => {
+      for (const c of conds) {
+        const id =
+          findInLists(marker, c.nestedRepeats) ?? findInBranchLists(marker, c.nestedConditionals, c.nestedWhenElse);
+        if (id) return id;
+      }
+      for (const we of wes) {
+        const id =
+          findInLists(marker, [...we.thenRepeats, ...we.elseRepeats]) ??
+          findInBranchLists(marker, we.thenConditionals, we.thenWhenElse) ??
+          findInBranchLists(marker, we.elseConditionals, we.elseWhenElse);
+        if (id) return id;
+      }
+      return null;
+    };
+
     for (let i = 0; i < childMounts.length; i++) {
       const cm = childMounts[i]!;
       const marker = `id="${cm.anchorId}"`;
-      let placed = false;
-
-      // Check repeat blocks (and their nested directives)
-      for (const rep of allRepeatBlocks) {
-        if (!rep.itemTemplate.includes(marker)) continue;
-        const innerCond = findInConditionals(marker, rep.nestedConditionals);
-        if (innerCond) {
-          addToDirective(innerCond, cm, i);
-          placed = true;
-          break;
-        }
-        const innerWE = findInWhenElse(marker, rep.nestedWhenElse);
-        if (innerWE) {
-          addToDirective(innerWE, cm, i);
-          placed = true;
-          break;
-        }
-        addToDirective(rep.id, cm, i);
-        placed = true;
-        break;
-      }
-      if (placed) continue;
-
-      // Check top-level conditionals
-      const condId = findInConditionals(marker, allConditionals);
-      if (condId) {
-        addToDirective(condId, cm, i);
-        continue;
-      }
-
-      // Check whenElse blocks
-      const weId = findInWhenElse(marker, allWhenElseBlocks);
-      if (weId) {
-        addToDirective(weId, cm, i);
-        continue;
-      }
-
-      // Top-level mount
-      topLevelChildMounts.push({ cm, globalIndex: i });
+      const directiveId =
+        findInLists(marker, allRepeatBlocks) ??
+        findInBranchLists(marker, allConditionals, allWhenElseBlocks) ??
+        findInConditionals(marker, allConditionals) ??
+        findInWhenElse(marker, allWhenElseBlocks);
+      // Outside every directive: a top-level mount
+      if (directiveId) addToDirective(directiveId, cm, i);
+      else topLevelChildMounts.push({ cm, globalIndex: i });
     }
   }
 
@@ -616,7 +571,7 @@ export const transformDefineComponentSource = (
   };
   const {
     code: bindingsBody,
-    staticTemplates: repeatStaticTemplates = [],
+    staticTemplates: repeatStaticTemplates,
     helpers,
   } = generateInitBindingsFunction(
     allBindings,
@@ -715,49 +670,3 @@ export const transformDefineComponentSource = (
 
   return applyEdits(source, edits);
 };
-
-// ============================================================================
-// esbuild Plugin
-// ============================================================================
-
-/**
- * `getOptions` is read per file, after the build's onStart callbacks have run, so a production
- * build's selector plan is in place by the time anything is compiled.
- */
-export const createReactiveBindingPlugin = (getOptions: () => CompileOptions = () => ({})): Plugin => ({
-  name: NAME,
-  setup(build) {
-    build.onLoad({ filter: /\.ts$/ }, async (args) => {
-      if (args.path.includes('scripts') || args.path.includes('node_modules')) {
-        return undefined;
-      }
-
-      const source = await fs.promises.readFile(args.path, 'utf8');
-
-      if (!extendsComponentQuick(source) || !hasHtmlTemplates(source)) {
-        return undefined;
-      }
-
-      try {
-        const transformed = transformDefineComponentSource(source, args.path, undefined, getOptions());
-
-        if (transformed === null) {
-          return undefined;
-        }
-
-        return createLoaderResult(transformed);
-      } catch (error) {
-        const diagnostic = createError(
-          `Error processing ${args.path}: ${error instanceof Error ? error.message : error}`,
-          { file: args.path, line: 0, column: 0 },
-          ErrorCode.PLUGIN_ERROR,
-        );
-        logger.diagnostic(diagnostic);
-        // A component the compiler cannot process must fail the build rather than ship uncompiled
-        return { errors: [{ text: diagnostic.message, location: { file: args.path } }] };
-      }
-    });
-  },
-});
-
-export const ReactiveBindingPlugin: Plugin = createReactiveBindingPlugin();

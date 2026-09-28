@@ -7,6 +7,7 @@
 import ts from 'typescript';
 import { minifyCSS } from './template-minifier.js';
 import type { SelectorMap } from './selector-minifier.js';
+import { logger } from '../../utils/logger.js';
 
 // Private-use characters: never part of an identifier, never CSS syntax, never in real source.
 // A `${…}` substitution of a `css` template is replaced by MASK_OPEN <index> MASK_CLOSE while
@@ -16,6 +17,33 @@ const MASK_CLOSE = '';
 
 const isIdentStart = (ch: string | undefined): boolean => ch !== undefined && /[a-zA-Z_-]/.test(ch);
 const isIdentChar = (ch: string | undefined): boolean => ch !== undefined && /[\w-]/.test(ch);
+
+/** The last index of a comment, quoted string or unquoted `url(…)` value that starts at `i`, or -1. */
+const skipNonSelectorText = (css: string, i: number): number => {
+  const length = css.length;
+  const ch = css[i]!;
+  if (ch === '/' && css[i + 1] === '*') {
+    const end = css.indexOf('*/', i + 2);
+    return end === -1 ? length : end + 1;
+  }
+  if (ch === '"' || ch === "'") {
+    let end = i + 1;
+    while (end < length && css[end] !== ch) {
+      if (css[end] === '\\') end++;
+      end++;
+    }
+    return end;
+  }
+  if ((ch === 'u' || ch === 'U') && /^url\(/i.test(css.slice(i, i + 4)) && !isIdentChar(css[i - 1])) {
+    let end = i + 4;
+    while (end < length && /\s/.test(css[end]!)) end++;
+    // a quoted url("…") is skipped as a string on the next iterations
+    if (css[end] === '"' || css[end] === "'") return end - 1;
+    const close = css.indexOf(')', end);
+    return close === -1 ? length : close;
+  }
+  return -1;
+};
 
 /**
  * Report every class selector (`.name`) in a stylesheet. Comments, quoted strings and
@@ -29,32 +57,9 @@ export const forEachCssClass = (css: string, visit: (name: string, start: number
   for (let i = 0; i < length; i++) {
     const ch = css[i]!;
 
-    if (ch === '/' && css[i + 1] === '*') {
-      const end = css.indexOf('*/', i + 2);
-      i = end === -1 ? length : end + 1;
-      continue;
-    }
-
-    if (ch === '"' || ch === "'") {
-      let end = i + 1;
-      while (end < length && css[end] !== ch) {
-        if (css[end] === '\\') end++;
-        end++;
-      }
-      i = end;
-      continue;
-    }
-
-    if ((ch === 'u' || ch === 'U') && /^url\(/i.test(css.slice(i, i + 4)) && !isIdentChar(css[i - 1])) {
-      let end = i + 4;
-      while (end < length && /\s/.test(css[end]!)) end++;
-      // a quoted url("…") is skipped by the string branch on the next iterations
-      if (css[end] !== '"' && css[end] !== "'") {
-        const close = css.indexOf(')', end);
-        i = close === -1 ? length : close;
-      } else {
-        i = end - 1;
-      }
+    const skipTo = skipNonSelectorText(css, i);
+    if (skipTo !== -1) {
+      i = skipTo;
       continue;
     }
 
@@ -93,16 +98,114 @@ export const renameCssClasses = (css: string, lookup: (name: string) => string |
 export interface CssTransformOptions {
   minify?: boolean | undefined;
   selectorMap?: SelectorMap | undefined;
+  /** The stylesheet's file, named in warnings */
+  file?: string | undefined;
 }
 
-/** Apply the production transforms to a whole stylesheet (no substitutions in it). */
+const HOST_CONTEXT = ':host-context(';
+
+/** `:host-context(X)` becomes `X &`: the runtime scoper puts the component's class where `&` stands. */
+const rewriteHostContext = (css: string): string => {
+  let out = '';
+  let cursor = 0;
+  for (let i = 0; i < css.length; i++) {
+    const skipTo = skipNonSelectorText(css, i);
+    if (skipTo !== -1) {
+      i = skipTo;
+    } else if (css.startsWith(HOST_CONTEXT, i)) {
+      let depth = 1;
+      let close = i + HOST_CONTEXT.length;
+      for (; close < css.length; close++) {
+        const skip = skipNonSelectorText(css, close);
+        if (skip !== -1) close = skip;
+        else if (css[close] === '(') depth++;
+        else if (css[close] === ')' && --depth === 0) break;
+      }
+      if (depth !== 0) break;
+      out += css.slice(cursor, i) + css.slice(i + HOST_CONTEXT.length, close).trim() + ' &';
+      cursor = close + 1;
+      i = close;
+    }
+  }
+  return cursor === 0 ? css : out + css.slice(cursor);
+};
+
+/**
+ * A development build drops comments too (the minifier does it in production): the runtime scoper
+ * reads a quote in a comment as the start of a string. Each becomes a space, as in the minifier.
+ */
+const stripCssComments = (css: string): string => {
+  let out = '';
+  let cursor = 0;
+  for (let i = 0; i < css.length; i++) {
+    const skipTo = skipNonSelectorText(css, i);
+    if (skipTo === -1) continue;
+    if (css.startsWith('/*', i)) {
+      out += css.slice(cursor, i) + ' ';
+      cursor = skipTo + 1;
+    }
+    i = skipTo;
+  }
+  return cursor === 0 ? css : out + css.slice(cursor);
+};
+
+const STATEMENT_AT_RULE = /^@(layer|charset|import)(?![\w-])/i;
+
+/**
+ * The statement at-rules the runtime scoper would read as the prelude of the next rule, which then
+ * stays unscoped. `@layer a, b;` becomes `@layer a{}@layer b{}` (the same order declared);
+ * `@charset` goes, as it means nothing in a style string; `@import` goes with a warning, since
+ * Thane adopts every stylesheet as a constructed stylesheet, and those drop `@import`.
+ */
+const rewriteStatementAtRules = (css: string, file: string | undefined): string => {
+  let out = '';
+  let cursor = 0;
+  for (let i = 0; i < css.length; i++) {
+    const skipTo = skipNonSelectorText(css, i);
+    if (skipTo !== -1) {
+      i = skipTo;
+      continue;
+    }
+    const name = css[i] === '@' ? STATEMENT_AT_RULE.exec(css.slice(i, i + 9))?.[1]?.toLowerCase() : undefined;
+    if (!name) continue;
+    // a statement ends at its `;`; a `{` or `}` first means a block (`@layer a { … }`), left alone
+    let end = i + name.length + 1;
+    while (end < css.length && !';{}'.includes(css[end]!)) {
+      const skip = skipNonSelectorText(css, end);
+      end = (skip === -1 ? end : skip) + 1;
+    }
+    if (css[end] !== ';') continue;
+    const prelude = css.slice(i + name.length + 1, end);
+    let replacement = '';
+    if (name === 'layer') {
+      for (const layer of prelude.split(',')) if (layer.trim()) replacement += `@layer ${layer.trim()}{}`;
+    } else if (name === 'import') {
+      const statement = css.slice(i, end + 1).replace(new RegExp(`${MASK_OPEN}\\d+${MASK_CLOSE}`, 'g'), '${…}');
+      logger.warn(
+        'css',
+        `${file ?? 'a stylesheet'}: ${statement.replace(/\s+/g, ' ')} was removed. @import is ignored in ` +
+          'component stylesheets (browsers drop it from constructed stylesheets): import that file globally ' +
+          'instead, with a <link> in index.html.',
+      );
+    }
+    out += css.slice(cursor, i) + replacement;
+    cursor = end + 1;
+    i = end;
+  }
+  return cursor === 0 ? css : out + css.slice(cursor);
+};
+
+/**
+ * Apply the transforms to a whole stylesheet (no substitutions in it): `:host-context()` and
+ * statement at-rules, renames, then minify or drop comments.
+ */
 export const transformCss = (css: string, options: CssTransformOptions): string => {
-  let text = css;
+  let text = rewriteStatementAtRules(rewriteHostContext(css), options.file);
   if (options.selectorMap !== undefined && options.selectorMap.size > 0) {
     const selectorMap = options.selectorMap;
     text = renameCssClasses(text, (name) => selectorMap.get(name));
   }
-  if (options.minify) text = minifyCSS(text);
+  text = options.minify ? minifyCSS(text) : stripCssComments(text);
   return text;
 };
 
@@ -153,10 +256,11 @@ export const compileCssTemplate = (
 ): string => {
   const source = sourceFile.text;
   const template = node.template;
+  const cssOptions = { ...options, file: options.file ?? sourceFile.fileName };
 
   if (ts.isNoSubstitutionTemplateLiteral(template)) {
     const raw = source.slice(template.getStart(sourceFile) + 1, template.getEnd() - 1);
-    return '`' + transformCss(raw, options) + '`';
+    return '`' + transformCss(raw, cssOptions) + '`';
   }
 
   const renderExpression = (expression: ts.Expression): string => {
@@ -190,7 +294,7 @@ export const compileCssTemplate = (
     masked += source.slice(span.literal.getStart(sourceFile) + 1, span.literal.getEnd() - closing);
   }
 
-  const transformed = transformCss(masked, options);
+  const transformed = transformCss(masked, cssOptions);
   const restored = transformed.replace(
     new RegExp(`${MASK_OPEN}(\\d+)${MASK_CLOSE}`, 'g'),
     (_match, index: string) => '${' + expressions[Number(index)]! + '}',

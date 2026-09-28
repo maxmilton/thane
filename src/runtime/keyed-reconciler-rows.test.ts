@@ -139,18 +139,91 @@ describe('general path: a row element that is no longer in the container', () =>
   });
 });
 
+describe('creating rows in an empty list: the container is detached and put back where it is now', () => {
+  // A list inside a row is created while that row is the last one; later rows go after it, so
+  // the container's next sibling changes. Until H-06 the reconciler put the container back before
+  // the sibling it had at creation, which reordered the outer rows (P15).
+  test('H-06: a sibling placed after the container since creation stays after it', () => {
+    const { list, reconcile, order } = setup();
+    const host = list.parentNode!;
+    // the next outer row, inserted after the list was created
+    host.appendChild(new FakeNode('later'));
+
+    expect(reconcile(rows('A'))).toEqual([
+      'remove list',
+      'create A@0 at anchor',
+      'insert A before anchor',
+      'insert list before later',
+    ]);
+    expect(order()).toEqual(['A', 'anchor']);
+    expect(host.childNodes.map((n) => n.name)).toEqual(['list', 'later']);
+  });
+
+  test('H-06: a container moved to another parent is put back into that parent', () => {
+    const { list, reconcile, order } = setup();
+    const moved = new FakeNode('moved');
+    moved.appendChild(new FakeNode('head'));
+    moved.appendChild(list);
+    moved.appendChild(new FakeNode('tail'));
+
+    reconcile(rows('A', 'B'));
+    expect(order()).toEqual(['A', 'B', 'anchor']);
+    expect(moved.childNodes.map((n) => n.name)).toEqual(['head', 'list', 'tail']);
+  });
+});
+
 describe('same-length reorder pass: rows after the third displaced row', () => {
-  // The pass stops after the third displaced row; the move branch then only moves rows. A row
-  // further on whose item changed (same key, new object) is therefore not updated and keeps its
-  // old value. Found in wave 1; not fixed by H-31, which only decides whether every key exists.
-  test('an item changed after the third displaced row is not updated', () => {
+  // Until H-48 the pass stopped updating after the third displaced row, and the move branch only
+  // moves rows, so a row further on whose item changed (same key, new object) kept its old value
+  // (K17, found in wave 1). The pass now updates every row whose item changed, before the moves.
+  test('H-48: an item changed after the third displaced row is updated', () => {
     const { reconcile, order, reconciler } = setup();
     const [a, b, c, d, e] = rows('A', 'B', 'C', 'D', 'E');
     reconcile([a!, b!, c!, d!, e!]);
     const e2 = { id: 'E', v: 1 };
-    expect(reconcile([c!, a!, b!, e2, d!])).toEqual(['insert C before A', 'insert E before D']);
+    expect(reconcile([c!, a!, b!, e2, d!])).toEqual(['update E@3 v1', 'insert C before A', 'insert E before D']);
     expect(order()).toEqual(['C', 'A', 'B', 'E', 'D', 'anchor']);
-    expect(reconciler.get('E')!.value).toBe(e!);
+    expect(reconciler.get('E')!.value).toBe(e2);
+  });
+
+  test('H-48: every changed row is updated once, at its new index, in list order', () => {
+    const { reconcile, order } = setup({ trackIndex: true });
+    const [a, b, c, d, e, f] = rows('A', 'B', 'C', 'D', 'E', 'F');
+    reconcile([a!, b!, c!, d!, e!, f!]);
+    const d2 = { id: 'D', v: 1 };
+    const f2 = { id: 'F', v: 2 };
+    expect(reconcile([d2, c!, b!, a!, f2, e!])).toEqual([
+      'update D@0 v1',
+      'update F@4 v2',
+      'insert D before A',
+      'insert C before A',
+      'insert B before A',
+      'insert F before E',
+      // index tracking: the rows at a new position that the pass did not update
+      'update C@1 v0',
+      'update B@2 v0',
+      'update A@3 v0',
+      'update E@5 v0',
+    ]);
+    expect(order()).toEqual(['D', 'C', 'B', 'A', 'F', 'E', 'anchor']);
+  });
+
+  test('H-48: rows updated before a missing key are not updated again by the general path', () => {
+    const { reconcile, order } = setup();
+    const [a, b, c, d, e] = rows('A', 'B', 'C', 'D', 'E');
+    reconcile([a!, b!, c!, d!, e!]);
+    const d2 = { id: 'D', v: 1 };
+    expect(reconcile([c!, a!, b!, d2, ...rows('X')])).toEqual([
+      // before H-48 this update came from the general path, after 'remove E'
+      'update D@3 v1',
+      'cleanup E',
+      'remove E',
+      'create X@4 at anchor',
+      'insert X before anchor',
+      'insert A before D',
+      'insert B before D',
+    ]);
+    expect(order()).toEqual(['C', 'A', 'B', 'D', 'X', 'anchor']);
   });
 
   test('an item changed before the third displaced row is updated', () => {
@@ -160,5 +233,215 @@ describe('same-length reorder pass: rows after the third displaced row', () => {
     const a2 = { id: 'A', v: 1 };
     expect(reconcile([c!, a2, b!, e!, d!])).toEqual(['update A@1 v1', 'insert C before A', 'insert E before D']);
     expect(order()).toEqual(['C', 'A', 'B', 'E', 'D', 'anchor']);
+  });
+});
+
+describe('one row removed: the remove-one fast path', () => {
+  // A list one row shorter whose other rows keep their keys and order: the missing row is cleaned
+  // up and removed, and with unchanged items nothing else happens (no key map, no moves, no updates).
+  test('the first row removed', () => {
+    const { reconcile, order } = setup();
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([b!, c!])).toEqual(['cleanup A', 'remove A']);
+    expect(order()).toEqual(['B', 'C', 'anchor']);
+  });
+
+  test('a middle row removed', () => {
+    const { reconcile, order } = setup();
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([a!, c!])).toEqual(['cleanup B', 'remove B']);
+    expect(order()).toEqual(['A', 'C', 'anchor']);
+  });
+
+  test('the last row removed', () => {
+    const { reconcile, order } = setup();
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([a!, b!])).toEqual(['cleanup C', 'remove C']);
+    expect(order()).toEqual(['A', 'B', 'anchor']);
+  });
+
+  test('the only other row kept: [A, B] → [B] and [A, B] → [A]', () => {
+    const first = setup();
+    const [a, b] = rows('A', 'B');
+    first.reconcile([a!, b!]);
+    expect(first.reconcile([b!])).toEqual(['cleanup A', 'remove A']);
+    expect(first.order()).toEqual(['B', 'anchor']);
+
+    const last = setup();
+    last.reconcile([a!, b!]);
+    expect(last.reconcile([a!])).toEqual(['cleanup B', 'remove B']);
+    expect(last.order()).toEqual(['A', 'anchor']);
+  });
+
+  test('static nodes around the rows stay in place', () => {
+    const { reconcile, order } = setup({ before: [new FakeNode('head')], after: [new FakeNode('tail')] });
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([a!, c!])).toEqual(['cleanup B', 'remove B']);
+    expect(order()).toEqual(['head', 'A', 'C', 'anchor', 'tail']);
+  });
+
+  test('with index tracking, every row after the removed one is updated with its new index, in list order', () => {
+    const { reconcile, order } = setup({ trackIndex: true });
+    const [a, b, c, d] = rows('A', 'B', 'C', 'D');
+    reconcile([a!, b!, c!, d!]);
+    expect(reconcile([a!, c!, d!])).toEqual(['cleanup B', 'remove B', 'update C@1 v0', 'update D@2 v0']);
+    expect(order()).toEqual(['A', 'C', 'D', 'anchor']);
+  });
+
+  test('the removed key is forgotten by get() once the key map is built', () => {
+    const { reconcile, reconciler } = setup();
+    const [a, b, c, d] = rows('A', 'B', 'C', 'D');
+    reconcile([a!, b!, c!, d!]);
+    for (const id of ['A', 'B', 'C', 'D', 'A']) reconciler.get(id); // the fifth lookup builds the map
+    expect(reconcile([a!, b!, d!])).toEqual(['cleanup C', 'remove C']);
+    expect(reconciler.get('C')).toBeUndefined();
+    expect(reconciler.get('D')!.value).toBe(d);
+  });
+
+  // Until H-51 this path updated no kept row, so a kept row whose item changed (same key, new object)
+  // kept its old item, and with index tracking the index update re-applied the old item (K22). Kept
+  // rows are now matched as in the in-place pass: a changed item is updated at its new index, before
+  // the removal.
+  test('H-51: kept rows whose item changed are updated at their new index', () => {
+    const { reconcile, reconciler, order } = setup();
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    const a2 = { id: 'A', v: 1 };
+    const c2 = { id: 'C', v: 2 };
+    expect(reconcile([a2, c2])).toEqual(['update A@0 v1', 'update C@1 v2', 'cleanup B', 'remove B']);
+    expect(order()).toEqual(['A', 'C', 'anchor']);
+    expect(reconciler.get('A')!.value).toBe(a2);
+    expect(reconciler.get('C')!.value).toBe(c2);
+  });
+
+  test('H-51: with index tracking, a changed row is updated once, with its new item and index', () => {
+    const { reconcile, reconciler, order } = setup({ trackIndex: true });
+    const [a, b, c, d] = rows('A', 'B', 'C', 'D');
+    reconcile([a!, b!, c!, d!]);
+    const c2 = { id: 'C', v: 1 };
+    expect(reconcile([a!, c2, d!])).toEqual([
+      'update C@1 v1',
+      'cleanup B',
+      'remove B',
+      // index tracking: the row at a new position that was not updated above
+      'update D@2 v0',
+    ]);
+    expect(order()).toEqual(['A', 'C', 'D', 'anchor']);
+    expect(reconciler.get('C')!.value).toBe(c2);
+  });
+
+  test('H-51: a changed row before the removed one is updated once, at its unchanged index', () => {
+    const { reconcile, order } = setup({ trackIndex: true });
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([{ id: 'A', v: 1 }, b!])).toEqual(['update A@0 v1', 'cleanup C', 'remove C']);
+    expect(order()).toEqual(['A', 'B', 'anchor']);
+  });
+
+  test('H-51: a row updated before the general path takes over is not updated again', () => {
+    const { reconcile, order, reconciler } = setup({ trackIndex: true });
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    const b2 = { id: 'B', v: 1 };
+    expect(reconcile([b2, ...rows('X')])).toEqual([
+      // matched one position down before X shows that more than one row changed
+      'update B@0 v1',
+      'cleanup A',
+      'remove A',
+      'cleanup C',
+      'remove C',
+      'create X@1 at anchor',
+      'insert X before anchor',
+    ]);
+    expect(order()).toEqual(['B', 'X', 'anchor']);
+    expect(reconciler.get('B')!.value).toBe(b2);
+  });
+});
+
+describe('one row fewer, but not one row removed (K21)', () => {
+  // Until H-50 the remove-one fast path removed the first row whose key differed and returned without
+  // checking the rows after it. Every shape below is a list one row shorter whose remaining keys do not
+  // match the old rows after the removed one; the fast path now sees that and the general path runs.
+  test('H-50: [A, B] → [G] removes both rows and creates G', () => {
+    const { reconcile, order } = setup();
+    reconcile(rows('A', 'B'));
+    expect(reconcile(rows('G'))).toEqual([
+      'cleanup A',
+      'remove A',
+      'cleanup B',
+      'remove B',
+      'create G@0 at anchor',
+      'insert G before anchor',
+    ]);
+    expect(order()).toEqual(['G', 'anchor']);
+    // the removed rows' cleanups ran once: clearing the list runs only G's
+    expect(reconcile([])).toEqual(['cleanup G', 'remove anchor', 'clear list', 'insert anchor before end']);
+  });
+
+  test('H-50: [A, B, C] → [B, X] removes A and C and creates X', () => {
+    const { reconcile, order, reconciler } = setup();
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([b!, ...rows('X')])).toEqual([
+      'cleanup A',
+      'remove A',
+      'cleanup C',
+      'remove C',
+      'create X@1 at anchor',
+      'insert X before anchor',
+    ]);
+    expect(order()).toEqual(['B', 'X', 'anchor']);
+    expect(reconciler.get('A')).toBeUndefined();
+    expect(reconciler.get('C')).toBeUndefined();
+    expect(reconcile([])).toEqual([
+      'cleanup B',
+      'cleanup X',
+      'remove anchor',
+      'clear list',
+      'insert anchor before end',
+    ]);
+  });
+
+  test('H-50: [A, B, C] → [A, X] removes B and C and creates X', () => {
+    const { reconcile, order } = setup();
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([a!, ...rows('X')])).toEqual([
+      'cleanup B',
+      'remove B',
+      'cleanup C',
+      'remove C',
+      'create X@1 at anchor',
+      'insert X before anchor',
+    ]);
+    expect(order()).toEqual(['A', 'X', 'anchor']);
+  });
+
+  test('H-50: [A, B, C] → [C, B] removes A and puts B after C', () => {
+    const { reconcile, order } = setup();
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([c!, b!])).toEqual(['cleanup A', 'remove A', 'insert B before anchor']);
+    expect(order()).toEqual(['C', 'B', 'anchor']);
+  });
+
+  test('H-50: with index tracking, a kept row at a new position is updated with its index', () => {
+    const { reconcile, order } = setup({ trackIndex: true });
+    const [a, b, c] = rows('A', 'B', 'C');
+    reconcile([a!, b!, c!]);
+    expect(reconcile([b!, ...rows('X')])).toEqual([
+      'cleanup A',
+      'remove A',
+      'cleanup C',
+      'remove C',
+      'create X@1 at anchor',
+      'insert X before anchor',
+      'update B@0 v0',
+    ]);
+    expect(order()).toEqual(['B', 'X', 'anchor']);
   });
 });

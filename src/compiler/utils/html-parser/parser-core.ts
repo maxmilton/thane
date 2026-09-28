@@ -4,7 +4,13 @@
 
 import type { ParserState, HtmlElement, BindingInfo, ParseDiagnostic, ParsedTemplate } from './types.js';
 import { VOID_ELEMENTS } from './types.js';
-import { findBindingsInText, findBindingsInAttributes, type BindingDetectionOptions } from './binding-detection.js';
+import {
+  findBindingsInText,
+  findBindingsInAttributes,
+  isEscaped,
+  templateExpressionEnd,
+  type BindingDetectionOptions,
+} from './binding-detection.js';
 import { PARSER_STATE } from '../../../contracts/index.js';
 
 /**
@@ -50,25 +56,6 @@ function createEmptyElement(tagName: string, tagStart: number, tagNameEnd: numbe
   };
 }
 
-/**
- * End (exclusive) of the `${…}` that starts at `start`, or -1 when it is not closed. Only braces are
- * counted: a brace inside a string or template literal counts too.
- */
-function scanDirectiveExpression(html: string, start: number): number {
-  let braceDepth = 0;
-  for (let i = start; i < html.length; i++) {
-    if (html[i] === '$' && html[i + 1] === '{') {
-      braceDepth++;
-      i++;
-    } else if (html[i] === '{') {
-      braceDepth++;
-    } else if (html[i] === '}' && --braceDepth === 0) {
-      return i + 1;
-    }
-  }
-  return -1;
-}
-
 export function parseHtmlTemplate(html: string, options?: BindingDetectionOptions): ParsedTemplate {
   const roots: HtmlElement[] = [];
   const bindings: BindingInfo[] = [];
@@ -92,10 +79,6 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
   let textContent = '';
 
   let commentBuffer = '';
-
-  let exprBraceDepth = 0;
-  let inTemplateBacktick = false;
-  let templateBraceDepth = 0;
 
   const flushText = () => {
     if (textContent.trim()) {
@@ -172,7 +155,13 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
     });
   };
 
+  /** Record the attribute; a duplicate is ignored, as browsers keep the first (H-46). */
   const setAttribute = (value: string, end: number, valueStart: number, valueEnd: number) => {
+    if (currentElement!.attributes.has(attrName)) {
+      const message = `Duplicate attribute "${attrName}" on <${currentElement!.tagName}>: the first one is kept`;
+      diagnostics.push({ message, position: attrStart, severity: 'warning' });
+      return;
+    }
     currentElement!.attributes.set(attrName, { name: attrName, value, start: attrStart, end, valueStart, valueEnd });
   };
 
@@ -198,72 +187,12 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
 
     switch (state) {
       case PARSER_STATE.TEXT:
-        if (char === '$' && nextChar === '{' && !inTemplateBacktick) {
-          if (textContent === '') {
-            textStart = pos;
-          }
-          textContent += '${';
-          pos += 2;
-          exprBraceDepth = 1;
-          continue;
-        }
-
-        if (exprBraceDepth > 0) {
-          if (textContent === '') {
-            textStart = pos;
-          }
-
-          if (inTemplateBacktick) {
-            if (char === '$' && nextChar === '{') {
-              templateBraceDepth++;
-              textContent += '${';
-              pos += 2;
-              continue;
-            }
-            if (char === '}' && templateBraceDepth > 0) {
-              templateBraceDepth--;
-              textContent += char;
-              pos++;
-              continue;
-            }
-            if (char === '{' && templateBraceDepth > 0) {
-              templateBraceDepth++;
-              textContent += char;
-              pos++;
-              continue;
-            }
-            if (char === '`' && templateBraceDepth === 0) {
-              inTemplateBacktick = false;
-              textContent += char;
-              pos++;
-              continue;
-            }
-            textContent += char;
-            pos++;
-            continue;
-          }
-
-          if (char === '`') {
-            inTemplateBacktick = true;
-            templateBraceDepth = 0;
-            textContent += char;
-            pos++;
-            continue;
-          }
-          if (char === '{') {
-            exprBraceDepth++;
-            textContent += char;
-            pos++;
-            continue;
-          }
-          if (char === '}') {
-            exprBraceDepth--;
-            textContent += char;
-            pos++;
-            continue;
-          }
-          textContent += char;
-          pos++;
+        if (char === '$' && nextChar === '{' && !isEscaped(html, pos)) {
+          // An expression is text up to its closing brace, whatever it holds; unclosed, to the end
+          const end = templateExpressionEnd(html, pos);
+          if (textContent === '') textStart = pos;
+          textContent += html.slice(pos, end === -1 ? html.length : end);
+          pos = end === -1 ? html.length : end;
           continue;
         }
 
@@ -297,6 +226,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
         } else {
           state = PARSER_STATE.TEXT;
           textContent += '<' + char;
+          textStart = tagStart;
         }
         break;
 
@@ -323,7 +253,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
           finishOpenTag(pos + 2, true);
           pos++;
         } else if (char === '$' && html.substring(pos, pos + 7) === '${when(') {
-          const directiveEnd = scanDirectiveExpression(html, pos);
+          const directiveEnd = templateExpressionEnd(html, pos);
           if (directiveEnd !== -1) {
             currentElement!.whenDirective = html.substring(pos, directiveEnd);
             currentElement!.whenDirectiveStart = pos;
@@ -367,7 +297,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
           attrValueStart = pos + 1;
           state = PARSER_STATE.ATTR_VALUE_Q;
         } else if (char === '$' && nextChar === '{') {
-          const valueEnd = scanDirectiveExpression(html, pos);
+          const valueEnd = templateExpressionEnd(html, pos);
           if (valueEnd !== -1) {
             setAttribute(html.substring(pos, valueEnd), valueEnd, pos, valueEnd);
             pos = valueEnd - 1;
@@ -402,7 +332,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
         break;
 
       case PARSER_STATE.TAG_CLOSE:
-        if (/[\w-]/.test(char)) {
+        if (/[\w\-:]/.test(char)) {
           tagName += char;
         } else if (char === '>') {
           flushText();

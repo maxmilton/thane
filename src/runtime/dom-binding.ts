@@ -140,9 +140,6 @@ export function createKeyedReconciler<T>(
   const keyFn: KeyFn<T> =
     typeof keyFnOrProp === 'string' ? (item: T) => (item as any)[keyFnOrProp] as string | number : keyFnOrProp;
 
-  const containerParent = container.parentNode;
-  const containerNextSibling = container.nextSibling;
-
   // Rows either carry their own update closure or share the one in `batch.update`.
   const sharedUpdate = batch?.update;
   const updateRow = (managed: ManagedItem<T>, item: T, index: number) => {
@@ -209,9 +206,14 @@ export function createKeyedReconciler<T>(
     for (let i = 0; i < len; i++) runCleanups(managedItems[i]!);
     const anchorParent = anchor.parentNode;
     if (anchorParent) {
-      anchor.remove();
-      (container as HTMLElement).textContent = '';
-      container.appendChild(anchor);
+      // Empty the container only when it holds nothing but the rows and the anchor (P18)
+      if (container.childNodes.length === len + 1) {
+        anchor.remove();
+        (container as HTMLElement).textContent = '';
+        container.appendChild(anchor);
+      } else {
+        for (let i = 0; i < len; i++) managedItems[i]!.el.remove();
+      }
     }
     managedItems.length = 0;
     keyMap = null;
@@ -231,7 +233,9 @@ export function createKeyedReconciler<T>(
     if (count <= 0) return;
 
     const base = managedItems.length;
-    const parent = base === 0 ? containerParent : null;
+    // Where the container is now, not at creation: later rows change a row's next sibling (P15)
+    const parent = base === 0 ? container.parentNode : null;
+    const next = container.nextSibling;
     if (parent) container.remove();
 
     managedItems.length = base + count;
@@ -263,7 +267,7 @@ export function createKeyedReconciler<T>(
       managedItems[write++] = adopt(createItemFn(item, i, anchor), keyFn(item, i), i);
     }
 
-    if (parent) parent.insertBefore(container, containerNextSibling);
+    if (parent) parent.insertBefore(container, next);
   };
 
   const applyOrder = (next: ManagedItem<T>[], currentEl: Element | null) => {
@@ -313,29 +317,30 @@ export function createKeyedReconciler<T>(
       }
     }
 
-    // Fast path: single item removed — find missing old key by linear scan
+    // Fast path: single item removed — find missing old key by linear scan. As in the in-place
+    // pass below, an identical item needs nothing and a changed one is updated at its new index (K22).
     if (oldLength === newLength + 1) {
-      let removedIdx = -1;
-      for (let i = 0; i < newLength; i++) {
-        const newKey = keyFn(newItems[i]!, i);
-        if (newKey !== managedItems[i]!.key) {
-          removedIdx = i;
-          break;
-        }
-      }
-      if (removedIdx === -1) removedIdx = oldLength - 1;
-
-      const removedManaged = managedItems[removedIdx]!;
-
-      let isActualRemoval = true;
-      for (let i = removedIdx; i < newLength; i++) {
-        if (keyFn(newItems[i]!, i) === removedManaged.key) {
-          isActualRemoval = false;
-          break;
-        }
+      let removedIdx = 0;
+      for (; removedIdx < newLength; removedIdx++) {
+        const managed = managedItems[removedIdx]!;
+        const newItem = newItems[removedIdx]!;
+        if (managed.value === newItem) continue;
+        if (keyFn(newItem, removedIdx) !== managed.key) break;
+        updateRow(managed, newItem, removedIdx);
       }
 
-      if (isActualRemoval) {
+      // Every later key must be the next old row's, or this is not one row removed (K21)
+      let i = removedIdx;
+      for (; i < newLength; i++) {
+        const managed = managedItems[i + 1]!;
+        const newItem = newItems[i]!;
+        if (managed.value === newItem) continue;
+        if (keyFn(newItem, i) !== managed.key) break;
+        updateRow(managed, newItem, i);
+      }
+
+      if (i === newLength) {
+        const removedManaged = managedItems[removedIdx]!;
         removeItem(removedManaged);
         if (keyMap !== null) keyMap.delete(removedManaged.key!);
         managedItems.splice(removedIdx, 1);
@@ -379,7 +384,6 @@ export function createKeyedReconciler<T>(
           allKeysExist = false;
           break;
         }
-        if (mismatchCount > 2) continue;
         if (existing.value !== newItem) updateRow(existing, newItem, i);
         if (managed !== existing) {
           mismatchCount++;

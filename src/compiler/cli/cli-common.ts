@@ -32,6 +32,11 @@ interface OptionSpec {
   config?: true;
 }
 
+const parsePort = (value: string): number => {
+  if (!/^\d+$/.test(value)) throw new Error(`Invalid --port value '${value}': expected a number, e.g. --port 4200.`);
+  return Number(value);
+};
+
 const toggle = (key: keyof CLIOptions, name: string): OptionSpec => ({
   key,
   set: { [`--${name}`]: true, [`--no-${name}`]: false },
@@ -52,7 +57,7 @@ const OPTIONS: OptionSpec[] = [
   toggle('dropDebugger', 'drop-debugger'),
   toggle('sourcemap', 'sourcemap'),
   { key: 'strictTypeCheck', set: { '--strict-type-check': true }, config: true },
-  { key: 'port', flag: '--port', parse: (v) => parseInt(v || '4200', 10), config: true },
+  { key: 'port', flag: '--port', parse: (v) => (v ? parsePort(v) : 4200), config: true },
   toggle('open', 'open'),
   { key: 'host', flag: '--host', parse: (v) => v || '0.0.0.0', config: true },
   { key: 'base', flag: '--base', parse: (v) => v || '/', config: true },
@@ -105,15 +110,6 @@ const getPositionalCommand = (args: string[], flagsWithValue: Set<string>): CLIO
     }
   }
   return null;
-};
-
-const hasValueFlag = (args: string[], flag: string): boolean => {
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === flag) {
-      return i + 1 < args.length && !args[i + 1]?.startsWith('-');
-    }
-  }
-  return false;
 };
 
 const applyCommandModeDefaults = (options: CLIOptions): CLIOptions => {
@@ -188,13 +184,12 @@ const mergeCLIAndConfig = (args: string[], parsedCLI: CLIOptions): CLIOptions =>
     configPath: loaded.path,
   };
 
-  // CLI overrides config (Angular/React-style precedence). A value flag overrides only when the
-  // argument after it does not start with '-'. --help and --version are not carried over.
+  // CLI overrides config (Angular/React-style precedence). A value flag overrides with the value
+  // parseArgs gave it (a bare flag's default too) unless that is empty.
   for (const { key, set = {}, flag } of OPTIONS) {
-    if (key === 'exitRequested') continue;
     for (const [name, value] of Object.entries(set)) if (args.includes(name)) setOption(merged, key, value);
     const value = parsedCLI[key];
-    if (flag && hasValueFlag(args, flag) && value != null && value !== '') {
+    if (flag && args.includes(flag) && value != null && value !== '') {
       setOption(merged, key, key === 'configPath' ? toAbsoluteIfRelative(value as string, process.cwd()) : value);
     }
   }
@@ -213,13 +208,16 @@ export function parseArgs(args: string[]): CLIOptions {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] ?? '';
     const flag = FLAGS.get(arg);
-    if (flag) {
-      setOption(options, flag.key, flag.parse ? flag.parse(args[++i]) : flag.value);
+    if (flag?.parse) {
+      // A value flag takes the next argument unless there is none or it is a flag: then it is bare
+      const next = args[i + 1];
+      setOption(options, flag.key, flag.parse(next === undefined || next.startsWith('-') ? undefined : args[++i]));
+    } else if (flag) {
+      setOption(options, flag.key, flag.value);
     } else if (arg.startsWith('--') || (arg.startsWith('-') && arg.length === 2)) {
-      // No warning when the previous argument is a value flag that was itself taken as a value
-      if (!VALUE_FLAGS.has(args[i - 1] ?? '')) {
-        console.warn(`Warning: Unknown flag '${arg}'. Run 'thane --help' to see available options.`);
-      }
+      console.warn(`Warning: Unknown flag '${arg}'. Run 'thane --help' to see available options.`);
+    } else if (arg !== '' && !arg.startsWith('-') && !COMMANDS.has(arg)) {
+      console.warn(`Warning: Unknown command '${arg}'. Run 'thane --help' to see available commands.`);
     }
   }
 

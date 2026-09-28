@@ -24,6 +24,7 @@ import {
   attributeDomProperty,
   findTemplateExpressions,
   stripTemplateExpressions,
+  extractSignalsFromExpression,
   type HtmlElement,
 } from '../../utils/html-parser/index.js';
 import { renameIdentifierInExpression, expressionReferencesIdentifier } from '../../utils/index.js';
@@ -40,6 +41,7 @@ import {
   type TemplateEdit,
 } from './template-utils.js';
 import type { Range } from '../../types.js';
+import { outsideVerbatim } from '../minification/template-minifier.js';
 
 /**
  * Inside a row, nested directives (when/whenElse/repeat) cannot close over the row factory's
@@ -208,7 +210,10 @@ export const generateStaticRepeatTemplate = (
   // - Remove all inter-element whitespace (><)
   // - Strip trailing whitespace before > in opening tags (<a > → <a>)
   // Sole-content elements become empty (<td></td>) — the row creates their text node on fill.
-  staticHtml = staticHtml.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim();
+  // Verbatim elements (<pre>, <textarea>, …) keep their whitespace (H-03).
+  staticHtml = outsideVerbatim(staticHtml, (html) =>
+    html.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim(),
+  );
 
   // Insert comment marker placeholders AFTER stripping (so they survive intact).
   // Mixed-content text bindings need: <!--iN--> + text node + <!----> boundary
@@ -361,6 +366,13 @@ const soleContentParent = (
 // Item binding extraction helpers (used by processItemTemplate)
 // ============================================================================
 
+/**
+ * The signals a row expression reads other than the row's own item, index and row signals, found
+ * the way component bindings find theirs (H-01): `it.name.toUpperCase()` reads none.
+ */
+const outerSignalsOf = (expr: string, itemVar: string, indexVar: string | undefined): string[] =>
+  extractSignalsFromExpression(expr).filter((name) => name !== itemVar && name !== `${itemVar}$` && name !== indexVar);
+
 interface ItemTextMatch {
   start: number;
   end: number;
@@ -479,16 +491,11 @@ const collectItemTextBindings = (
   state: IdState,
   itemBindings: ItemBinding[],
 ): ItemTextMatch[] => {
-  const allExprRegex = /\$\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/g;
   const itemTextMatches: ItemTextMatch[] = [];
-  let match: RegExpExecArray | null;
 
-  while ((match = allExprRegex.exec(templateContent)) !== null) {
-    const matchStart = match.index;
-    const matchEnd = matchStart + match[0].length;
+  for (const { start: matchStart, end: matchEnd, expression: innerExpr } of findTemplateExpressions(templateContent)) {
     const insideRange = allRanges.some((r) => matchStart >= r.start && matchStart < r.end);
     if (insideRange) continue;
-    const innerExpr = match[1]?.trim() ?? '';
     const refsItem = expressionReferencesIdentifier(innerExpr, itemVar);
     const refsIndex = indexVar ? expressionReferencesIdentifier(innerExpr, indexVar) : false;
     if (!refsItem && !refsIndex) continue;
@@ -520,15 +527,7 @@ const collectItemTextBindings = (
       const id = `i${state.idCounter++}`;
 
       // Detect outer signal references in the expression (mixed binding)
-      const signalCallRegex = /(?<!\.)(\w+)\(\)/g;
-      const outerSignals: string[] = [];
-      let sigMatch: RegExpExecArray | null;
-      while ((sigMatch = signalCallRegex.exec(innerExpr)) !== null) {
-        const name = sigMatch[1]!;
-        if (name !== itemVar && name !== `${itemVar}$` && (!indexVar || name !== indexVar)) {
-          if (!outerSignals.includes(name)) outerSignals.push(name);
-        }
-      }
+      const outerSignals = outerSignalsOf(innerExpr, itemVar, indexVar);
 
       itemBindings.push({
         elementId: id,
@@ -577,12 +576,11 @@ const collectItemAttrBindings = (
       // One binding per attribute. With static text around the expression, or several
       // expressions, the value is the whole attribute as a template literal
       // (`class="row ${item.kind}"` writes `row a`); otherwise it is the expression itself.
-      const attrExprRegex = /\$\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/g;
-      const exprs = [...attr.value.matchAll(attrExprRegex)].map((m) => (m[1] ?? '').trim());
+      const exprs = findTemplateExpressions(attr.value).map((e) => e.expression);
       const refsRow = (e: string) =>
         expressionReferencesIdentifier(e, itemVar) || (indexVar ? expressionReferencesIdentifier(e, indexVar) : false);
       if (exprs.length === 0 || !exprs.some(refsRow)) continue;
-      const staticText = attr.value.replace(attrExprRegex, '');
+      const staticText = stripTemplateExpressions(attr.value);
       const hasStatic = exprs.length > 1 || staticText.trim() !== '';
       {
         const innerExpr = hasStatic ? '`' + attr.value + '`' : exprs[0]!;
@@ -594,15 +592,7 @@ const collectItemAttrBindings = (
         const id = ensureRowElementId(el, state, 'i');
 
         // Detect outer signal references in the expression (mixed binding)
-        const signalCallRegex = /(?<!\.)\b(\w+)\(\)/g;
-        const outerSignals: string[] = [];
-        let sigMatch: RegExpExecArray | null;
-        while ((sigMatch = signalCallRegex.exec(innerExpr)) !== null) {
-          const name = sigMatch[1]!;
-          if (name !== itemVar && name !== `${itemVar}$` && (!indexVar || name !== indexVar)) {
-            if (!outerSignals.includes(name)) outerSignals.push(name);
-          }
-        }
+        const outerSignals = outerSignalsOf(innerExpr, itemVar, indexVar);
 
         const domProperty = attributeDomProperty(attrName, el);
         itemBindings.push({
@@ -656,6 +646,12 @@ export const processItemTemplate = (
   nextId: number;
 } => {
   const parsed = parseHtmlTemplate(templateContent);
+  // The reconciler holds each row by its root element, which a when() would replace (H-47)
+  if (parsed.roots.some((root) => root.whenDirective !== undefined)) {
+    throw new Error(
+      `${ErrorCode.ROW_ROOT_WHEN}: a repeat() row's root element cannot carry when(); filter the list, or put when() on an inner element.`,
+    );
+  }
 
   const itemBindings: ItemBinding[] = [];
   const itemEvents: ItemEventBinding[] = [];
@@ -783,9 +779,10 @@ export const processItemTemplate = (
   // Track which parent elements need IDs for sole-content text bindings
   const parentElementIds = new Map<HtmlElement, string>();
 
+  // The expressions themselves stay as written: the static row template strips them, and the row
+  // code is generated from the item bindings
   for (const textMatch of itemTextMatches) {
     const { start, end, expr, id, soleParent } = textMatch;
-    const transformedExpr = renameIdentifierInExpression(expr, itemVar, `${itemVar}$()`);
 
     if (soleParent) {
       // For sole content: just output the expression (no wrapper)
@@ -793,7 +790,7 @@ export const processItemTemplate = (
       edits.push({
         start,
         end,
-        replacement: `\${${transformedExpr}}`,
+        replacement: `\${${expr}}`,
       });
       parentElementIds.set(soleParent, id);
     } else {
@@ -802,7 +799,7 @@ export const processItemTemplate = (
       edits.push({
         start,
         end,
-        replacement: `<!--${id}-->\${${transformedExpr}}`,
+        replacement: `<!--${id}-->\${${expr}}`,
       });
     }
   }
@@ -819,12 +816,10 @@ export const processItemTemplate = (
     }
   }
   for (const { start, end, attrName, expr } of itemAttrMatches) {
-    const transformedExpr = renameIdentifierInExpression(expr, itemVar, `${itemVar}$()`);
-
     edits.push({
       start,
       end,
-      replacement: `${attrName}="\${${transformedExpr}}"`,
+      replacement: `${attrName}="\${${expr}}"`,
     });
   }
   edits.push(...buildElementIdEdits(elementIdMap, allRanges));

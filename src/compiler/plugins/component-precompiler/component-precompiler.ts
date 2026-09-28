@@ -11,6 +11,7 @@ import {
   extendsComponentQuick,
   generateComponentHTML,
   createBuildContext,
+  applyEdits,
 } from '../../utils/index.js';
 import { transformDefineComponentSource } from '../reactive-binding-compiler/index.js';
 import type { CompileOptions } from '../reactive-binding-compiler/index.js';
@@ -137,41 +138,38 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
     const rewriteMountToMountComponent = (source: string): string | null => {
       const sf = ts.createSourceFile('__mount.ts', source, ts.ScriptTarget.Latest, true);
 
-      // 1. Find the `mount(...)` call expression
-      let mountCall: ts.CallExpression | null = null;
+      // 1. Only thane's `mount`, imported under its own name, and only when it is called once: the
+      //    rewrite takes `mount` out of the import, so a second call, or a local function of that
+      //    name, would be left without a definition
+      const mountImport = sf.statements.find(
+        (s): s is ts.ImportDeclaration =>
+          ts.isImportDeclaration(s) &&
+          ts.isStringLiteral(s.moduleSpecifier) &&
+          s.moduleSpecifier.text === 'thane' &&
+          !s.importClause?.phaseModifier &&
+          !s.importClause?.name &&
+          !!s.importClause?.namedBindings &&
+          ts.isNamedImports(s.importClause.namedBindings) &&
+          s.importClause.namedBindings.elements.some(
+            (e) => !e.isTypeOnly && !e.propertyName && e.name.text === 'mount',
+          ),
+      );
+      const mountCalls: ts.CallExpression[] = [];
       const findMount = (node: ts.Node): void => {
-        if (mountCall) return;
-        if (
-          ts.isCallExpression(node) &&
-          ts.isIdentifier(node.expression) &&
-          node.expression.text === 'mount' &&
-          node.arguments.length >= 1
-        ) {
-          const arg = node.arguments[0];
-          if (arg && ts.isObjectLiteralExpression(arg)) {
-            // Ensure it has 'component' and does NOT have 'router'
-            let hasComponent = false;
-            let hasRouter = false;
-            for (const prop of arg.properties) {
-              if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
-                if (prop.name.text === 'component') hasComponent = true;
-                if (prop.name.text === 'router') hasRouter = true;
-              }
-            }
-            if (hasComponent && !hasRouter) {
-              mountCall = node;
-            }
-          }
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'mount') {
+          mountCalls.push(node);
         }
         ts.forEachChild(node, findMount);
       };
       findMount(sf);
 
-      if (!mountCall) return null;
-      const mc = mountCall as ts.CallExpression;
+      const mc = mountCalls[0];
+      const objArg = mc?.arguments[0];
+      if (!mountImport || mountCalls.length !== 1 || !mc || !objArg || !ts.isObjectLiteralExpression(objArg)) {
+        return null;
+      }
 
-      // 2. Extract component, target, and props values from the object literal
-      const objArg = mc.arguments[0] as ts.ObjectLiteralExpression;
+      // 2. Extract component, target, and props values from the object literal (no `router` key)
       let componentText: string | null = null;
       let targetText: string | null = null;
       let propsText: string | null = null;
@@ -182,6 +180,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           if (prop.name.text === 'component') componentText = valueText;
           else if (prop.name.text === 'target') targetText = valueText;
           else if (prop.name.text === 'props') propsText = valueText;
+          else if (prop.name.text === 'router') return null;
         }
       }
 
@@ -196,34 +195,33 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
         args.push(propsText);
       }
 
-      // 4. Replace the mount call text
-      const callStart = mc.getStart(sf);
-      const callEnd = mc.getEnd();
-      const call = `${RUNTIME_HELPER.MOUNT_COMPONENT}(${args.join(', ')})`;
-      let result = source.substring(0, callStart) + call + source.substring(callEnd);
-
-      // 5. Fix the imports: `mount` leaves the thane import, and mountComponent comes from the
-      //    compiler's entry, with the other helpers compiled code calls
-      result = result.replace(/import\s*\{([^}]*)\}\s*from\s*['"]thane['"]/, (_match, specifiers: string) => {
-        const specs = specifiers
-          .split(',')
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-        if (!specs.includes('mount')) return `import { ${specs.join(', ')} } from 'thane'`;
-        const rest = specs.filter((s: string) => s !== 'mount');
-        const runtimeImport = `import { ${RUNTIME_HELPER.MOUNT_COMPONENT} } from '${INTERNAL_RUNTIME_SPECIFIER}'`;
-        return rest.length > 0 ? `import { ${rest.join(', ')} } from 'thane';\n${runtimeImport}` : runtimeImport;
-      });
-
-      return result;
+      // 4. Replace the mount call, and fix the import: `mount` leaves it, and mountComponent comes
+      //    from the compiler's entry, with the other helpers compiled code calls
+      const rest = (mountImport.importClause!.namedBindings as ts.NamedImports).elements
+        .map((e) => e.getText(sf))
+        .filter((s) => s !== 'mount');
+      const runtimeImport = `import { ${RUNTIME_HELPER.MOUNT_COMPONENT} } from '${INTERNAL_RUNTIME_SPECIFIER}'`;
+      return applyEdits(source, [
+        {
+          start: mountImport.getStart(sf),
+          end: mountImport.moduleSpecifier.getEnd(),
+          replacement:
+            rest.length > 0 ? `import { ${rest.join(', ')} } from 'thane';\n${runtimeImport}` : runtimeImport,
+        },
+        {
+          start: mc.getStart(sf),
+          end: mc.getEnd(),
+          replacement: `${RUNTIME_HELPER.MOUNT_COMPONENT}(${args.join(', ')})`,
+        },
+      ]);
     };
 
     /**
      * Replace tagged templates with plain ones using the AST: html`...` loses its tag, and
      * css`...` is compiled (its tag goes, and a production build minifies the stylesheet).
      */
-    const stripTemplateTags = (code: string): string => {
-      const sf = ts.createSourceFile('__strip.ts', code, ts.ScriptTarget.Latest, true);
+    const stripTemplateTags = (code: string, filePath: string): string => {
+      const sf = ts.createSourceFile(filePath, code, ts.ScriptTarget.Latest, true);
       // Collect positions to strip in reverse order (end → start)
       const edits: { start: number; end: number; replacement: string }[] = [];
       const ownCssTag = declaresOwnCssTag(sf);
@@ -270,13 +268,13 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           result = transformed;
         }
       }
-      result = stripTemplateTags(result);
+      result = stripTemplateTags(result, filePath);
       return createLoaderResult(result);
     };
 
     build.onLoad({ filter: /\.ts$/ }, async (args) => {
       try {
-        if (args.path.includes('scripts') || args.path.includes('node_modules')) {
+        if (args.path.includes('node_modules')) {
           return undefined;
         }
 
@@ -289,7 +287,9 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           const rewritten = rewriteMountToMountComponent(source);
           if (rewritten) {
             logger.info(NAME, `Optimised mount() → mountComponent() in ${args.path}`);
-            return createLoaderResult(source.includes(FN.CSS + '`') ? stripTemplateTags(rewritten) : rewritten);
+            return createLoaderResult(
+              source.includes(FN.CSS + '`') ? stripTemplateTags(rewritten, args.path) : rewritten,
+            );
           }
         }
 
@@ -297,7 +297,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           // A module with only css`` templates (shared styles) still needs them compiled:
           // the tag is a compile-time marker and does not exist at runtime.
           if (source.includes(FN.CSS + '`')) {
-            return createLoaderResult(stripTemplateTags(source));
+            return createLoaderResult(stripTemplateTags(source, args.path));
           }
           return undefined;
         }
@@ -331,11 +331,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
               const componentDef = componentDefinitions.get(call.componentName);
               if (componentDef) {
                 const anchorId = `b${childIdCounter++}`;
-                const compiledHTML = generateComponentHTML({
-                  selector: componentDef.selector,
-                  props: {},
-                  anchorId,
-                });
+                const compiledHTML = generateComponentHTML(anchorId);
 
                 modifiedSource =
                   modifiedSource.substring(0, call.startIndex) + compiledHTML + modifiedSource.substring(call.endIndex);

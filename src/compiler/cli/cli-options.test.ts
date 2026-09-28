@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseArgs, printHelp, resolveCLIOptions } from './cli-common.js';
+import { cliMain, parseArgs, printHelp, resolveCLIOptions } from './cli-common.js';
 
 const originalCwd = process.cwd();
 let root = '';
@@ -39,6 +39,8 @@ const resolveWith = (files: Record<string, string>, args: string[]) => {
 };
 
 const unknown = (flag: string) => `Warning: Unknown flag '${flag}'. Run 'thane --help' to see available options.`;
+const unknownCommand = (arg: string) =>
+  `Warning: Unknown command '${arg}'. Run 'thane --help' to see available commands.`;
 
 test('help text is unchanged', () => {
   const log = spyOn(console, 'log').mockImplementation(() => {});
@@ -67,11 +69,11 @@ describe('arguments named like Object.prototype members', () => {
     });
   }
   for (const arg of ['constructor', 'toString', '__proto__', 'valueOf']) {
-    test(`${arg} is a stray positional`, () => {
+    test(`${arg} is a stray positional (warned about since H-24)`, () => {
       const warn = spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const opts = parseArgs([arg]);
-        expect(warn).not.toHaveBeenCalled();
+        expect(warn.mock.calls.map((c) => c.join(' '))).toEqual([unknownCommand(arg)]);
         expect(opts).toEqual(parseArgs([]));
       } finally {
         warn.mockRestore();
@@ -171,9 +173,82 @@ describe('config files', () => {
       '--no-open',
       '--nope',
     ]);
-    expect(warnings).toEqual([unknown('--nope')]);
+    expect(warnings).toEqual([unknownCommand('x'), unknown('--nope')]);
     expect(result.gzip).toBe(true);
     expect(result.open).toBe(false);
     expect(result.port).toBe(1);
+  });
+});
+
+describe('H-24: one rule for bare value flags, with or without a config file', () => {
+  const CONFIG = { 'thane.config.json': JSON.stringify({ host: 'cfg-host', port: 5000, entry: './cfg.ts' }) };
+
+  for (const [label, files] of [
+    ['no config file', {}],
+    ['a config file', CONFIG],
+  ] as const) {
+    test(`${label}: a value flag never takes the next flag as its value`, () => {
+      const { result, warnings } = resolveWith(files, ['--entry', '--prod', '--host', '--nope']);
+      expect(result.prod).toBe(true);
+      expect(result.host).toBe('0.0.0.0');
+      expect(result.entry).toEqual(label === 'a config file' ? expect.stringMatching(/cfg\.ts$/) : undefined);
+      expect(warnings).toEqual([unknown('--nope')]);
+    });
+
+    test(`${label}: a bare value flag means its default, as an empty value does`, () => {
+      for (const args of [['--host'], ['--host', ''], ['--host', '--gzip']]) {
+        expect(resolveWith(files, args).result.host).toBe('0.0.0.0');
+      }
+      for (const args of [['--port'], ['--port', '']]) expect(resolveWith(files, args).result.port).toBe(4200);
+    });
+
+    test(`${label}: a port that is not a number is refused`, () => {
+      for (const port of ['abc', '30x', '1.5', 'NaN']) {
+        expect(() => resolveWith(files, ['--port', port])).toThrow(`Invalid --port value '${port}': expected a number`);
+      }
+      expect(resolveWith(files, ['--port', '0']).result.port).toBe(0);
+    });
+
+    test(`${label}: an unknown command is reported, and the build still runs`, () => {
+      const { result, warnings } = resolveWith(files, ['biuld']);
+      expect(warnings).toEqual(["Warning: Unknown command 'biuld'. Run 'thane --help' to see available commands."]);
+      expect(result.command).toBe('build');
+    });
+  }
+});
+
+describe('H-34: --help and --version with a config file', () => {
+  const CONFIG = { 'thane.config.json': JSON.stringify({ port: 1 }) };
+
+  test('each flag is carried over', () => {
+    for (const [flag, request] of [
+      ['--help', 'help'],
+      ['-h', 'help'],
+      ['--version', 'version'],
+      ['-v', 'version'],
+    ] as const) {
+      expect(resolveWith(CONFIG, ['build', flag]).result.exitRequested).toBe(request);
+    }
+  });
+
+  test('thane --help prints the help and builds nothing', async () => {
+    const dir = join(root, `d${dirCount++}`);
+    mkdirSync(dir);
+    writeFileSync(join(dir, 'thane.config.json'), CONFIG['thane.config.json']);
+    const argv = process.argv;
+    const log = spyOn(console, 'log').mockImplementation(() => {});
+    const info = spyOn(console, 'info').mockImplementation(() => {});
+    process.argv = [argv[0]!, 'thane', '--help'];
+    process.chdir(dir);
+    try {
+      await cliMain(); // without the fix: a build, which fails for want of src/main.ts
+      expect(log.mock.calls).toEqual([[readFileSync(join(import.meta.dir, 'cli-help.golden.txt'), 'utf8')]]);
+      expect(info).not.toHaveBeenCalled();
+    } finally {
+      process.chdir(originalCwd);
+      process.argv = argv;
+      log.mockRestore();
+      info.mockRestore();
+    }
   });
 });

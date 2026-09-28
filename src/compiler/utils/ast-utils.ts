@@ -117,21 +117,6 @@ export const findSignalInitializers = (sourceFile: ts.SourceFile): Map<string, s
 };
 
 // ============================================================================
-// Class Detection
-// ============================================================================
-
-export const findEnclosingClass = (node: ts.Node): ts.ClassExpression | ts.ClassDeclaration | null => {
-  let current: ts.Node | undefined = node;
-  while (current) {
-    if (ts.isClassExpression(current) || ts.isClassDeclaration(current)) {
-      return current;
-    }
-    current = current.parent;
-  }
-  return null;
-};
-
-// ============================================================================
 // Template Detection
 // ============================================================================
 
@@ -194,46 +179,6 @@ export const extractComponentDefinitions = (sourceFile: ts.SourceFile, filePath:
 
   visit(sourceFile);
   return definitions;
-};
-
-/**
- * Extract the page selector from a source file.
- * Supports defineComponent() (named exports).
- */
-export const extractPageSelector = (sourceFile: ts.SourceFile): string | null => {
-  let selector: string | null = null;
-
-  const visit = (node: ts.Node) => {
-    // export const X = defineComponent(...)
-    if (ts.isVariableStatement(node)) {
-      const hasExport = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-      if (hasExport) {
-        for (const decl of node.declarationList.declarations) {
-          if (
-            ts.isIdentifier(decl.name) &&
-            decl.initializer &&
-            ts.isCallExpression(decl.initializer) &&
-            isDefineComponentCall(decl.initializer)
-          ) {
-            const exportName = decl.name.text;
-            const firstArg = decl.initializer.arguments[0];
-            if (firstArg && ts.isStringLiteral(firstArg)) {
-              selector = firstArg.text;
-            } else {
-              selector = pascalToKebab(exportName);
-            }
-          }
-        }
-      }
-    }
-
-    if (!selector) {
-      ts.forEachChild(node, visit);
-    }
-  };
-
-  visit(sourceFile);
-  return selector;
 };
 
 // ============================================================================
@@ -391,18 +336,11 @@ export const parseArrowFunction = (
 // Component HTML Generation (Compile-time)
 // ============================================================================
 
-export interface ComponentHTMLConfig {
-  selector: string;
-  props: Record<string, any>;
-  /** Pre-allocated anchor ID from the CTFE counter ("b0", "b1", …) */
-  anchorId: string;
-}
-
 /**
  * Emit a `<template>` anchor for a child component mount point.
- * CTFE allocates IDs `b0`, `b1`, … and the binding compiler starts its
+ * CTFE allocates IDs `b0`, `b1`, … (`anchorId`) and the binding compiler starts its
  * `idCounter` at the offset = number of child mounts.
  */
-export const generateComponentHTML = (config: ComponentHTMLConfig): string => {
-  return `<template id="${config.anchorId}"></template>`;
+export const generateComponentHTML = (anchorId: string): string => {
+  return `<template id="${anchorId}"></template>`;
 };

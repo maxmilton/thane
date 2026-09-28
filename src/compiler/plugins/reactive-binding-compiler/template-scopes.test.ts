@@ -51,6 +51,15 @@ const cases: Record<string, Case> = {
       ['d', false],
     ],
   },
+  // H-46 keeps the first of two duplicates, so the bound copy has to come first to be bound
+  'component: pre-rendered when() on a non-void element with a duplicated property-bound attribute, bound first': {
+    scope: 'component',
+    template: '<div><button ${when(s())} disabled=${d()} disabled>B</button><b>${n()}</b></div>',
+    inits: [
+      ['s', true],
+      ['d', false],
+    ],
+  },
   'component: whenElse with events, a repeat with row events, then more bindings': {
     scope: 'component',
     template:

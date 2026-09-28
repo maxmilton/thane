@@ -300,18 +300,39 @@ describe('general path with static nodes around the rows', () => {
     expect(order()).toEqual(['head', '#comment', 'X', 'Y', 'Z', 'anchor', '#text', 'tail']);
   });
 
-  test('a complete same-length replacement deletes every static node in the container (P18, H-05)', () => {
+  test('a complete same-length replacement keeps every static node in the container (P18, H-05)', () => {
     const { reconcile, order } = setup(statics());
     reconcile(rows('A', 'B'));
-    reconcile(rows('X', 'Y'));
-    expect(order()).toEqual(['X', 'Y', 'anchor']);
+    expect(reconcile(rows('X', 'Y'))).toEqual([
+      'cleanup A',
+      'cleanup B',
+      // static nodes share the container, so the rows are removed one by one instead of clearing it
+      'remove A',
+      'remove B',
+      'remove list',
+      'create X@0 at anchor',
+      'insert X before anchor',
+      'create Y@1 at anchor',
+      'insert Y before anchor',
+      'insert list before end',
+    ]);
+    expect(order()).toEqual(['head', '#comment', 'X', 'Y', 'anchor', '#text', 'tail']);
   });
 
-  test('clearing the list deletes every static node in the container (P18, H-05)', () => {
+  test('clearing the list keeps every static node in the container (P18, H-05)', () => {
     const { reconcile, order } = setup(statics());
     reconcile(rows('A', 'B'));
-    reconcile([]);
-    expect(order()).toEqual(['anchor']);
+    expect(reconcile([])).toEqual(['cleanup A', 'cleanup B', 'remove A', 'remove B']);
+    expect(order()).toEqual(['head', '#comment', 'anchor', '#text', 'tail']);
+    reconcile(rows('C'));
+    expect(order()).toEqual(['head', '#comment', 'C', 'anchor', '#text', 'tail']);
+  });
+
+  test('a static node only after the anchor also keeps the rows from being cleared at once (P18, H-05)', () => {
+    const { reconcile, order } = setup({ after: [new FakeNode('tail')] });
+    reconcile(rows('A'));
+    expect(reconcile([])).toEqual(['cleanup A', 'remove A']);
+    expect(order()).toEqual(['anchor', 'tail']);
   });
 });
 

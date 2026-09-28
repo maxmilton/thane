@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { consoleColors } from '../../utils/index.js';
+import { ansi, consoleColors } from '../../utils/index.js';
 
 /** A file's size, and with `useGzip` the sizes of its `.gz` and `.br` copies when they exist. */
 export interface FileSizes {
@@ -16,10 +16,10 @@ export interface FileSizes {
 
 const getSizeColor = (sizeInBytes: number, maxSize: number): string => {
   const ratio = sizeInBytes / maxSize;
-  if (ratio < 0.33) return '\x1b[32m'; // green
-  if (ratio < 0.66) return '\x1b[33m'; // yellow
-  if (ratio < 0.85) return '\x1b[38;5;208m'; // orange
-  return '\x1b[31m'; // red
+  if (ratio < 0.33) return ansi.green;
+  if (ratio < 0.66) return ansi.yellow;
+  if (ratio < 0.85) return ansi.orange;
+  return ansi.red;
 };
 
 const statIfExists = async (filePath: string): Promise<number | undefined> =>
@@ -46,21 +46,19 @@ export const collectFileSizes = async (
 
 export const printAllFileSizes = (sizes: FileSizes[]): void => {
   const maxSize = Math.max(...sizes.map((f) => f.sizeInBytes));
-  const cyanColor = '\x1b[36m';
-  const { reset } = consoleColors;
+  const { reset } = ansi;
 
   for (const { fileName, sizeInBytes, gzip, brotli } of sizes) {
     const sizeInKilobytes = sizeInBytes / 1024;
     const sizeColor = getSizeColor(sizeInBytes, maxSize);
     let sizeInfo = `${sizeColor}Size: ${sizeInKilobytes.toFixed(2)} KB${reset}`;
     if (gzip !== undefined) {
-      const greenColor = '\x1b[32m';
-      sizeInfo += ` ${greenColor}(gzip: ${(gzip / 1024).toFixed(2)} KB`;
+      sizeInfo += ` ${ansi.green}(gzip: ${(gzip / 1024).toFixed(2)} KB`;
       sizeInfo += brotli !== undefined ? `, br: ${(brotli / 1024).toFixed(2)} KB)` : `)`;
       sizeInfo += reset;
     }
 
-    console.info(`${cyanColor}${fileName}${reset}  ${sizeInfo}`);
+    console.info(`${ansi.cyan}${fileName}${reset}  ${sizeInfo}`);
   }
 };
 

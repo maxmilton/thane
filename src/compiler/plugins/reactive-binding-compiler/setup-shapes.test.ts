@@ -196,43 +196,31 @@ describe('setup shapes: lifecycle hooks', () => {
 });
 
 describe('setup shapes: several return statements and nested functions', () => {
-  test('return inside if: the last return counts (H-07); a second return object cannot work (K5)', async () => {
-    // Every return object's template is compiled and blanked, and `__tpl` is the last one. The
-    // last return object is the component's: it decides lean or full and loses its dead
-    // properties. The early return keeps its blanked template and an onMount that a lean
-    // registration never calls. H-38 turns a second return object into a build error.
-    const r = await compile(`export const App = defineComponent(() => {
+  // A second return object cannot work (K5): the compiler builds one template, from the last return
+  // (H-07). Since H-38 the linter makes it a build error, THANE412, reported at each earlier return.
+  // (registration-import.test.ts still pins what the compiler itself does with such a setup.)
+  test('return inside if: a build error (H-38)', async () => {
+    await expect(
+      compile(`export const App = defineComponent(() => {
   if (flag) {
     return { template: html\`<p>a</p>\`, onMount: () => { log('a'); } };
   }
   return { template: html\`<p>b</p>\` };
-});`);
-    expect(r.tpl).toBe('<p>b</p>');
-    expect(r.registration).toBe(
-      [
-        'var App = __registerComponentLean("app", () => {',
-        '  if (flag) {',
-        '    return { template: ``, onMount: () => {',
-        '      log("a");',
-        '    } };',
-        '  }',
-        '  return {};',
-        '}, __tpl);',
-      ].join('\n'),
+});`),
+    ).rejects.toThrow(
+      /main\.ts:6:4: ERROR: \[plugin: thane-linter\] A setup function with more than one return object is not supported/,
     );
   });
 
-  test('styles only in a later return: the last return counts (H-07), styles called and imported', async () => {
-    const r = await compile(`export const App = defineComponent(() => {
+  test('styles only in a later return: a build error (H-38)', async () => {
+    await expect(
+      compile(`export const App = defineComponent(() => {
   if (flag) {
     return { template: html\`<p>a</p>\` };
   }
   return { template: html\`<p>b</p>\`, styles: css\`p { color: red; }\` };
-});`);
-    expect(r.registration.startsWith('var App = __registerComponent("app", () => {')).toBe(true);
-    expect(r.registration).toContain('return { template: `` };');
-    expect(r.registration).toContain('return { styles: `p { color: red; }` };');
-    expect([r.stylesCall, r.stylesImported]).toEqual([true, true]);
+});`),
+    ).rejects.toThrow(/\[plugin: thane-linter\] A setup function with more than one return object/);
   });
 
   test('nested arrow, function expression and function declaration returns are skipped (P8, H-07)', async () => {

@@ -75,41 +75,33 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     });
   };
 
+  /** The output index.html: relay script (dev server), entry scripts, selector renames, minified in prod. */
+  const renderIndexHtml = async (hashedFileNames: Record<string, string | undefined>): Promise<string> => {
+    let data = await fs.promises.readFile(config.inputHTMLFilePath, 'utf8');
+    if (config.serve && !config.isProd) {
+      data = DevServer.injectBrowserRelayScript(data);
+    }
+    data = injectEntryScripts(data, hashedFileNames);
+    if (config.buildContext) {
+      data = minifySelectorsInHTML(data, config.buildContext);
+    }
+    return config.isProd ? minifyHTML(data) : data;
+  };
+
   /**
    * Re-process the HTML template and notify live reload clients.
    * Used by file watchers when index.html or assets change.
    */
   const reprocessAndReloadHTML = async (): Promise<void> => {
-    const { inputHTMLFilePath, outputHTMLFilePath } = config;
-    let data = await fs.promises.readFile(inputHTMLFilePath, 'utf8');
-    if (config.serve && !config.isProd) {
-      data = DevServer.injectBrowserRelayScript(data);
-    }
-    data = injectEntryScripts(data, cachedHashedFileNames);
-    let updatedData = data;
-    if (config.buildContext) {
-      updatedData = minifySelectorsInHTML(updatedData, config.buildContext);
-    }
-    await fs.promises.writeFile(outputHTMLFilePath, updatedData, 'utf8');
+    await fs.promises.writeFile(config.outputHTMLFilePath, await renderIndexHtml(cachedHashedFileNames), 'utf8');
     devServer.notifyLiveReloadClients();
   };
 
   const copyIndexHTMLIntoDistAndStartServer = async (
     hashedFileNames: Record<string, string | undefined>,
   ): Promise<void> => {
-    const { inputHTMLFilePath, outputHTMLFilePath, isProd, serve, useGzip, distDir } = config;
-    let data = await fs.promises.readFile(inputHTMLFilePath, 'utf8');
-    if (serve && !isProd) {
-      data = DevServer.injectBrowserRelayScript(data);
-    }
-    data = injectEntryScripts(data, hashedFileNames);
-    let updatedData = data;
-    if (config.buildContext) {
-      updatedData = minifySelectorsInHTML(updatedData, config.buildContext);
-    }
-    if (isProd) {
-      updatedData = minifyHTML(updatedData);
-    }
+    const { outputHTMLFilePath, isProd, serve, useGzip, distDir } = config;
+    const updatedData = await renderIndexHtml(hashedFileNames);
 
     await fs.promises.writeFile(outputHTMLFilePath, updatedData, 'utf8');
 

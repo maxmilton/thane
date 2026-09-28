@@ -18,6 +18,7 @@ const MAIN_JS = 'console.log(1);'.repeat(50);
 
 let root = '';
 let dist = '';
+let distWithoutIndex = '';
 
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), 'thane-dev-server-'));
@@ -29,6 +30,9 @@ beforeAll(() => {
   writeFileSync(join(dist, 'assets', 'My Logo.png'), 'PNGDATA');
   writeFileSync(join(dist, 'café.txt'), 'cafe');
   writeFileSync(join(root, 'secret.txt'), 'secret');
+  distWithoutIndex = join(root, 'dist-without-index');
+  mkdirSync(distWithoutIndex);
+  writeFileSync(join(distWithoutIndex, 'main.js'), MAIN_JS);
 });
 
 afterAll(() => {
@@ -47,7 +51,7 @@ const OWN_HEADERS = ['cache-control', 'content-encoding', 'content-type', 'vary'
 
 /** Start a server for the duration of `fn`, with its console output silenced. */
 const withServer = async (
-  options: Omit<DevServerOptions, 'distDir'>,
+  options: Partial<DevServerOptions>,
   fn: (get: (path: string, acceptEncoding?: string) => Promise<Served>) => Promise<void>,
 ) => {
   const info = console.info;
@@ -139,6 +143,21 @@ describe('dev server routing without compression', () => {
       expect(await get('/__thane-browser-events')).toEqual(index());
     });
   });
+});
+
+describe('H-37: a dist without index.html', () => {
+  for (const isProd of [false, true]) {
+    for (const useGzip of [false, true]) {
+      test(`${isProd ? 'production' : 'development'}${useGzip ? ', useGzip' : ''}: client routes get a 404`, async () => {
+        await withServer({ distDir: distWithoutIndex, isProd, useGzip }, async (get) => {
+          expect(await get('/')).toEqual(status(404, 'Not Found'));
+          expect(await get('/about', 'br, gzip')).toEqual(status(404, 'Not Found'));
+          expect(await get('/missing.js')).toEqual(status(404, 'Not Found'));
+          expect((await get('/main.js')).status).toBe(200);
+        });
+      });
+    }
+  }
 });
 
 describe('dev server routing with useGzip', () => {

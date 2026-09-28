@@ -41,6 +41,4 @@ export const consoleColors = {
   cyan: `${ansi.cyan}%s${ansi.reset}`,
   red: `${ansi.red}%s${ansi.reset}`,
   orange: `${ansi.orange}%s${ansi.reset}`,
-  // Not a format string: the reset code alone, or '%s' without colour.
-  reset: supportsColor ? ansi.reset : '%s',
 } as const;

@@ -27,8 +27,14 @@ describe('scopeCssRules: :host', () => {
     [':host:hover { color: red; }', '.sel:hover{ color: red; }'],
     [':host>.x{a:b}', '.sel>.x{a:b}'],
     [':host, :host(.x), .y { a: b }', '.sel, .sel.x, .sel .y{ a: b }'],
-    // Cut at the first `)`, so a nested parenthesis ends the host suffix early (P26a, H-19)
-    [':host(:not(.x).y) .a { b: c }', '.sel:not(.x.y) .a{ b: c }'],
+    // The host suffix ends at the parenthesis that matches `:host(` (P26a, H-19 (i); until then
+    // it ended at the first `)`, giving `.sel:not(.x.y) .a`)
+    [':host(:not(.x).y) .a { b: c }', '.sel:not(.x).y .a{ b: c }'],
+    [':host(.a:is(.b,.c)) .d { e: f }', '.sel.a:is(.b,.c) .d{ e: f }'],
+    [':host(:not(.x)) { a: b }', '.sel:not(.x){ a: b }'],
+    [':host(:is(.a, .b)) .c, .d { e: f }', '.sel:is(.a, .b) .c, .sel .d{ e: f }'],
+    // No parenthesis matches `:host(`: falls through to the plain `:host` prefix rule
+    [':host(:not(.x) .a { b: c }', '.sel(:not(.x) .a{ b: c }'],
     // `:host-context` is treated as `:host` followed by `-context` (P26b, H-19)
     [':host-context(.dark) .a { b: c }', '.sel-context(.dark) .a{ b: c }'],
     // No closing parenthesis: falls through to the plain `:host` prefix rule

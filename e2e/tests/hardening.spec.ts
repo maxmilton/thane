@@ -46,7 +46,7 @@ const kidDestroyCounts = (page: Page): Promise<Record<string, number>> =>
   page.evaluate(() => ({ ...((window as any).__counts?.kidDestroy ?? {}) }));
 
 test.describe('F0-3 hardening probes', () => {
-  test.fixme('H-01 P1 a method call on the row item renders in row text', async ({ page }) => {
+  test('H-01 P1 a method call on the row item renders in row text', async ({ page }) => {
     const probe = await mountProbe(page, 'p1');
     await expect(page.locator('.p1-row')).toHaveText(['ALPHA', 'BETA']);
 
@@ -88,7 +88,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-17 P5 a child component in a whenElse() nested in a when() is mounted', async ({ page }) => {
+  test('H-17 P5 a child component in a whenElse() nested in a when() is mounted', async ({ page }) => {
     const probe = await mountProbe(page, 'p5');
     await expect(page.locator('.p5-then .card')).toHaveText(['p5-card']);
 
@@ -131,22 +131,20 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-03 P12 whitespace inside <pre> is kept', async ({ page }) => {
+  test('H-03 P12 whitespace inside <pre> is kept', async ({ page }) => {
     const probe = await mountProbe(page, 'p12');
     expect(await page.locator('.p12-pre').textContent()).toBe('line1\n    line2');
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-02 P13 a backslash and an escaped interpolation in template text render literally', async ({
-    page,
-  }) => {
+  test('H-02 P13 a backslash and an escaped interpolation in template text render literally', async ({ page }) => {
     const probe = await mountProbe(page, 'p13');
     expect(await page.locator('.p13-bs').textContent()).toBe('C:\\dir');
     expect(await page.locator('.p13-dollar').textContent()).toBe('${notExpr}');
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-04 P14 hyphenated tags keep their name as a whenElse() root and with when()', async ({ page }) => {
+  test('H-04 P14 hyphenated tags keep their name as a whenElse() root and with when()', async ({ page }) => {
     const probe = await mountProbe(page, 'p14');
     await expect(page.locator('.p14-we-else')).toHaveText('B');
     await expect(page.locator('section.p14 my-tag')).toHaveCount(0);
@@ -172,7 +170,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-06 P15 a nested list in the row root does not reorder the outer rows', async ({ page }) => {
+  test('H-06 P15 a nested list in the row root does not reorder the outer rows', async ({ page }) => {
     const probe = await mountProbe(page, 'p15');
     const rowIds = () => page.locator('.p15-row').evaluateAll((els) => els.map((el) => el.getAttribute('data-id')));
     expect(await rowIds()).toEqual(['A', 'B']);
@@ -191,7 +189,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-05 P18 static siblings survive clearing a list', async ({ page }) => {
+  test('H-05 P18 static siblings survive clearing a list', async ({ page }) => {
     const probe = await mountProbe(page, 'p18');
     await expect(page.locator('ul.p18 > li')).toHaveText(['H', 'a', 'b']);
 
@@ -213,7 +211,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-19 P26a :host() with a compound argument applies only while the host matches it', async ({ page }) => {
+  test('H-19 P26a :host() with a compound argument applies only while the host matches it', async ({ page }) => {
     const probe = await mountProbe(page, 'p26a');
     const text = page.locator('.p26a-a');
     const setHostClasses = (classes: string[]) =>
@@ -234,7 +232,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-19 P26b :host-context() applies inside a matching ancestor', async ({ page }) => {
+  test('H-19 P26b :host-context() applies inside a matching ancestor', async ({ page }) => {
     const probe = await mountProbe(page, 'p26b');
     const text = page.locator('.p26b-a');
     const red = 'rgb(255, 0, 0)';
@@ -247,7 +245,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-19 P26c a quote in a CSS comment leaves the following rules scoped (dev build)', async ({ page }) => {
+  test('H-19 P26c a quote in a CSS comment leaves the following rules scoped (dev build)', async ({ page }) => {
     const probe = await mountProbe(page, 'p26c');
     await expect(page.locator('#app .p26c-a')).toHaveCSS('color', 'rgb(0, 0, 255)');
     await expect(page.locator('#app .p26c-leak')).toHaveCSS('color', 'rgb(1, 2, 3)');
@@ -255,7 +253,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme("H-28 L1 destroying a component releases its rows' subscriptions and destroys row children", async ({
+  test("H-28 L1 destroying a component releases its rows' subscriptions and destroys row children", async ({
     page,
   }) => {
     const probe = await openProbe(page, 'l1', { manual: true });
@@ -275,7 +273,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme("H-28 L2 hiding a when() releases its rows' subscriptions and showing it again adds no second set", async ({
+  test("H-28 L2 hiding a when() releases its rows' subscriptions and showing it again adds no second set", async ({
     page,
   }) => {
     const probe = await openProbe(page, 'l2', { manual: true });
@@ -283,6 +281,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(await page.evaluate(() => (window as any).__mountProbe())).toBe(true);
     expect(await probe.mountErrors()).toEqual([]);
     await expect(page.locator('.l2-m')).toHaveText(['a-0', 'b-0']);
+    await expect(page.locator('.l2-row .kid')).toHaveText(['a', 'b']);
     const mounted = await liveSubscribers(page, 'l2Tick');
     expect(mounted).toBeGreaterThan(before);
 
@@ -290,16 +289,19 @@ test.describe('F0-3 hardening probes', () => {
       await page.evaluate(() => (window as any).__probe.l2.show(false));
       await expect(page.locator('.l2-row')).toHaveCount(0);
       expect(await liveSubscribers(page, 'l2Tick')).toBe(before);
+      // each hide destroys each row's child once (H-40 mounts them in the rows, H-28 cleans the rows up)
+      expect(await kidDestroyCounts(page)).toEqual({ a: round, b: round });
 
       await page.evaluate(() => (window as any).__probe.l2.show(true));
       expect(await liveSubscribers(page, 'l2Tick')).toBe(mounted);
+      await expect(page.locator('.l2-row .kid')).toHaveText(['a', 'b']);
       await page.evaluate((tick) => (window as any).__probe.store.l2Tick(tick), round);
       await expect(page.locator('.l2-m')).toHaveText([`a-${round}`, `b-${round}`]);
     }
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('H-29 I1 a child component in a row may use a named index in its props', async ({ page }) => {
+  test('H-29 I1 a child component in a row may use a named index in its props', async ({ page }) => {
     const probe = await mountProbe(page, 'i1');
     await expect(page.locator('.i1-row .kid')).toHaveText(['x0', 'y1']);
     expect(probe.pageErrors).toEqual([]);
@@ -380,9 +382,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test.fixme('NEW N1 (no owner yet) child components in the rows of a repeat() inside a when() mount', async ({
-    page,
-  }) => {
+  test('H-40 N1 child components in the rows of a repeat() inside a when() mount', async ({ page }) => {
     const probe = await mountProbe(page, 'n1');
     await expect(page.locator('.n1-row .kid')).toHaveText(['a', 'b']);
 
@@ -410,6 +410,21 @@ test.describe('F0-3 hardening probes', () => {
     await expect(page.locator('.n2-b')).toHaveCount(0);
     await page.evaluate(() => (window as any).__probe.n2.show(true));
     expect(await titles()).toEqual(['ONE', 'TWO', 'THREE']);
+    expect(probe.pageErrors).toEqual([]);
+  });
+
+  test('H-44 K13 a row that is a component call may hold a template literal in its props', async ({ page }) => {
+    const probe = await mountProbe(page, 'k13');
+    await expect(page.locator('.k13 .card')).toHaveText(['x-a', 'x-b']);
+
+    await page.evaluate(() =>
+      (window as any).__probe.k13.rows([
+        { id: 1, label: 'a' },
+        { id: 2, label: 'b' },
+        { id: 3, label: 'c' },
+      ]),
+    );
+    await expect(page.locator('.k13 .card')).toHaveText(['x-a', 'x-b', 'x-c']);
     expect(probe.pageErrors).toEqual([]);
   });
 });

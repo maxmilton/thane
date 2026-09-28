@@ -14,7 +14,7 @@ export function walkElements(roots: HtmlElement[], callback: (element: HtmlEleme
   walk(roots, 0);
 }
 
-export function findElements(roots: HtmlElement[], predicate: (el: HtmlElement) => boolean): HtmlElement[] {
+function findElements(roots: HtmlElement[], predicate: (el: HtmlElement) => boolean): HtmlElement[] {
   const results: HtmlElement[] = [];
   walkElements(roots, (el) => {
     if (predicate(el)) {
@@ -33,7 +33,7 @@ export function getElementHtml(element: HtmlElement, html: string): string {
 }
 
 /** Whether the element sits inside an `<svg>` subtree (including the `<svg>` element itself). */
-export function isInsideSvg(element: HtmlElement | null): boolean {
+function isInsideSvg(element: HtmlElement | null): boolean {
   for (let el = element; el; el = el.parent) {
     if (el.tagName.toLowerCase() === 'svg') return true;
   }
@@ -74,21 +74,19 @@ export function attributeDomProperty(attrName: string, element: HtmlElement | nu
 }
 
 /**
- * Escape a string so it can be safely embedded inside a JS template literal.
- * Prevents backticks from breaking the literal and `${` from being
- * interpreted as a template expression.
- *
- * Use this for raw HTML / plain-text content that should appear verbatim
- * inside a template literal.
+ * The one escaper for every template the compiler emits into a JS template literal (H-02).
+ * Templates are carried as written in the source (raw), so the escape sequences the developer
+ * wrote (`\\`, `` \` ``, `\${`, `\n`, …) are kept as they are; a backtick or `${` that is not
+ * escaped (text the compiler put there) is escaped, so the literal can neither end early nor
+ * interpolate.
  */
 export function escapeTemplateLiteral(s: string): string {
-  return s.replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+  return s.replace(/\\[\s\S]|`|\$\{/g, (m) => (m[0] === '\\' ? m : '\\' + m));
 }
 
 /**
- * Like {@link escapeTemplateLiteral} but also escapes backslashes.
- * Use when the source string may contain raw backslash sequences
- * (e.g., repeat item templates that originate from raw HTML source).
+ * A plain string (a signal's initial value) as raw template text: backslashes, backticks and `${`
+ * escaped, so that it reads back as itself once the template is emitted.
  */
 export function escapeRawTemplateLiteral(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
@@ -96,7 +94,7 @@ export function escapeRawTemplateLiteral(s: string): string {
 
 export function injectIdIntoFirstElement(html: string, id: string): string {
   const trimmed = html.trim();
-  const firstTagMatch = trimmed.match(/^<(\w+)([^>]*)>/);
+  const firstTagMatch = trimmed.match(/^<([A-Za-z][\w:-]*)([^>]*)>/);
   if (!firstTagMatch) {
     return trimmed;
   }
@@ -114,6 +112,6 @@ export function injectIdIntoFirstElement(html: string, id: string): string {
 
 /** The `id` attribute of a template's first element, if it has one. */
 export function firstElementId(html: string): string | undefined {
-  const firstTagMatch = html.trim().match(/^<(\w+)([^>]*)>/);
+  const firstTagMatch = html.trim().match(/^<([A-Za-z][\w:-]*)([^>]*)>/);
   return firstTagMatch?.[2]?.match(/\sid\s*=\s*['"]([^'"]*)['"]/)?.[1];
 }

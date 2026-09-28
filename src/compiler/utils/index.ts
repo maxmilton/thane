@@ -22,8 +22,6 @@ export {
   isDefineComponentCall,
   isSignalCall,
   extractComponentDefinitions,
-  extractPageSelector,
-  findEnclosingClass,
   extractStaticValue,
   findSignalInitializers,
   isHtmlTemplate,

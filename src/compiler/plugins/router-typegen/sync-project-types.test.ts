@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { syncProjectTypes } from './router-typegen.js';
 
 const page = (...names: string[]): string =>
@@ -133,9 +133,10 @@ describe('syncProjectTypes', () => {
     expect(existsSync(generated('.thane', 'types', 'router', 'nested'))).toBe(false);
   });
 
-  test('client types are copied from the package', () => {
-    const packaged = readFileSync(resolve(import.meta.dir, '../../../../client.d.ts'), 'utf8');
-    expect(readFileSync(generated('.thane', 'types', 'client.d.ts'), 'utf8')).toBe(packaged);
+  test("client types are one reference to the package's client.d.ts (H-49)", () => {
+    const file = generated('.thane', 'types', 'client.d.ts');
+    const packaged = relative(dirname(file), resolve(import.meta.dir, '../../../../client.d.ts')).replace(/\\/g, '/');
+    expect(readFileSync(file, 'utf8')).toBe(`/// <reference path="${packaged}" />\n`);
   });
 
   test('legacy and stale generated files are removed', () => {

@@ -13,10 +13,12 @@ import {
   getElementHtml,
   injectIdIntoFirstElement,
   firstElementId,
+  escapeRawTemplateLiteral,
   type HtmlElement,
   type ParsedTemplate,
   type BindingInfo as ParsedBindingInfo,
 } from '../../utils/html-parser/index.js';
+import { outsideVerbatim } from '../minification/template-minifier.js';
 import { safeEvaluateCondition } from './template-processing.js';
 import type { processItemTemplate } from './repeat-analysis.js';
 
@@ -259,9 +261,21 @@ export const collectWhenElseBlocks = (
 // toRepeatBlock
 // ============================================================================
 
-/** A repeat()'s empty template with its whitespace collapsed. */
+/** A repeat()'s empty template with its whitespace collapsed (outside verbatim elements). */
 export const collapseEmptyTemplate = (template: string): string =>
-  template.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim();
+  outsideVerbatim(template, (t) => t.replace(/\s+/g, ' ').replace(/>\s+</g, '><').replace(/\s+>/g, '>').trim());
+
+const _componentRowRe = /^\s*([A-Za-z_$][\w$]*)\((.*)\)\s*$/s;
+
+/**
+ * A row that is a component call (`(item) => Card({ item })`): the component and its props as
+ * written. Read from the row template before processing, which treats every `${…}` in it as row
+ * markup (H-44).
+ */
+const componentRowOf = (rowTemplate: string): RepeatBlock['componentRow'] => {
+  const match = _componentRowRe.exec(rowTemplate.trim());
+  return match ? { componentName: match[1]!, propsExpression: match[2]?.trim() || '{}' } : undefined;
+};
 
 /**
  * The RepeatBlock for a parsed repeat() binding whose row template has been processed. The
@@ -282,6 +296,7 @@ export const toRepeatBlock = (
   itemVar: binding.itemVar!,
   indexVar: binding.indexVar,
   itemTemplate: processed.processedContent,
+  componentRow: componentRowOf(binding.itemTemplate!),
   emptyTemplate: binding.emptyTemplate ? collapseEmptyTemplate(binding.emptyTemplate) : undefined,
   trackByFn: binding.trackByFn,
   startIndex: binding.expressionStart,
@@ -327,12 +342,15 @@ export const applyTemplateEdits = (source: string, edits: TemplateEdit[]): strin
   for (const edit of edits) {
     result = result.substring(0, edit.start) + edit.replacement + result.substring(edit.end);
   }
-  return result
-    .replace(/\s+/g, ' ')
-    .replace(/>\s+<(?![!-])/g, '><')
-    .replace(/(<!--[ib]\d+-->)(<!---->)/g, '$1 $2')
-    .replace(/\s+>/g, '>')
-    .trim();
+  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style> (H-03)
+  return outsideVerbatim(result, (html) =>
+    html
+      .replace(/\s+/g, ' ')
+      .replace(/>\s+<(?![!-])/g, '><')
+      .replace(/(<!--[ib]\d+-->)(<!---->)/g, '$1 $2')
+      .replace(/\s+>/g, '>')
+      .trim(),
+  );
 };
 
 /**
@@ -472,7 +490,7 @@ export const buildSignalReplacementEdits = (
       if (expressionPositions.has(exprStart)) continue;
 
       const value = signalInitializers.get(signalName);
-      const valueStr = value !== undefined ? String(value) : '';
+      const valueStr = value !== undefined ? escapeRawTemplateLiteral(String(value)) : '';
 
       edits.push({
         start: exprStart,

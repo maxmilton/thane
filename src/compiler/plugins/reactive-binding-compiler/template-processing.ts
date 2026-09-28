@@ -16,6 +16,7 @@ import {
   walkElements,
   findElementsWithWhenDirective,
   attributeDomProperty,
+  escapeRawTemplateLiteral,
   type HtmlElement,
   type BindingInfo as ParsedBindingInfo,
 } from '../../utils/html-parser/index.js';
@@ -319,7 +320,7 @@ const processTemplate = (
       });
     } else {
       const initialValue = signalInitializers.get(binding.signalName);
-      const raw = initialValue !== undefined ? String(initialValue) : '';
+      const raw = initialValue !== undefined ? escapeRawTemplateLiteral(String(initialValue)) : '';
       inlineExpressionReplacements.set(binding.expressionStart, {
         exprEnd: binding.expressionEnd,
         replacement: isUnquotedAttrValue ? `"${raw}"` : raw,

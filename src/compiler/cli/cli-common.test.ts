@@ -45,11 +45,12 @@ describe('parseArgs', () => {
     expect(parseArgs(['--gzip']).gzip).toBe(true);
   });
 
-  test('--app is an unknown flag and its value a stray positional (CL-5)', () => {
+  test('--app is an unknown flag and its value a stray positional (CL-5), warned about since H-24', () => {
     const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
     const opts = parseArgs(['--app', 'my-app']);
     expect(warnSpy.mock.calls).toEqual([
       ["Warning: Unknown flag '--app'. Run 'thane --help' to see available options."],
+      ["Warning: Unknown command 'my-app'. Run 'thane --help' to see available commands."],
     ]);
     warnSpy.mockRestore();
     expect(opts).toEqual(parseArgs([]));

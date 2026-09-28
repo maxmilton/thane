@@ -7,6 +7,7 @@
  */
 import { mount, type ComponentHTMLSelector } from 'thane';
 import { I1 } from './probes/i1-index-child-props.js';
+import { K13 } from './probes/k13-component-row-template.js';
 import { L1 } from './probes/l1-destroy-rows.js';
 import { L2 } from './probes/l2-hidden-rows.js';
 import { M1 } from './probes/m1-multi-root-branch.js';
@@ -56,6 +57,7 @@ const probes: Record<string, ComponentHTMLSelector<any>> = {
   x1: X1,
   n1: N1,
   n2: N2,
+  k13: K13,
 };
 
 const win = window as any;

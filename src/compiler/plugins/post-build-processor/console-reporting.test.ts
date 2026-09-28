@@ -3,15 +3,15 @@
  *
  * A real build runs with console.info captured. Every line of the report is checked against the
  * sizes of the files on disk: per-file raw size, colour band, gzip and brotli sizes, and the
- * totals. The expected text is today's format, including its hard-coded colour codes (H-25
- * changes those later).
+ * totals. Since H-25 the colours come from `ansi` (empty without colour), so the expected text
+ * follows the colour decision of this process; the CLI runs below pin both modes.
  */
 import { describe, expect, test } from 'bun:test';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { runBuild } from '../../cli/build.js';
 import { createTempProject, createTestBuildConfig, removeTempProject } from '../../testing/build-project.js';
-import { consoleColors } from '../../utils/index.js';
+import { ansi, consoleColors } from '../../utils/index.js';
 
 const APP = `
 import { defineComponent, mount } from 'thane';
@@ -22,15 +22,12 @@ export const App = defineComponent('test-app', () => ({
 mount({ component: App });
 `;
 
-const CYAN = '\x1b[36m';
-const GREEN = '\x1b[32m';
-
 const sizeColor = (size: number, max: number): string => {
   const ratio = size / max;
-  if (ratio < 0.33) return GREEN;
-  if (ratio < 0.66) return '\x1b[33m';
-  if (ratio < 0.85) return '\x1b[38;5;208m';
-  return '\x1b[31m';
+  if (ratio < 0.33) return ansi.green;
+  if (ratio < 0.66) return ansi.yellow;
+  if (ratio < 0.85) return ansi.orange;
+  return ansi.red;
 };
 
 const kb = (bytes: number): string => (bytes / 1024).toFixed(2);
@@ -57,9 +54,9 @@ const buildAndCapture = async (useGzip: boolean) => {
 const expectReport = async (useGzip: boolean) => {
   const { project, calls, size, files } = await buildAndCapture(useGzip);
   try {
-    const { reset } = consoleColors;
-    const fileLines = calls.filter((args) => args.length === 1 && String(args[0]).startsWith(CYAN));
-    const names = fileLines.map((args) => String(args[0]).slice(CYAN.length).split(reset)[0] ?? '');
+    const { reset } = ansi;
+    const fileLines = calls.filter((args) => args.length === 1 && / {2}(\x1b\[[\d;]+m)?Size: /.test(String(args[0])));
+    const names = fileLines.map((args) => String(args[0]).slice(ansi.cyan.length).split(`${reset}  `)[0] ?? '');
 
     // One line per emitted file (the compressed copies are not listed)
     expect([...names].sort()).toEqual(files.filter((f) => !f.endsWith('.gz') && !f.endsWith('.br')).sort());
@@ -69,11 +66,11 @@ const expectReport = async (useGzip: boolean) => {
     const raw = names.map((n) => size(n) ?? 0);
     const max = Math.max(...raw);
     const expectedLines = names.map((name, i) => {
-      let line = `${CYAN}${name}${reset}  ${sizeColor(raw[i]!, max)}Size: ${kb(raw[i]!)} KB${reset}`;
+      let line = `${ansi.cyan}${name}${reset}  ${sizeColor(raw[i]!, max)}Size: ${kb(raw[i]!)} KB${reset}`;
       const gz = size(name + '.gz');
       const br = size(name + '.br');
       if (useGzip && gz !== undefined) {
-        line += ` ${GREEN}(gzip: ${kb(gz)} KB` + (br !== undefined ? `, br: ${kb(br)} KB)` : ')') + reset;
+        line += ` ${ansi.green}(gzip: ${kb(gz)} KB` + (br !== undefined ? `, br: ${kb(br)} KB)` : ')') + reset;
       }
       return [line];
     });
@@ -111,4 +108,35 @@ describe('Size report', () => {
   test('with useGzip: gzip and brotli sizes per file and in total', async () => {
     await expectReport(true);
   });
+});
+
+describe('H-25: the CLI output follows NO_COLOR and never prints %s', () => {
+  const CLI = join(import.meta.dir, '..', '..', 'cli', 'thane.ts');
+
+  /** `thane build --gzip` in a fresh project with the given colour variables; its whole output. */
+  const cliBuild = async (colour: Record<string, string>): Promise<string> => {
+    const project = await createTempProject(APP, { 'tsconfig.json': '{ "compilerOptions": { "strict": true } }' });
+    try {
+      const env: Record<string, string | undefined> = { ...process.env, ...colour };
+      if (!('FORCE_COLOR' in colour)) delete env['FORCE_COLOR'];
+      const run = Bun.spawnSync([process.execPath, CLI, 'build', '--gzip'], { cwd: project.root, env });
+      expect(run.exitCode).toBe(0);
+      return run.stdout.toString() + run.stderr.toString();
+    } finally {
+      await removeTempProject(project);
+    }
+  };
+
+  test('NO_COLOR=1: no escape codes and no %s', async () => {
+    const out = await cliBuild({ NO_COLOR: '1' });
+    expect(out).toMatch(/\nindex\.html {2}Size: [\d.]+ KB \(gzip: [\d.]+ KB, br: [\d.]+ KB\)\n/);
+    expect(out).not.toContain('\x1b[');
+    expect(out).not.toContain('%s');
+  }, 60000);
+
+  test('FORCE_COLOR=1: the same lines in colour, and no %s', async () => {
+    const out = await cliBuild({ FORCE_COLOR: '1' });
+    expect(out).toMatch(/\x1b\[36mindex\.html\x1b\[0m {2}\x1b\[[\d;]+mSize: [\d.]+ KB\x1b\[0m \x1b\[32m\(gzip: /);
+    expect(out).not.toContain('%s');
+  }, 60000);
 });

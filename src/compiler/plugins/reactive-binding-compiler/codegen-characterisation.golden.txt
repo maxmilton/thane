@@ -159,6 +159,7 @@
       _rc_b8.reconcile(_items_b8());
       const _rsrc_b8_0 = list;
       _subs.push(typeof _rsrc_b8_0?.subscribe === 'function' ? _rsrc_b8_0.subscribe(() => { _rc_b8.reconcile(_items_b8()); }, true) : () => {});
+      _subs.push(() => _rc_b8.clearAll());
       }
       return [
         __bindIf(r, inner, 'b1', `<div id="b1"><!--b2--> <!----></div>`, () => {
@@ -270,6 +271,7 @@
       _rc_b8.reconcile(_items_b8());
       const _rsrc_b8_0 = rows;
       _subs.push(typeof _rsrc_b8_0?.subscribe === 'function' ? _rsrc_b8_0.subscribe(() => { _rc_b8.reconcile(_items_b8()); }, true) : () => {});
+      _subs.push(() => _rc_b8.clearAll());
       _ct_b8.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b8) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; pick(item); });
       }
       return [
@@ -320,6 +322,7 @@
       _syncEmpty_b11(_items_b11());
       const _rsrc_b11_0 = others;
       _subs.push(typeof _rsrc_b11_0?.subscribe === 'function' ? _rsrc_b11_0.subscribe(() => { const items = _items_b11(); _rc_b11.reconcile(items); _syncEmpty_b11(items); }, true) : () => {});
+      _subs.push(() => _rc_b11.clearAll());
       }
       return [
         () => { for (let i = 0; i < _rsubs_b11.length; i++) _rsubs_b11[i](); },
@@ -430,6 +433,7 @@
       _rc_b1.reconcile(_items_b1());
       const _rsrc_b1_0 = xs;
       _subs.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { _rc_b1.reconcile(_items_b1()); }, true) : () => {});
+      _subs.push(() => _rc_b1.clearAll());
       }
       return [
         () => { for (let i = 0; i < _rsubs_b1.length; i++) _rsubs_b1[i](); },
@@ -476,6 +480,7 @@
       _rc_b2.reconcile(_items_b2());
       const _rsrc_b2_0 = xs;
       _subs.push(typeof _rsrc_b2_0?.subscribe === 'function' ? _rsrc_b2_0.subscribe(() => { _rc_b2.reconcile(_items_b2()); }, true) : () => {});
+      _subs.push(() => _rc_b2.clearAll());
       }
       return [
         () => { for (let i = 0; i < _rsubs_b2.length; i++) _rsubs_b2[i](); },
@@ -525,6 +530,7 @@
       _rc_b3.reconcile(_items_b3());
       const _rsrc_b3_0 = xs;
       _subs.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
+      _subs.push(() => _rc_b3.clearAll());
       }
       return [
         __bindIfExpr(r, [b], () => b(), 'b1', `<b id="b1">2</b>`, () => {
@@ -570,6 +576,7 @@
     _rc_b8.reconcile(_items_b8());
     const _rsrc_b8_0 = ys;
     _subs.push(typeof _rsrc_b8_0?.subscribe === 'function' ? _rsrc_b8_0.subscribe(() => { _rc_b8.reconcile(_items_b8()); }, true) : () => {});
+    _subs.push(() => _rc_b8.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -611,6 +618,7 @@
       _rc_b3.reconcile(_items_b3());
       const _rsrc_b3_0 = xs;
       _subs.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
+      _subs.push(() => _rc_b3.clearAll());
       }
       return [
         () => { for (let i = 0; i < _rsubs_b3.length; i++) _rsubs_b3[i](); },
@@ -659,6 +667,7 @@
       _rc_b3.reconcile(_items_b3());
       const _rsrc_b3_0 = xs;
       _subs.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
+      _subs.push(() => _rc_b3.clearAll());
       }
       return [
         () => { for (let i = 0; i < _rsubs_b3.length; i++) _rsubs_b3[i](); },
@@ -720,6 +729,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -750,6 +760,7 @@
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -779,6 +790,7 @@
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     const _rsrc_b0_1 = flag;
     _subs.push(typeof _rsrc_b0_1?.subscribe === 'function' ? _rsrc_b0_1.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -816,6 +828,7 @@
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -856,6 +869,7 @@
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
     const _rsrc_b0_1 = flag;
     _subs.push(typeof _rsrc_b0_1?.subscribe === 'function' ? _rsrc_b0_1.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -891,6 +905,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = store.items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -920,6 +935,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -952,6 +968,7 @@
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -983,6 +1000,7 @@
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
     const _rsrc_b0_1 = n;
     _subs.push(typeof _rsrc_b0_1?.subscribe === 'function' ? _rsrc_b0_1.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1008,13 +1026,14 @@
         const _cm0 = document.createElement('x-kid');
         const _cma0 = (_el.id === 'b900' ? _el : _el.querySelector('#b900'));
         if (_cma0) _cma0.replaceWith(_cm0);
-        return { el: _el, cleanups: [__dc(Kid.__f(_cm0, { label: item.name, i: _idx }))], value: item, update: () => {} };
+        return { el: _el, cleanups: [__dc(Kid.__f(_cm0, { label: item.name, i }))], value: item, update: () => {} };
       },
     (_, i) => i);
     const _items_b0 = () => items();
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1050,6 +1069,7 @@
     _syncEmpty_b0(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { const items = _items_b0(); _rc_b0.reconcile(items); _syncEmpty_b0(items); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1092,6 +1112,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1173,6 +1194,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1212,6 +1234,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1249,6 +1272,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     _ct_b0.addEventListener('click', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; pick(item); if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling) { e.stopPropagation(); remove(e); return; } });
     _ct_b0.addEventListener('keydown', (e) => { let _row = e.target, _cell = null; while (_row && _row.parentNode !== _ct_b0) { _cell = _row; _row = _row.parentNode; } if (!_row || !_row.__d) return; const item = _row.__d; if (_cell !== null && _cell === _row.firstElementChild.nextElementSibling.nextElementSibling) { if (e.key !== 'Enter') return; save(item, i, e); return; } });
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
@@ -1287,6 +1311,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1326,6 +1351,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1369,6 +1395,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1412,6 +1439,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1450,6 +1478,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1494,6 +1523,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1533,6 +1563,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1614,6 +1645,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1659,6 +1691,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = items;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1722,6 +1755,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1778,6 +1812,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1835,6 +1870,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1884,6 +1920,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1934,6 +1971,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -1981,6 +2019,7 @@
     _syncEmpty_b1(_items_b1());
     const _rsrc_b1_0 = items;
     _subs.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { const items = _items_b1(); _rc_b1.reconcile(items); _syncEmpty_b1(items); }, true) : () => {});
+    _subs.push(() => _rc_b1.clearAll());
     const _tc_b3 = __tpl_b3.content.firstElementChild;
     const _a_b3 = _gid('b3');
     const _ct_b3 = _a_b3.parentNode;
@@ -1995,6 +2034,7 @@
     _rc_b3.reconcile(_items_b3());
     const _rsrc_b3_0 = items;
     _subs.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
+    _subs.push(() => _rc_b3.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -2002,8 +2042,8 @@
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b1 = _T(`<li title="c\\d"><!--i2--> <!----> e\\f</li>`);
-  const __tpl_b3 = _T(`<li>s\\t</li>`);
+  const __tpl_b1 = _T(`<li title="c\d"><!--i2--> <!----> e\f</li>`);
+  const __tpl_b3 = _T(`<li>s\t</li>`);
 === escaping: the same templates, production ===
 --- template
 <p title="a\b">`q` <!--b4--> <!----></p><ul><template id="b1"></template></ul><ol><template id="b3"></template></ol><template id="b0"></template>
@@ -2042,6 +2082,7 @@
     _syncEmpty_b1(_items_b1());
     const _rsrc_b1_0 = items;
     _subs.push(typeof _rsrc_b1_0?.subscribe === 'function' ? _rsrc_b1_0.subscribe(() => { const items = _items_b1(); _rc_b1.reconcile(items); _syncEmpty_b1(items); }, true) : () => {});
+    _subs.push(() => _rc_b1.clearAll());
     const _tc_b3 = __tpl_b3.content.firstElementChild;
     const _a_b3 = _gid('b3');
     const _ct_b3 = _a_b3.parentNode;
@@ -2056,6 +2097,7 @@
     _rc_b3.reconcile(_items_b3());
     const _rsrc_b3_0 = items;
     _subs.push(typeof _rsrc_b3_0?.subscribe === 'function' ? _rsrc_b3_0.subscribe(() => { _rc_b3.reconcile(_items_b3()); }, true) : () => {});
+    _subs.push(() => _rc_b3.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };
@@ -2063,8 +2105,8 @@
   const _cloneNode = Node.prototype.cloneNode;
   const _insertBefore = Node.prototype.insertBefore;
   const _nc = [];
-  const __tpl_b1 = _T(`<li title="c\\d"><!--i2--> <!----> e\\f</li>`);
-  const __tpl_b3 = _T(`<li>s\\t</li>`);
+  const __tpl_b1 = _T(`<li title="c\d"><!--i2--> <!----> e\f</li>`);
+  const __tpl_b3 = _T(`<li>s\t</li>`);
 === production: nested rows, row directives and a child mount ===
 --- template
 <ul><template id="b0"></template></ul>
@@ -2121,6 +2163,7 @@
     _rc_b0.reconcile(_items_b0());
     const _rsrc_b0_0 = groups;
     _subs.push(typeof _rsrc_b0_0?.subscribe === 'function' ? _rsrc_b0_0.subscribe(() => { _rc_b0.reconcile(_items_b0()); }, true) : () => {});
+    _subs.push(() => _rc_b0.clearAll());
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const _T = (h) => { const t = document.createElement('template'); t.innerHTML = h; return t; };

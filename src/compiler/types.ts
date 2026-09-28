@@ -49,19 +49,8 @@ export interface ComponentDefinition {
  */
 export interface TemplateInfo {
   node: ts.TaggedTemplateExpression;
-  expressions: SignalExpression[];
   templateStart: number;
   templateEnd: number;
-}
-
-/**
- * Signal expression in template
- */
-export interface SignalExpression {
-  signalName: string;
-  fullExpression: string;
-  start: number;
-  end: number;
 }
 
 /** A start/end character range for source positions and overlap checking. */
@@ -83,8 +72,7 @@ export interface ImportInfo {
 
 /**
  * Shared build context passed across plugins to avoid duplicate work.
- * The filesystem scan results are populated once during onStart and
- * shared by ComponentPrecompiler and HTMLBootstrapInjector.
+ * The filesystem scan results are populated once and read by ComponentPrecompiler.
  */
 export interface BuildContext {
   /** All .ts files discovered by the shared scan */

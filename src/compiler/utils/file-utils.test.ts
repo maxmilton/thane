@@ -1,9 +1,9 @@
 /**
- * Characterisation of createBuildContext (before CL-3): it scans the working directory, not the
- * project root, skips the excluded folders and .d.ts files, and indexes every exported
- * defineComponent by name and by selector.
+ * Characterisation of createBuildContext (before CL-3): it scans the working directory, skips the
+ * excluded folders and .d.ts files, and indexes every exported defineComponent by name and by
+ * selector. Since H-15 it also scans the project root when that lies outside the working directory.
  */
-import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
@@ -73,5 +73,35 @@ test('createBuildContext scans the working directory', async () => {
     'x-card': ['Card', 'src/widgets/card.ts'],
     'x-other': ['Other', 'src/widgets/card.ts'],
     'leaf-node': ['LeafNode', 'deep/a/b/c/leaf.ts'],
+  });
+});
+
+/** Scanned files relative to `root`, in scan order, for a build started in `cwd`. */
+const scanFrom = async (cwd: string, projectRoot?: string): Promise<string[]> => {
+  process.chdir(cwd);
+  try {
+    const ctx = await createBuildContext(projectRoot);
+    return ctx.tsFiles.map((p) => relative(root, p).replace(/\\/g, '/'));
+  } finally {
+    process.chdir(originalCwd);
+  }
+};
+
+describe('H-15: the project root is scanned too when it lies outside the working directory', () => {
+  test('a project root inside the working directory adds nothing', async () => {
+    expect(await scanFrom(root, join(root, 'src'))).toEqual(await scanFrom(root));
+    expect(await scanFrom(root, root)).toEqual(await scanFrom(root));
+  });
+
+  test('a working directory outside the project: its files first, then the project', async () => {
+    const files = await scanFrom(join(root, 'deep'), join(root, 'src'));
+    expect(files[0]).toBe('deep/a/b/c/leaf.ts');
+    expect(files.slice(1).sort()).toEqual(['src/app-shell.ts', 'src/main.ts', 'src/widgets/card.ts']);
+  });
+
+  test('a working directory inside the project: each file once', async () => {
+    const files = await scanFrom(join(root, 'src', 'widgets'), root);
+    expect(files[0]).toBe('src/widgets/card.ts');
+    expect(files.slice(1).sort()).toEqual(['deep/a/b/c/leaf.ts', 'src/app-shell.ts', 'src/main.ts']);
   });
 });

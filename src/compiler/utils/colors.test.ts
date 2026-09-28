@@ -31,7 +31,6 @@ describe('console colours', () => {
         cyan: `${E}36m%s${E}0m`,
         red: `${E}31m%s${E}0m`,
         orange: `${E}38;5;208m%s${E}0m`,
-        reset: `${E}0m`,
       },
       ansi: {
         green: `${E}32m`,
@@ -51,7 +50,8 @@ describe('console colours', () => {
   test('colour off', () => {
     expect(load('0')).toEqual({
       supportsColor: false,
-      consoleColors: { green: '%s', yellow: '%s', blue: '%s', cyan: '%s', red: '%s', orange: '%s', reset: '%s' },
+      // no `reset` since H-25: interpolated into a line, its '%s' was printed literally
+      consoleColors: { green: '%s', yellow: '%s', blue: '%s', cyan: '%s', red: '%s', orange: '%s' },
       ansi: {
         green: '',
         yellow: '',
@@ -69,7 +69,7 @@ describe('console colours', () => {
 
   test('key order', () => {
     const on = load('1');
-    expect(Object.keys(on.consoleColors)).toEqual(['green', 'yellow', 'blue', 'cyan', 'red', 'orange', 'reset']);
+    expect(Object.keys(on.consoleColors)).toEqual(['green', 'yellow', 'blue', 'cyan', 'red', 'orange']);
     expect(Object.keys(on.ansi)).toEqual([
       'green',
       'yellow',

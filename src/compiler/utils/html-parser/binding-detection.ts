@@ -14,155 +14,44 @@ import { ErrorCode } from '../../errors.js';
 /**
  * Shared argument parser for both whenElse and repeat expressions.
  *
- * Parses a comma-separated argument list from a `${directive(` call,
- * handling nested template literals and balanced parentheses.
+ * Parses a comma-separated argument list from a `${directive(` call: strings and template
+ * literals are skipped whole by the expression scanner (H-12), and a comma splits only outside
+ * every bracket.
  *
  * @param text - full text being parsed
  * @param startPos - position right after the opening paren of the directive
  * @returns parsed args and end position, or null if parsing fails
  */
 function parseDirectiveArgs(text: string, startPos: number): { args: string[]; end: number } | null {
-  let pos = startPos;
   let parenDepth = 1;
   let braceDepth = 0;
   let bracketDepth = 0;
-
   const args: string[] = [];
-  let currentArg = '';
-  let inBacktick = false;
-  let templateBraceDepth = 0;
-  let inSingleQuote = false;
-  let inDoubleQuote = false;
-  let escaped = false;
+  let argStart = startPos;
 
-  while (pos < text.length) {
+  for (let pos = startPos; pos < text.length; pos++) {
     const char = text[pos];
-
-    if (inSingleQuote) {
-      currentArg += char;
-      if (escaped) {
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-      } else if (char === "'") {
-        inSingleQuote = false;
-      }
-      pos++;
-      continue;
-    }
-
-    if (inDoubleQuote) {
-      currentArg += char;
-      if (escaped) {
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-      } else if (char === '"') {
-        inDoubleQuote = false;
-      }
-      pos++;
-      continue;
-    }
-
-    if (char === '`' && !inBacktick) {
-      inBacktick = true;
-      templateBraceDepth = 0;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (char === '`' && inBacktick && templateBraceDepth === 0) {
-      inBacktick = false;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (inBacktick && char === '$' && text[pos + 1] === '{') {
-      templateBraceDepth++;
-      currentArg += '${';
-      pos += 2;
-      continue;
-    }
-
-    if (inBacktick && char === '}' && templateBraceDepth > 0) {
-      templateBraceDepth--;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (inBacktick && templateBraceDepth > 0 && char === '{') {
-      templateBraceDepth++;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (inBacktick) {
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (char === "'") {
-      inSingleQuote = true;
-      escaped = false;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (char === '"') {
-      inDoubleQuote = true;
-      escaped = false;
-      currentArg += char;
-      pos++;
-      continue;
-    }
-
-    if (char === '(') {
+    if (char === "'" || char === '"' || char === '`') {
+      pos = literalEnd(text, pos);
+      if (pos === -1) return null;
+    } else if (char === '(') {
       parenDepth++;
-      currentArg += char;
-    } else if (char === ')') {
-      parenDepth--;
-      if (parenDepth === 0) {
-        const finalArg = currentArg.trim();
-        if (finalArg !== '') {
-          args.push(finalArg);
-        }
-        pos++;
-        if (text[pos] === '}') {
-          pos++;
-        }
-        return { args, end: pos };
-      }
-      currentArg += char;
+    } else if (char === ')' && --parenDepth === 0) {
+      const finalArg = text.slice(argStart, pos).trim();
+      if (finalArg !== '') args.push(finalArg);
+      return { args, end: text[pos + 1] === '}' ? pos + 2 : pos + 1 };
     } else if (char === '{') {
       braceDepth++;
-      currentArg += char;
-    } else if (char === '}') {
-      if (braceDepth > 0) {
-        braceDepth--;
-      }
-      currentArg += char;
+    } else if (char === '}' && braceDepth > 0) {
+      braceDepth--;
     } else if (char === '[') {
       bracketDepth++;
-      currentArg += char;
-    } else if (char === ']') {
-      if (bracketDepth > 0) {
-        bracketDepth--;
-      }
-      currentArg += char;
+    } else if (char === ']' && bracketDepth > 0) {
+      bracketDepth--;
     } else if (char === ',' && parenDepth === 1 && braceDepth === 0 && bracketDepth === 0) {
-      args.push(currentArg.trim());
-      currentArg = '';
-    } else {
-      currentArg += char;
+      args.push(text.slice(argStart, pos).trim());
+      argStart = pos + 1;
     }
-
-    pos++;
   }
 
   return null;
@@ -182,7 +71,7 @@ function extractHtmlTemplateContent(arg: string): string {
   return arg;
 }
 
-function extractSignalsFromExpression(expression: string): string[] {
+export function extractSignalsFromExpression(expression: string): string[] {
   const signals: string[] = [];
   const sourceFile = ts.createSourceFile(
     '__thane_expr.ts',
@@ -216,6 +105,13 @@ function extractSignalsFromExpression(expression: string): string[] {
   return signals;
 }
 
+/** Whether the character at `pos` is escaped: an odd run of backslashes before it (`\${` is text). */
+export function isEscaped(text: string, pos: number): boolean {
+  let i = pos;
+  while (i > 0 && text[i - 1] === '\\') i--;
+  return (pos - i) % 2 === 1;
+}
+
 /** The template with every `${…}` expression removed, nested template literals included. */
 export function stripTemplateExpressions(value: string): string {
   let out = '';
@@ -228,30 +124,34 @@ export function stripTemplateExpressions(value: string): string {
 }
 
 /**
- * End (exclusive) of the `${…}` that starts at `start`, or -1 when it is not closed. Nested braces
- * and template literals (with their own `${…}`) are skipped; quotes are not.
+ * End (exclusive) of the `${…}` that starts at `start`, or -1 when it is not closed. The one
+ * expression scanner (H-12): braces count in code only, so a brace inside a string or a nested
+ * template literal (whose own `${…}` are scanned the same way, at any depth) never ends it.
  */
-function templateExpressionEnd(value: string, start: number): number {
-  let braceDepth = 1;
-  let inBacktick = false;
-  let templateBraceDepth = 0;
-  for (let i = start + 2; i < value.length; i++) {
-    const ch = value[i];
-    if (inBacktick) {
-      if (ch === '`' && templateBraceDepth === 0) {
-        inBacktick = false;
-      } else if (ch === '$' && value[i + 1] === '{') {
-        templateBraceDepth++;
-        i++;
-      } else if (ch === '}' && templateBraceDepth > 0) {
-        templateBraceDepth--;
-      }
-    } else if (ch === '`') {
-      inBacktick = true;
-    } else if (ch === '{') {
-      braceDepth++;
-    } else if (ch === '}' && --braceDepth === 0) {
-      return i + 1;
+export function templateExpressionEnd(text: string, start: number): number {
+  let depth = 0;
+  for (let i = start + 2; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{') depth++;
+    else if (ch === '}' && depth-- === 0) return i + 1;
+    else if (ch === '"' || ch === "'" || ch === '`') {
+      i = literalEnd(text, i);
+      if (i === -1) return -1;
+    }
+  }
+  return -1;
+}
+
+/** Index of the quote that closes the string or template literal opened at `start`, or -1. */
+function literalEnd(text: string, start: number): number {
+  const quote = text[start];
+  for (let i = start + 1; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '\\') i++;
+    else if (ch === quote) return i;
+    else if (quote === '`' && ch === '$' && text[i + 1] === '{') {
+      i = templateExpressionEnd(text, i) - 1;
+      if (i < 0) return -1;
     }
   }
   return -1;
@@ -265,7 +165,7 @@ export function findTemplateExpressions(
   let start: number;
 
   while ((start = value.indexOf('${', searchPos)) !== -1) {
-    const end = templateExpressionEnd(value, start);
+    const end = isEscaped(value, start) ? -1 : templateExpressionEnd(value, start);
     if (end === -1) {
       searchPos = start + 2;
       continue;
@@ -346,7 +246,7 @@ function splitStyleDeclarations(styleValue: string, expressions: TemplateExpress
   return declarations;
 }
 
-export function parseWhenElseExpression(
+function parseWhenElseExpression(
   text: string,
   startPos: number,
 ): {
@@ -381,7 +281,7 @@ export function parseWhenElseExpression(
   };
 }
 
-export function parseRepeatExpression(
+function parseRepeatExpression(
   text: string,
   startPos: number,
 ): {
@@ -480,7 +380,7 @@ export function findBindingsInText(
 
   while ((whenElseMatch = whenElseRegex.exec(text)) !== null) {
     const startPos = whenElseMatch.index;
-    const parsed = parseWhenElseExpression(text, startPos);
+    const parsed = isEscaped(text, startPos) ? null : parseWhenElseExpression(text, startPos);
     if (parsed) {
       complexExprPositions.push({ start: startPos, end: parsed.end });
 
@@ -504,7 +404,7 @@ export function findBindingsInText(
 
   while ((repeatMatch = repeatRegex.exec(text)) !== null) {
     const startPos = repeatMatch.index;
-    const parsed = parseRepeatExpression(text, startPos);
+    const parsed = isEscaped(text, startPos) ? null : parseRepeatExpression(text, startPos);
     if (parsed) {
       complexExprPositions.push({ start: startPos, end: parsed.end });
 
@@ -535,7 +435,7 @@ export function findBindingsInText(
   while ((match = signalExprRegex.exec(text)) !== null) {
     const pos = match.index;
     const insideComplex = complexExprPositions.some((cp) => pos >= cp.start && pos < cp.end);
-    if (insideComplex) continue;
+    if (insideComplex || isEscaped(text, pos)) continue;
 
     const signalName = match[1];
     if (!signalName) continue;
@@ -562,7 +462,7 @@ export function findBindingsInText(
   let dollarIdx: number;
   while ((dollarIdx = text.indexOf('${', searchPos)) !== -1) {
     const insideSkipRange = allSkipRanges.some((r) => dollarIdx >= r.start && dollarIdx < r.end);
-    const end = insideSkipRange ? -1 : templateExpressionEnd(text, dollarIdx);
+    const end = insideSkipRange || isEscaped(text, dollarIdx) ? -1 : templateExpressionEnd(text, dollarIdx);
     if (end === -1) {
       searchPos = dollarIdx + 2;
       continue;

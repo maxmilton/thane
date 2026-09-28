@@ -251,13 +251,7 @@ export class DevServer {
         return null;
       }
 
-      const requestedPath = resolve(this.options.distDir, '.' + parsed.pathname);
-      const canonicalDistDir = resolve(this.options.distDir);
-      if (!requestedPath.startsWith(canonicalDistDir)) {
-        return null;
-      }
-
-      return requestedPath;
+      return resolveRequestPath(this.options.distDir, parsed.pathname);
     } catch {
       return null;
     }
@@ -418,7 +412,7 @@ export class DevServer {
           if (await file.exists()) {
             const stat = await file.stat();
             if (stat?.isFile()) {
-              return compressAndRespond(
+              return await compressAndRespond(
                 requestedPath,
                 req,
                 getContentType(requestedUrl),
@@ -430,8 +424,8 @@ export class DevServer {
           // Not a readable file: answered below like a missing one
         }
 
-        // Anything that is not a file: a missing asset, or a client route served by index.html
-        return hasFileExtension
+        // Anything that is not a file: a missing asset, or a client route served by index.html (if there is one)
+        return hasFileExtension || !(await Bun.file(indexPath).exists())
           ? new Response('Not Found', { status: 404 })
           : compressAndRespond(indexPath, req, 'text/html', 'no-cache');
       },

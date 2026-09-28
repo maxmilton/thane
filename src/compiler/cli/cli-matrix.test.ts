@@ -240,13 +240,16 @@ const normalise = (value: unknown, cwd: string): Json => {
   return value as Json;
 };
 
+/** The resolved options, or `{ "(error)": message }` when resolving throws (H-24: `--port abc`). */
 const resolveIn = (state: State, args: string[]): { result: Json; warnings: string[] } => {
   process.chdir(dirs[state]);
   const cwd = process.cwd();
   const warn = spyOn(console, 'warn').mockImplementation(() => {});
+  const warnings = () => warn.mock.calls.map((call) => call.map(String).join(' '));
   try {
-    const result = normalise(resolveCLIOptions(args), cwd);
-    return { result, warnings: warn.mock.calls.map((call) => call.map(String).join(' ')) };
+    return { result: normalise(resolveCLIOptions(args), cwd), warnings: warnings() };
+  } catch (error) {
+    return { result: { '(error)': error instanceof Error ? error.message : String(error) }, warnings: warnings() };
   } finally {
     warn.mockRestore();
     process.chdir(originalCwd);
@@ -271,7 +274,8 @@ const computeMatrix = () => {
     const rowResults: { [row: string]: Json } = {};
     for (const args of rows().slice(1)) {
       const { result, warnings } = resolveIn(state, args);
-      const d = delta(base, result as { [key: string]: Json });
+      const r = result as { [key: string]: Json };
+      const d = '(error)' in r ? { ...r } : delta(base, r);
       if (warnings.length > 0) d['(warnings)'] = warnings;
       rowResults[rowKey(args)] = d;
     }

@@ -436,6 +436,12 @@ describe('mountComponent', () => {
     expect(() => mountComponent({} as any, el())).toThrow('Invalid mount component');
   });
 
+  test('H-20: no component at all is rejected with the same message, not a TypeError', () => {
+    expect(() => mountComponent(undefined as any, el())).toThrow(new Error('Invalid mount component'));
+    expect(() => mountComponent(null as any, el())).toThrow(new Error('Invalid mount component'));
+    expect(log).toEqual([]);
+  });
+
   test('passes target, props and extras to the factory and returns { root, destroy }', () => {
     const seen: { args?: unknown[] } = {};
     const target = el();
@@ -546,6 +552,21 @@ describe('mount (Mode A)', () => {
     log = [];
     handle.destroy();
     expect(log).toEqual(['target.className = ""', 'target.innerHTML = ""']);
+  });
+
+  test('H-20: mount({}) and mount({ target }) throw "Invalid mount component"', () => {
+    const g = globalThis as any;
+    const saved = g.document;
+    const body = el('body');
+    g.document = { body };
+    try {
+      expect(() => mount({})).toThrow(new Error('Invalid mount component'));
+      expect(() => mount({ target: el() })).toThrow(new Error('Invalid mount component'));
+      expect(() => mount({ component: undefined, props: { a: 1 } })).toThrow(new Error('Invalid mount component'));
+      expect(log).toEqual([]);
+    } finally {
+      g.document = saved;
+    }
   });
 
   test('mount({ component }) mounts into document.body', () => {

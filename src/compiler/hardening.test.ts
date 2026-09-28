@@ -82,7 +82,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(callsRuntimeDefineComponent(js)).toBe(false);
   });
 
-  test.todo('H-09 C2 a component whose path contains "scripts" is compiled', async () => {
+  test('H-09 C2 a component whose path contains "scripts" is compiled', async () => {
     const js = await buildAndReadJs(mainFor('Tr', 'transcripts/tr'), {
       ...DEV,
       extraFiles: {
@@ -96,7 +96,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test.todo('H-10 C3 a component file importing thane/router before thane builds', async () => {
+  test('H-10 C3 a component file importing thane/router before thane builds', async () => {
     const js = await buildAndReadJs(mainFor('Rt', 'rt'), {
       ...DEV,
       extraFiles: {
@@ -114,24 +114,21 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test.todo(
-    'H-11 C4 a style binding of a CSS custom property to a bare signal builds and sets the property',
-    async () => {
-      const js = await buildAndReadJs(mainFor('Cp', 'cp'), {
-        ...DEV,
-        extraFiles: {
-          'src/cp.ts': component(
-            'Cp',
-            '  const w = signal(\'10px\');\n  return { template: html`<p class="c4" style="--w: ${w()}">c4</p>` };',
-          ),
-        },
-      });
-      expect(js).toMatch(/\.setProperty\(\s*["']--w["']/);
-      expect(undeclaredNames(js)).toEqual([]);
-    },
-  );
+  test('H-11 C4 a style binding of a CSS custom property to a bare signal builds and sets the property', async () => {
+    const js = await buildAndReadJs(mainFor('Cp', 'cp'), {
+      ...DEV,
+      extraFiles: {
+        'src/cp.ts': component(
+          'Cp',
+          '  const w = signal(\'10px\');\n  return { template: html`<p class="c4" style="--w: ${w()}">c4</p>` };',
+        ),
+      },
+    });
+    expect(js).toMatch(/\.setProperty\(\s*["']--w["']/);
+    expect(undeclaredNames(js)).toEqual([]);
+  });
 
-  test.todo('H-12 C5 braces inside a string inside a template expression build', async () => {
+  test('H-12 C5 braces inside a string inside a template expression build', async () => {
     const js = await buildAndReadJs(mainFor('Br', 'br'), {
       ...DEV,
       extraFiles: {
@@ -145,7 +142,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test.todo('H-13 C6 an entry with two mount() calls on different targets defines mount for both', async () => {
+  test('H-13 C6 an entry with two mount() calls on different targets defines mount for both', async () => {
     const js = await buildAndReadJs(
       "import { mount } from 'thane';\n" +
         "import { Mo } from './mo.js';\n" +
@@ -162,7 +159,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test.todo("H-14 C7 importing an .scss file fails with esbuild's no-loader error", async () => {
+  test("H-14 C7 importing an .scss file fails with esbuild's no-loader error", async () => {
     await expect(
       buildAndReadJs(mainFor('Sc', 'sc'), {
         ...DEV,
@@ -177,24 +174,28 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     ).rejects.toThrow(/No loader is configured for "\.scss" files/);
   });
 
-  test.todo('H-15 C8 building from a working directory outside the project gives the same output', async () => {
+  test('H-15 C8 building from a working directory outside the project gives the same output', async () => {
     // The same project built twice: from the repository (an ancestor of the project), then from a
     // folder that is not an ancestor. Child components must be compiled and the entry script injected
     // either way.
+    // The child's name is unique in the repository: components are looked up by name over the whole
+    // scan, so a `Kid` elsewhere in the repository (e2e/hardening-app) would lend it its selector in
+    // the build from the repository (a finding of H-15, not fixed here).
     const project = await createTempProject(mainFor('Par', 'par'), {
       'src/par.ts':
         "import { defineComponent } from 'thane';\n" +
-        "import { Kid } from './kid.js';\n" +
-        'export const Par = defineComponent(() => ({ template: html`<div class="par">${Kid({})}</div>` }));\n',
+        "import { CwdKid } from './kid.js';\n" +
+        'export const Par = defineComponent(() => ({ template: html`<div class="par">${CwdKid({})}</div>` }));\n',
       'src/kid.ts':
-        'import { defineComponent } from \'thane\';\nexport const Kid = defineComponent(() => ({ template: html`<b class="kid">kid</b>` }));\n',
+        'import { defineComponent } from \'thane\';\nexport const CwdKid = defineComponent(() => ({ template: html`<b class="kid">kid</b>` }));\n',
     });
     const outside = await mkdtemp(join(tmpdir(), 'thane-cwd-'));
     const previousCwd = process.cwd();
     const build = async () => {
       await runBuild(createTestBuildConfig(project, DEV.config));
       return {
-        js: (await readBuiltJs(project.outDir)).replace(/^\/\/# sourceMappingURL=.*$/gm, ''),
+        // esbuild's `// <file>` markers name each module relative to the working directory
+        js: (await readBuiltJs(project.outDir)).replace(/^\/\/(# sourceMappingURL=| ).*$/gm, ''),
         html: await readFile(join(project.outDir, 'index.html'), 'utf8'),
       };
     };

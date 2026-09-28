@@ -101,8 +101,17 @@
     "nextId": 1
   },
   "component: pre-rendered when() with property-bound attributes, on a void element and inside": {
-    "processedContent": "<div><input id=\"b0\" checked=${c()} checked><p id=\"b1\"><input id=\"b2\"></p></div>",
+    "processedContent": "<div><input id=\"b0\"><p id=\"b1\"><input id=\"b2\"></p></div>",
     "bindings": [
+      {
+        "id": "b0",
+        "signalName": "c",
+        "type": "attr",
+        "property": "checked",
+        "domProperty": "checked",
+        "isInsideConditional": true,
+        "conditionalId": "b0"
+      },
       {
         "id": "b2",
         "signalName": "v",
@@ -122,8 +131,18 @@
         "initialValue": true,
         "startIndex": 5,
         "endIndex": 48,
-        "templateContent": "<input id=\"b0\" checked=${c()} checked>",
-        "nestedBindings": [],
+        "templateContent": "<input id=\"b0\" checked>",
+        "nestedBindings": [
+          {
+            "id": "b0",
+            "signalName": "c",
+            "type": "attr",
+            "property": "checked",
+            "domProperty": "checked",
+            "isInsideConditional": true,
+            "conditionalId": "b0"
+          }
+        ],
         "nestedConditionals": [],
         "nestedWhenElse": [],
         "nestedRepeats": [],
@@ -161,6 +180,38 @@
     "nextId": 3
   },
   "component: pre-rendered when() on a non-void element with a duplicated property-bound attribute": {
+    "processedContent": "<div><button id=\"b0\" disabled disabled=${d()}>B</button><b><!--b1--> <!----></b></div>",
+    "bindings": [
+      {
+        "id": "b1",
+        "signalName": "n",
+        "type": "text",
+        "isInsideConditional": false
+      }
+    ],
+    "conditionals": [
+      {
+        "id": "b0",
+        "signalName": "s",
+        "signalNames": ["s"],
+        "jsExpression": "s()",
+        "initialValue": true,
+        "startIndex": 5,
+        "endIndex": 61,
+        "templateContent": "<button id=\"b0\" disabled disabled=${d()}>B</button>",
+        "nestedBindings": [],
+        "nestedConditionals": [],
+        "nestedWhenElse": [],
+        "nestedRepeats": [],
+        "nestedEventBindings": []
+      }
+    ],
+    "whenElseBlocks": [],
+    "repeatBlocks": [],
+    "eventBindings": [],
+    "nextId": 2
+  },
+  "component: pre-rendered when() on a non-void element with a duplicated property-bound attribute, bound first": {
     "processedContent": "<div><button id=\"b0\">B</button><b><!--b1--> <!----></b></div>",
     "bindings": [
       {
@@ -188,7 +239,7 @@
         "initialValue": true,
         "startIndex": 5,
         "endIndex": 61,
-        "templateContent": "<button id=\"b0\" disabled=\"false\">B</button>",
+        "templateContent": "<button id=\"b0\" disabled>B</button>",
         "nestedBindings": [
           {
             "id": "b0",
@@ -271,7 +322,7 @@
         "signalNames": ["items"],
         "itemsExpression": "items()",
         "itemVar": "it",
-        "itemTemplate": "<li id=\"b4\">${it$().name}</li>",
+        "itemTemplate": "<li id=\"b4\">${it.name}</li>",
         "startIndex": 81,
         "endIndex": 159,
         "itemBindings": [

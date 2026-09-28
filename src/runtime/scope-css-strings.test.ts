@@ -50,6 +50,15 @@ describe('scopeCssRules: strings inside selector lists', () => {
   ]);
 });
 
+describe('scopeCssRules: strings inside :host(…) (H-19 (i))', () => {
+  table([
+    // A parenthesis inside a string does not close `:host(`
+    [':host([a=")"]) .b { c: d }', '.sel[a=")"] .b{ c: d }'],
+    [":host([a='(']) .b { c: d }", ".sel[a='('] .b{ c: d }"],
+    [':host(:not([a="x)"])) .b { c: d }', '.sel:not([a="x)"]) .b{ c: d }'],
+  ]);
+});
+
 describe('scopeCssRules: strings inside grouping at-rules', () => {
   table([
     [

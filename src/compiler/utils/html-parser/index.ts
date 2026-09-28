@@ -6,17 +6,7 @@
  */
 
 // Types
-export type {
-  ParserState,
-  AttributeInfo,
-  TextNode,
-  HtmlElement,
-  BindingInfo,
-  ParseDiagnostic,
-  ParsedTemplate,
-} from './types.js';
-
-export { VOID_ELEMENTS } from './types.js';
+export type { HtmlElement, BindingInfo, ParsedTemplate } from './types.js';
 
 // Parser core
 export { parseHtmlTemplate } from './parser-core.js';
@@ -24,21 +14,16 @@ export { parseHtmlTemplate } from './parser-core.js';
 // Binding detection
 export type { BindingDetectionOptions } from './binding-detection.js';
 export {
-  parseWhenElseExpression,
-  parseRepeatExpression,
-  findBindingsInText,
-  findBindingsInAttributes,
   findTemplateExpressions,
+  extractSignalsFromExpression,
   stripTemplateExpressions,
 } from './binding-detection.js';
 
 // Utilities
 export {
   walkElements,
-  findElements,
   findElementsWithWhenDirective,
   getElementHtml,
-  isInsideSvg,
   attributeDomProperty,
   injectIdIntoFirstElement,
   firstElementId,

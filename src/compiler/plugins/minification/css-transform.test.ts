@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import ts from 'typescript';
+import { buildAndReadJs } from '../../testing/build-project.js';
 import {
   compileCssTemplate,
   countCssClass,
@@ -10,6 +11,7 @@ import {
 } from './css-transform.js';
 import { minifyCSS, minifyHTML } from './template-minifier.js';
 import { SelectorMap } from './selector-minifier.js';
+import { scopeCssRules } from '../../../runtime/component.js';
 
 const mapOf = (...selectors: string[]): SelectorMap => {
   const map = new SelectorMap();
@@ -160,6 +162,173 @@ describe('compileCssTemplate', () => {
   test('a css template nested in a substitution is compiled too', () => {
     const source = 'const s = css`.a { } ${on ? css`.b {  color: red;  }` : ""}`;';
     expect(compile(source, { minify: true })).toBe('`.a{}${on ? `.b{color:red}` : ""}`');
+  });
+});
+
+describe('H-19 (ii): :host-context(X) becomes X &', () => {
+  test('in every build, before the runtime scoper sees it', () => {
+    const css = ':host-context(.dark) .title { color: red; }';
+    expect(transformCss(css, {})).toBe('.dark & .title { color: red; }');
+    expect(transformCss(css, { minify: true })).toBe('.dark & .title{color:red}');
+    expect(scopeCssRules(transformCss(css, {}), '.my-card')).toBe('.dark .my-card .title{ color: red; }');
+  });
+
+  test('in one member of a selector list, on its own, and with a pseudo-class after it', () => {
+    expect(transformCss('.a, :host-context(body.dark) .b { }', {})).toBe('.a, body.dark & .b { }');
+    expect(transformCss(':host-context(.dark) { }', {})).toBe('.dark & { }');
+    expect(transformCss(':host-context(.dark):hover .a { }', {})).toBe('.dark &:hover .a { }');
+    expect(transformCss('@media (min-width: 1px) { :host-context(.x) .a { } :host-context(.y) .b { } }', {})).toBe(
+      '@media (min-width: 1px) { .x & .a { } .y & .b { } }',
+    );
+  });
+
+  test('the argument ends at its matching parenthesis, skipping strings', () => {
+    expect(transformCss(':host-context(:not([data-x=")"])) .a { }', {})).toBe(':not([data-x=")"]) & .a { }');
+  });
+
+  test('strings are left alone, and so is an unclosed argument (comments go, see H-19 (iii))', () => {
+    const untouched = [
+      '.a::before { content: ":host-context(.x)"; }',
+      ".a { background: url(':host-context(.x)'); }",
+      ':host-context(.x .a { }',
+    ];
+    for (const css of untouched) expect(transformCss(css, {})).toBe(css);
+  });
+
+  test('a css template: the argument may be a substitution', () => {
+    expect(compile('const s = css`:host-context(${theme}) .a { color: ${c}; }`;', {})).toBe(
+      '`${theme} & .a { color: ${c}; }`',
+    );
+  });
+});
+
+describe('H-19 (iii): comments go in a development build too', () => {
+  const css = ".a {\n  /* it's a note */\n  color: blue;\n}\n.b { color: red; }\n";
+
+  test('each comment becomes a space, and the runtime scoper then scopes every rule', () => {
+    expect(transformCss(css, {})).toBe('.a {\n   \n  color: blue;\n}\n.b { color: red; }\n');
+    // with the comment left in, the scoper returns the stylesheet unscoped
+    expect(scopeCssRules(css, '.sel')).toBe(css);
+    expect(scopeCssRules(transformCss(css, {}), '.sel')).toBe(
+      '.sel .a{\n   \n  color: blue;\n}.sel .b{ color: red; }\n',
+    );
+  });
+
+  test('comment openers inside strings and unquoted url() values stay', () => {
+    const untouched = ['.a::before { content: "/* x */"; }', '.a { background: url(/img/*.png); } .b { }'];
+    for (const text of untouched) expect(transformCss(text, {})).toBe(text);
+  });
+
+  test('every comment goes, whatever it holds', () => {
+    expect(transformCss('/* :host-context(.x) */ .a { } /* a */ /* b */', {})).toBe('  .a { }    ');
+    expect(transformCss('.a { } /* unclosed', {})).toBe('.a { }  ');
+  });
+
+  test('a production build is unchanged: the minifier drops them', () => {
+    expect(transformCss(css, { minify: true })).toBe(minifyCSS(css));
+  });
+});
+
+describe('H-36c: statement at-rules never reach the runtime scoper', () => {
+  /** transformCss with console.warn captured. */
+  const transform = (css: string, options: Parameters<typeof transformCss>[1] = {}) => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      return { css: transformCss(css, options), warnings: warn.mock.calls.map((c) => c.join(' ')) };
+    } finally {
+      warn.mockRestore();
+    }
+  };
+
+  test('@layer statements become empty @layer blocks, in the order declared', () => {
+    expect(transform('@layer base; .a { color: red; }').css).toBe('@layer base{} .a { color: red; }');
+    expect(transform('@layer reset, base,\n  theme.dark;\n.a { }').css).toBe(
+      '@layer reset{}@layer base{}@layer theme.dark{}\n.a { }',
+    );
+    expect(transform('@layer base; .a { color: red; }', { minify: true }).css).toBe('@layer base{}.a{color:red}');
+    // the runtime scoper then scopes the rule after it
+    expect(scopeCssRules(transform('@layer base; .a { color: red; }').css, '.sel')).toBe(
+      '@layer base{}.sel .a{ color: red; }',
+    );
+  });
+
+  test('@charset goes silently; @import goes with a warning naming the file and the rule', () => {
+    expect(transform('@charset "UTF-8";\n.a { }')).toEqual({ css: '\n.a { }', warnings: [] });
+    const { css, warnings } = transform('@import url("x.css") layer(base) supports(display: grid);\n.a { }', {
+      file: 'src/card.css',
+    });
+    expect(css).toBe('\n.a { }');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(
+      'src/card.css: @import url("x.css") layer(base) supports(display: grid); was removed. @import is ignored in ' +
+        'component stylesheets (browsers drop it from constructed stylesheets): import that file globally ' +
+        'instead, with a <link> in index.html.',
+    );
+    expect(transform("@import 'y.css'; .a { }").css).toBe(' .a { }');
+  });
+
+  test('inside a block, in any case of the name', () => {
+    expect(transform('@media (min-width: 1px) { @layer a; .b { } }').css).toBe(
+      '@media (min-width: 1px) { @layer a{} .b { } }',
+    );
+    expect(transform('@LAYER a; .b { }').css).toBe('@layer a{} .b { }');
+  });
+
+  test('blocks, @namespace, strings and look-alike names are left alone', () => {
+    const untouched = [
+      '@layer base { .a { } }',
+      '@namespace svg url(http://www.w3.org/2000/svg); .a { }',
+      '.a::before { content: "@import x; @layer y;"; }',
+      '@layer-x a; .b { }',
+      '@importer a; .b { }',
+      '@layer a',
+    ];
+    for (const css of untouched) expect(transform(css)).toEqual({ css, warnings: [] });
+  });
+
+  test('a css template: the layer name may be a substitution', () => {
+    expect(compile('const s = css`@layer ${name}; .a { color: ${c}; }`;', {})).toBe(
+      '`@layer ${name}{} .a { color: ${c}; }`',
+    );
+  });
+
+  test('build-through: css`` and an imported .css file both come out scoped after @layer', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    let js = '';
+    let warnings: string[] = [];
+    try {
+      js = await buildAndReadJs(
+        "import { mount } from 'thane';\nimport { Lt } from './lt.js';\nimport { Lf } from './lf.js';\n" +
+          "mount({ component: Lt, target: document.getElementById('app')! });\n" +
+          "mount({ component: Lf, target: document.getElementById('app')! });\n",
+        {
+          config: { strictTypeCheck: false },
+          extraFiles: {
+            'src/lt.ts':
+              "import { defineComponent } from 'thane';\n" +
+              'export const Lt = defineComponent(() => ({ template: html`<p class="a">t</p>`, ' +
+              'styles: css`@layer base; @import url(x.css); .a { color: red; }` }));\n',
+            'src/lf.ts':
+              "import { defineComponent } from 'thane';\nimport styles from './lf.css';\n" +
+              'export const Lf = defineComponent(() => ({ template: html`<p class="b">f</p>`, styles }));\n',
+            'src/lf.css': '@charset "UTF-8";\n@layer base, theme;\n.b { color: blue; }\n',
+          },
+        },
+      );
+    } finally {
+      warnings = warn.mock.calls.map((c) => c.join(' '));
+      warn.mockRestore();
+    }
+    const fromTemplate = /`(@layer base\{\}[^`]*)`/.exec(js)?.[1];
+    const fromFile = /"(\\n@layer base\{\}[^"]*)"/.exec(js)?.[1];
+    expect(fromTemplate).toBe('@layer base{}  .a { color: red; }');
+    expect(JSON.parse(`"${fromFile}"`)).toBe('\n@layer base{}@layer theme{}\n.b { color: blue; }\n');
+    expect(scopeCssRules(fromTemplate!, '.lt')).toBe('@layer base{}.lt .a{ color: red; }');
+    expect(scopeCssRules(JSON.parse(`"${fromFile}"`), '.lf')).toBe(
+      '\n@layer base{}@layer theme{}.lf .b{ color: blue; }\n',
+    );
+    expect(warnings.filter((w) => w.includes('@import'))).toHaveLength(1);
+    expect(warnings.find((w) => w.includes('@import'))).toMatch(/lt\.ts: @import url\(x\.css\); was removed/);
   });
 });
 

@@ -122,7 +122,7 @@ function scopeSingleSelector(selector: string, hostSelector: string): string {
   }
 
   if (trimmed.startsWith(':host(')) {
-    const end = trimmed.indexOf(')');
+    const end = findMatchingBrace(trimmed, ':host'.length);
     if (end !== -1) {
       const hostSuffix = trimmed.slice(':host('.length, end).trim();
       const rest = trimmed.slice(end + 1);
@@ -136,7 +136,10 @@ function scopeSingleSelector(selector: string, hostSelector: string): string {
   return `${hostSelector} ${trimmed}`;
 }
 
+// The `}` or `)` that closes the `{` or `(` at openIndex, outside strings; -1 if none
 function findMatchingBrace(source: string, openIndex: number): number {
+  const open = source[openIndex];
+  const close = open === '(' ? ')' : '}';
   let depth = 0;
 
   for (let i = openIndex; i < source.length; i++) {
@@ -147,8 +150,8 @@ function findMatchingBrace(source: string, openIndex: number): number {
       continue;
     }
 
-    if (ch === '{') depth++;
-    if (ch === '}') {
+    if (ch === open) depth++;
+    if (ch === close) {
       depth--;
       if (depth === 0) return i;
     }
@@ -495,7 +498,7 @@ export function mountComponent(
   // store the factory as __f on the ref.
   const factory:
     | ((t: HTMLElement, p?: Record<string, any>, e?: { route?: UntypedRouteContext | undefined }) => ComponentInstance)
-    | undefined = (component as unknown as ComponentRef).__f;
+    | undefined = (component as unknown as ComponentRef | undefined)?.__f;
   if (!factory) {
     throw new Error('Invalid mount component');
   }

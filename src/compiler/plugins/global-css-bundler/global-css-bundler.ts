@@ -22,12 +22,13 @@ export const GlobalCSSBundlerPlugin = (options: GlobalCSSBundlerOptions = {}): P
   setup(build) {
     const shouldMinify = options.minify ?? false;
 
-    build.onLoad({ filter: /.css$/ }, async (args) => {
+    build.onLoad({ filter: /\.css$/ }, async (args) => {
       try {
         const selectorMap = options.selectorMap?.();
         const cssContent = transformCss(await fs.promises.readFile(args.path, 'utf8'), {
           minify: shouldMinify,
           selectorMap: selectorMap?.hasStylesheet(args.path) ? selectorMap : undefined,
+          file: args.path,
         });
         return {
           contents: `export default ${JSON.stringify(cssContent)};`,

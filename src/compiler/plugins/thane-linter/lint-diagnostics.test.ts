@@ -24,6 +24,7 @@ import {
   noAliasedComponentExport,
   noCrossFileHtmlTemplate,
   duplicateMountTarget,
+  singleReturnObject,
 } from './rules/index.js';
 
 /** The path passed to the rule. The source is parsed as 'parsed.ts', so the reported file must come from here. */
@@ -539,5 +540,58 @@ describe('THANE411 diagnostics', () => {
       warning(src, 5, 'mount', message('var:el', 3)),
       warning(src, 7, 'mount', message('var:el', 1)),
     ]);
+  });
+});
+
+// ============================================================================
+// THANE412: single-return-object (H-38)
+// ============================================================================
+
+describe('THANE412 diagnostics', () => {
+  const error = diag('error', ErrorCode.SINGLE_RETURN_OBJECT);
+  const MESSAGE =
+    'A setup function with more than one return object is not supported. ' +
+    "The compiler builds one template per component, from the last return, so this one is never used. Use 'when()' or 'whenElse()' in the template instead.";
+
+  test('reports every return object but the last, at any depth, at its return', () => {
+    const src = [
+      'export const App = defineComponent(() => {',
+      '  if (flag) {',
+      '    return { template: html`<p>a</p>` };',
+      '  }',
+      '  for (const x of xs) { if (x) return { template: html`<p>b</p>` }; }',
+      '  return { template: html`<p>c</p>` };',
+      '});',
+    ];
+    expect(run(singleReturnObject, src)).toStrictEqual([
+      error(src, 3, 'return', MESSAGE),
+      error(src, 5, 'return', MESSAGE),
+    ]);
+  });
+
+  test('the setup after a selector counts; each component on its own', () => {
+    const src = [
+      "export const A = defineComponent('x-a', function () {",
+      '  if (flag) return { template: html`<p>a</p>` };',
+      '  return { template: html`<p>b</p>` };',
+      '});',
+      'export const B = defineComponent(() => ({ template: html`<p>b</p>` }));',
+    ];
+    expect(run(singleReturnObject, src)).toStrictEqual([error(src, 2, 'return', MESSAGE)]);
+  });
+
+  test('accepts one return object, a concise body, returns inside nested functions, and other returns', () => {
+    const src = [
+      'export const A = defineComponent(() => {',
+      '  const helper = () => { return { a: 1 }; };',
+      '  function decl() { return { b: 2 }; }',
+      '  const obj = { method() { return { c: 3 }; } };',
+      '  if (flag) return;',
+      '  return { template: html`<p>a</p>` };',
+      '});',
+      'export const B = defineComponent(() => (({ template: html`<p>b</p>` })));',
+      'const notAComponent = () => { if (flag) return { a: 1 }; return { b: 2 }; };',
+    ];
+    expect(run(singleReturnObject, src)).toStrictEqual([]);
   });
 });

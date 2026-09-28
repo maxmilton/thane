@@ -14,19 +14,25 @@ const VERBATIM_ELEMENT = /<(pre|textarea|script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/
 const VERBATIM_OPEN = '';
 const VERBATIM_CLOSE = '';
 
-export const minifyHTML = (html: string): string => {
+/**
+ * Apply `transform` to the HTML outside verbatim elements, which are masked while it runs and put
+ * back as written. Every place that collapses a template's whitespace goes through it (H-03).
+ */
+export const outsideVerbatim = (html: string, transform: (html: string) => string): string => {
   const verbatim: string[] = [];
   const masked = html.replace(VERBATIM_ELEMENT, (block) => {
     verbatim.push(block);
     return `${VERBATIM_OPEN}${verbatim.length - 1}${VERBATIM_CLOSE}`;
   });
-  const minified = collapseHTML(masked);
-  if (verbatim.length === 0) return minified;
-  return minified.replace(
+  const result = transform(masked);
+  if (verbatim.length === 0) return result;
+  return result.replace(
     new RegExp(`${VERBATIM_OPEN}(\\d+)${VERBATIM_CLOSE}`, 'g'),
     (_match, index: string) => verbatim[Number(index)]!,
   );
 };
+
+export const minifyHTML = (html: string): string => outsideVerbatim(html, collapseHTML);
 
 const collapseHTML = (html: string): string => {
   return (

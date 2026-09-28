@@ -38,9 +38,9 @@ export async function runBuild(config: BuildConfig): Promise<void> {
 
   console.info(consoleColors.blue, `Running ${environment} build...`);
 
-  const buildContext = await createBuildContext();
   const firstEntry = config.entryPoints[0];
   const projectRoot = config.projectRoot ?? (firstEntry ? resolveProjectRoot(firstEntry) : process.cwd());
+  const buildContext = await createBuildContext(projectRoot);
 
   // Templates, stylesheets and selectors are minified by the compiler as it emits them (see
   // plugins/minification); esbuild minifies the JavaScript. Nothing edits the emitted files.
@@ -85,6 +85,9 @@ export async function runBuild(config: BuildConfig): Promise<void> {
   if (config.dropDebugger) prodDrop.push('debugger');
 
   const buildConfig: BuildOptions = {
+    // esbuild's default is the directory it was loaded in; the post-build step resolves the
+    // metafile's paths against the current one
+    absWorkingDir: process.cwd(),
     entryPoints: config.entryPoints,
     bundle: true,
     platform: 'browser',
