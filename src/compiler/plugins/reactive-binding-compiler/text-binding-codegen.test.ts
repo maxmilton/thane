@@ -156,7 +156,7 @@ export const App = defineComponent('test-app', () => {
 mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
-    // The text node after the marker is reached by path once per row (A1-4), no TreeWalker, and
+    // The text node after the marker is reached by path once per row, no TreeWalker, and
     // written through `.data`
     expect(js).not.toContain('createTreeWalker');
     expect(js).toContain('<li>Name: <!----> <!----></li>');
@@ -182,7 +182,7 @@ mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // Two comment markers means two text nodes, each written in fill and update; the space between
-    // the bindings stays (H-52)
+    // the bindings stays
     expect(js).toContain('<li><!----> <!----> <!----> <!----></li>');
     expect(js).not.toContain('createTreeWalker');
     const dataWrites = js.match(/\.data\s*=/g);
@@ -460,7 +460,7 @@ mount({ component: App });
 `;
     const js = await buildAndReadJs(source);
     // The marker and the boundary comment survive in the template, the marker without its id
-    // (A1-4), with the text node between them, which the binding writes
+    //, with the text node between them, which the binding writes
     expect(js).not.toMatch(/<!--b\d+-->/);
     expect(js).toContain('Hello <!---->World<!----> World');
     expect(js).toMatch(/\.data ?=/);

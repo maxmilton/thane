@@ -1,7 +1,7 @@
 import { defineComponent, signal } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// A1-1: markup the browser's parser rebuilds. A table written without <tbody> (the parser inserts
+// Markup the browser's parser rebuilds. A table written without <tbody> (the parser inserts
 // one), a <p> followed by a block element (the parser closes the <p> first, and the stray </p>
 // becomes a second, empty <p>), an unclosed <li> (closed by the next one), and a <select> with a
 // static <option> before a repeat().

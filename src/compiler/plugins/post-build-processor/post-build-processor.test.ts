@@ -41,7 +41,7 @@ describe('Entry script injection', () => {
   });
 });
 
-describe('H-26: an edited index.html is rendered like the built one', () => {
+describe('an edited index.html is rendered like the built one', () => {
   const SOURCE_HTML =
     '<!doctype html>\n<html>\n  <head>\n    <!-- a note -->\n    <title>t</title>\n  </head>\n  <body>\n    <div id="app"></div>\n  </body>\n</html>\n';
 

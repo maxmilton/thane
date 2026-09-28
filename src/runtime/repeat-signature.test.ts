@@ -1,5 +1,5 @@
 /**
- * H-54: the global `repeat()` declaration (index.ts, `declare global`) type-checks every empty
+ * The global `repeat()` declaration (index.ts, `declare global`) type-checks every empty
  * template the compiler takes, and rejects a function in the third argument, where a key function is
  * easily written by mistake: `repeat(items, row, (it) => it.id)` (the key function goes fourth).
  *
@@ -76,7 +76,7 @@ describe('the global repeat() declaration', () => {
   }, 60_000);
 
   for (const name of Object.keys(INVALID)) {
-    test(`H-54 ${name} in the third argument is a type error`, () => {
+    test(`${name} in the third argument is a type error`, () => {
       expect(diagnostics().get(name)?.join('\n')).toMatch(/not assignable/);
     }, 60_000);
   }

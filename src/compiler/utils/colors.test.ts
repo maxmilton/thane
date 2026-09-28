@@ -1,5 +1,5 @@
 /**
- * Characterisation of the console colour strings (before CL-3), with colour forced on and off.
+ * Characterisation of the console colour strings, with colour forced on and off.
  * `supportsColor` is decided when the module loads, so each mode runs in a child process.
  */
 import { describe, expect, test } from 'bun:test';
@@ -50,7 +50,7 @@ describe('console colours', () => {
   test('colour off', () => {
     expect(load('0')).toEqual({
       supportsColor: false,
-      // no `reset` since H-25: interpolated into a line, its '%s' was printed literally
+      // no `reset`: interpolated into a line, its '%s' was printed literally
       consoleColors: { green: '%s', yellow: '%s', blue: '%s', cyan: '%s', red: '%s', orange: '%s' },
       ansi: {
         green: '',

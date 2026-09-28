@@ -1,5 +1,5 @@
 /**
- * Golden matrix of CLI option resolution (F0-2 item 5, before CL-1 and CL-5).
+ * Golden matrix of CLI option resolution.
  *
  * `resolveCLIOptions(args)` is run for every flag `parseArgs` knows, with and without a value,
  * plus repeated flags, negation pairs in both orders, bare value flags followed by another flag,
@@ -237,7 +237,7 @@ const normalise = (value: unknown, cwd: string): Json => {
   return value as Json;
 };
 
-/** The resolved options, or `{ "(error)": message }` when resolving throws (H-24: `--port abc`). */
+/** The resolved options, or `{ "(error)": message }` when resolving throws (`--port abc`). */
 const resolveIn = (state: State, args: string[]): { result: Json; warnings: string[] } => {
   process.chdir(dirs[state]);
   const cwd = process.cwd();

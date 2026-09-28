@@ -3,7 +3,7 @@ import { expose } from '../shared/expose.js';
 
 type SigRow = { id: number; on: boolean; name: string };
 
-// RW-2 (H-18): rows whose items are signals (the Signal<Signal<T>[]> pattern) with a when() on the item
+// Rows whose items are signals (the Signal<Signal<T>[]> pattern) with a when() on the item
 // signal and a binding that reads it inside. The row's directives read the item variable itself, which
 // the row factory declares (`const row = item;`).
 export const RW2Sig = defineComponent('hardening-rw2-sig', () => {

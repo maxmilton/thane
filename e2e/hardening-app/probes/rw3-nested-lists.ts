@@ -29,7 +29,7 @@ export const RW3_TOPS: Top[] = [
   { id: 3, title: 'C', mids: [] },
 ];
 
-// RW-3 (H-18): a list inside a row is generated like any other list, at any depth.
+// A list inside a row is generated like any other list, at any depth.
 // - three: three lists, each row reading the rows above it, a handler on each level's row, a .stop one
 //   on the innermost;
 // - idx: index bindings in inner rows, then a reorder;
@@ -39,7 +39,7 @@ export const RW3_TOPS: Top[] = [
 // - mixed: repeat › whenElse › repeat › when / whenElse;
 // - shadow: an inner list whose item has the outer item's name;
 // - after: a handler of the outer row on a static element after an inner list, in the list's container;
-// - oitem: a child in an inner row whose props read an outer item named `item` (found in RW-3);
+// - oitem: a child in an inner row whose props read an outer item named `item`;
 // - sigitem: rows whose items are signals and whose parameter is named `item`, read as `item()` in inner rows.
 type SigRow = { id: number; name: string; tags: string[] };
 

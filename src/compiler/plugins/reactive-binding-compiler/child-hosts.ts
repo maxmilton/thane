@@ -1,5 +1,5 @@
 /**
- * Child component hosts in the template (A1-4).
+ * Child component hosts in the template.
  *
  * The component precompiler leaves a placeholder comment where a child component call was written
  * (`${Card({…})}` → `<!--b3.-->`). The child's host element takes its place in the template

@@ -1,6 +1,5 @@
 /**
- * Characterisation of the mount-call optimiser (F0-2 item 7; component-precompiler.ts L340–418,
- * before H-13 and PL-4).
+ * Characterisation of the mount-call optimiser (component-precompiler.ts).
  *
  * An entry file that calls `mount({ component, target?, props? })` and contains neither the text
  * `router` nor an `html` template is rewritten to `mountComponent(component, target?, props?)`,
@@ -94,7 +93,7 @@ export const boot = () => mount({ component: App });
     expect(hasMountWrapper(js)).toBe(false);
   });
 
-  test('H-13: mount imported by the second of two thane imports', async () => {
+  test('mount imported by the second of two thane imports', async () => {
     const js = await build(`import { signal } from 'thane';
 import { mount } from 'thane';
 import { App } from './app';
@@ -106,7 +105,7 @@ if (ready()) mount({ component: App });
     expect(hasMountWrapper(js)).toBe(false);
   });
 
-  test('H-13: an unmount() call is not a second mount() call', async () => {
+  test('an unmount() call is not a second mount() call', async () => {
     const js = await build(`import { mount, unmount } from 'thane';
 import { App } from './app';
 const handle = mount({ component: App });
@@ -139,7 +138,7 @@ mount({ component: App });
     expect(hasMountWrapper(js)).toBe(true);
   });
 
-  test('H-13: two mount() calls on different targets: neither is rewritten', async () => {
+  test('two mount() calls on different targets: neither is rewritten', async () => {
     const js = await build(`import { mount } from 'thane';
 import { App } from './app';
 mount({ component: App, target: document.getElementById('a')! });
@@ -151,7 +150,7 @@ mount({ component: App, target: document.getElementById('b')! });
     expect(hasMountWrapper(js)).toBe(true);
   });
 
-  test("H-13: a local function called mount is not thane's", async () => {
+  test("a local function called mount is not thane's", async () => {
     const js = await build(`import { App } from './app';
 const mount = (options: { component: unknown }) => console.log(options);
 mount({ component: App });
@@ -182,7 +181,7 @@ export { mount };
     expect(hasMountWrapper(js)).toBe(true);
   });
 
-  test('H-13: mount imported from another module', async () => {
+  test('mount imported from another module', async () => {
     const js = await build(
       `import { mount } from './my-mount';
 import { App } from './app';

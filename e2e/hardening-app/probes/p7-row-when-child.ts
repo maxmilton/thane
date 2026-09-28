@@ -1,7 +1,7 @@
 import { defineComponent, signal } from 'thane';
 import { ProbeCard } from '../shared/probe-card.js';
 
-// P7 (H-18, RW-2): a child component inside a when() inside a repeat() row.
+// P7: a child component inside a when() inside a repeat() row.
 export const P7 = defineComponent('hardening-p7', () => {
   const rows = signal([{ id: 1 }]);
   const show = signal(true);

@@ -1,6 +1,6 @@
 import { defineComponent, signal } from 'thane';
 
-// P2 (H-18, RW-3): an event handler on an element in a nested repeat() row.
+// P2: an event handler on an element in a nested repeat() row.
 export const P2 = defineComponent('hardening-p2', () => {
   const groups = signal([{ id: 1, tags: ['a', 'b'] }]);
   const picked = signal('none');

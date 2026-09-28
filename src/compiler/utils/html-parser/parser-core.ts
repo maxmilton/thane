@@ -155,7 +155,7 @@ export function parseHtmlTemplate(html: string, options?: BindingDetectionOption
     });
   };
 
-  /** Record the attribute; a duplicate is ignored, as browsers keep the first (H-46). */
+  /** Record the attribute; a duplicate is ignored, as browsers keep the first. */
   const setAttribute = (value: string, end: number, valueStart: number, valueEnd: number) => {
     if (currentElement!.attributes.has(attrName)) {
       const message = `Duplicate attribute "${attrName}" on <${currentElement!.tagName}>: the first one is kept`;

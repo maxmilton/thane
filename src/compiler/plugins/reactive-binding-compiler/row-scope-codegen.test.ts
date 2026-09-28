@@ -31,8 +31,8 @@ describe('Nested directives inside rows read the row through row-scoped signals'
     expect(js).toMatch(/row\$\(row2?\);/);
     // The condition reads it and is subscribed to it
     expect(js).toMatch(/__bindIfExpr\(_w[se]_b\d+, _w[me]_b\d+, \[row\$\], \(\) => row\$\(\)\.on,/);
-    // Bound elements inside the content are reached by path from the content's root (A1-2): here the
-    // bound element is the root itself. The content is bound by the branch initializer (RW-2).
+    // Bound elements inside the content are reached by path from the content's root: here the
+    // bound element is the root itself. The content is bound by the branch initializer.
     expect(js).toMatch(/\(_c\) => \{\s+const b\d+ = _c;/);
     expect(js).not.toMatch(/_q\(/);
     // The host attribute is a guarded expression binding on the row signal
@@ -59,7 +59,7 @@ describe('Nested directives inside rows read the row through row-scoped signals'
   test('a nested repeat over item data re-reconciles on row update and its rows read the outer item', async () => {
     const js = await buildAndReadJs(app('<li>${repeat(row.tags, (t) => html`<i>${row.name}:${t}</i>`)}</li>'));
     expect(js).toMatch(/const row\$ = (?:__sig|signal)\(row\);/);
-    // Inner list driven by the row signal, generated like any list (RW-3), its subscription in the row's cleanups
+    // Inner list driven by the row signal, generated like any list, its subscription in the row's cleanups
     expect(js).toMatch(/const _items_b\d+ = \(\) => row\$\(\)\.tags;/);
     expect(js).toMatch(/const _rsrc_b\d+_0 = row\$;\s*_cleanups\.push\(typeof _rsrc_b\d+_0\?\.subscribe/);
     // Inner rows write the member, not the object, and subscribe to the row signal

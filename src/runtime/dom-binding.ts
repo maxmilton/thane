@@ -232,7 +232,7 @@ export function createKeyedReconciler<T>(
     for (let i = 0; i < len; i++) runCleanups(managedItems[i]!);
     const anchorParent = anchor.parentNode;
     if (anchorParent) {
-      // Empty the container only when it holds nothing but the rows and the anchor (P18)
+      // Empty the container only when it holds nothing but the rows and the anchor
       if (container.childNodes.length === len + 1) {
         anchor.remove();
         (container as HTMLElement).textContent = '';
@@ -257,7 +257,7 @@ export function createKeyedReconciler<T>(
     if (count <= 0) return;
 
     const base = managedItems.length;
-    // Where the container is now, not at creation: later rows change a row's next sibling (P15)
+    // Where the container is now, not at creation: later rows change a row's next sibling
     const parent = base === 0 ? container.parentNode : null;
     const next = container.nextSibling;
     if (parent) container.remove();
@@ -327,7 +327,7 @@ export function createKeyedReconciler<T>(
     }
 
     // Fast path: single item removed — find missing old key by linear scan. As in the in-place
-    // pass below, an identical item needs nothing and a changed one is updated at its new index (K22).
+    // pass below, an identical item needs nothing and a changed one is updated at its new index.
     if (oldLength === newLength + 1) {
       let removedIdx = 0;
       for (; removedIdx < newLength; removedIdx++) {
@@ -338,7 +338,7 @@ export function createKeyedReconciler<T>(
         updateRow(managed, newItem, removedIdx);
       }
 
-      // Every later key must be the next old row's, or this is not one row removed (K21)
+      // Every later key must be the next old row's, or this is not one row removed
       let i = removedIdx;
       for (; i < newLength; i++) {
         const managed = managedItems[i + 1]!;

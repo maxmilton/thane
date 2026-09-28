@@ -165,7 +165,7 @@ describe('compileCssTemplate', () => {
   });
 });
 
-describe('H-19 (ii): :host-context(X) becomes X &', () => {
+describe('(ii): :host-context(X) becomes X &', () => {
   test('in every build, before the runtime scoper sees it', () => {
     const css = ':host-context(.dark) .title { color: red; }';
     expect(transformCss(css, {})).toBe('.dark & .title { color: red; }');
@@ -186,7 +186,7 @@ describe('H-19 (ii): :host-context(X) becomes X &', () => {
     expect(transformCss(':host-context(:not([data-x=")"])) .a { }', {})).toBe(':not([data-x=")"]) & .a { }');
   });
 
-  test('strings are left alone, and so is an unclosed argument (comments go, see H-19 (iii))', () => {
+  test('strings are left alone, and so is an unclosed argument (comments go)', () => {
     const untouched = [
       '.a::before { content: ":host-context(.x)"; }',
       ".a { background: url(':host-context(.x)'); }",
@@ -202,7 +202,7 @@ describe('H-19 (ii): :host-context(X) becomes X &', () => {
   });
 });
 
-describe('H-19 (iii): comments go in a development build too', () => {
+describe('(iii): comments go in a development build too', () => {
   const css = ".a {\n  /* it's a note */\n  color: blue;\n}\n.b { color: red; }\n";
 
   test('each comment becomes a space, and the runtime scoper then scopes every rule', () => {
@@ -229,7 +229,7 @@ describe('H-19 (iii): comments go in a development build too', () => {
   });
 });
 
-describe('H-36c: statement at-rules never reach the runtime scoper', () => {
+describe('statement at-rules never reach the runtime scoper', () => {
   /** transformCss with console.warn captured. */
   const transform = (css: string, options: Parameters<typeof transformCss>[1] = {}) => {
     const warn = spyOn(console, 'warn').mockImplementation(() => {});

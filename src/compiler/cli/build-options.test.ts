@@ -1,7 +1,7 @@
 /**
- * Characterisation of the esbuild options runBuild derives from a BuildConfig (before CL-2).
+ * Characterisation of the esbuild options runBuild derives from a BuildConfig.
  *
- * The output snapshot (§1.7) covers dev builds without drops and prod builds with both drops.
+ * The output snapshot covers dev builds without drops and prod builds with both drops.
  * This file pins the other combinations: drops requested in a dev build (ignored), prod builds
  * that keep console / debugger, and entry and chunk file names with and without hashes.
  * It calls runBuild directly (not buildAndReadJs), so the snapshot preload does not record it.

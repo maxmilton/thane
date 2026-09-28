@@ -49,7 +49,7 @@ export interface DomModel {
 
 /**
  * The value of template-literal text written as `raw`: what a compiled template hands to
- * innerHTML. Templates are carried as written (H-02), so their escape sequences are still in them.
+ * innerHTML. Templates are carried as written, so their escape sequences are still in them.
  */
 export const cookTemplateText = (raw: string): string =>
   raw

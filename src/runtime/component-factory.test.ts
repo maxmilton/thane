@@ -1,14 +1,13 @@
 /**
- * Characterisation of the component factories, `__dc` and `mountComponent` (before RT-6…RT-8).
+ * Characterisation of the component factories, `__dc` and `mountComponent`.
  *
  * component.ts has little other unit coverage: its behaviour is covered by the
  * e2e contract and destroy suites. These tests pin, with an operation log over a fake DOM, what
- * each factory does and in which order, so that RT-6 (defineComponent), RT-7
- * (__registerComponent) and RT-8 (mountComponent().destroy) can be checked without a browser.
+ * each factory does and in which order, so that a change to defineComponent, __registerComponent or
+ * mountComponent().destroy can be checked without a browser.
  *
- * Not pinned on purpose: the undeclared third and further arguments of defineComponent (RT-6
- * removes them) and the extra name/template pairs __registerComponent copies onto its ref (RT-7
- * removes them). The route-context provider is pinned in router-lifecycle.test.ts, because it is
+ * Not pinned on purpose: undeclared third and further arguments of defineComponent, and extra
+ * name/template pairs passed to __registerComponent: neither is used. The route-context provider is pinned in router-lifecycle.test.ts, because it is
  * installed by the router module.
  */
 import { afterEach, describe, expect, test } from 'bun:test';
@@ -204,7 +203,7 @@ describe('__registerComponent', () => {
     ]);
   });
 
-  test('RT-7: extra name/template pairs (from compilers before CE-6) are not stored on the ref', () => {
+  test('extra name/template pairs (from older compilers) are not stored on the ref', () => {
     const ref = (__registerComponent as any)('x-a', () => ({}), fakeTemplate('tpl'), '__tpl_b1', fakeTemplate('extra'));
     expect(Object.keys(ref)).toEqual(['__f']);
   });
@@ -450,7 +449,7 @@ describe('mountComponent', () => {
     expect(() => mountComponent({} as any, el())).toThrow('Invalid mount component');
   });
 
-  test('H-20: no component at all is rejected with the same message, not a TypeError', () => {
+  test('no component at all is rejected with the same message, not a TypeError', () => {
     expect(() => mountComponent(undefined as any, el())).toThrow(new Error('Invalid mount component'));
     expect(() => mountComponent(null as any, el())).toThrow(new Error('Invalid mount component'));
     expect(log).toEqual([]);
@@ -568,7 +567,7 @@ describe('mount (Mode A)', () => {
     expect(log).toEqual(['target.className = ""', 'target.innerHTML = ""']);
   });
 
-  test('H-20: mount({}) and mount({ target }) throw "Invalid mount component"', () => {
+  test('mount({}) and mount({ target }) throw "Invalid mount component"', () => {
     const g = globalThis as any;
     const saved = g.document;
     const body = el('body');

@@ -1,13 +1,11 @@
 /**
- * Characterisation of `bindConditional` through `__bindIf` / `__bindIfExpr` (F0-2 item 2, before
- * RT-4; moved to anchored ranges by A1-3).
+ * Characterisation of `bindConditional` through `__bindIf` / `__bindIfExpr`.
  *
  * A `when()` / `whenElse()` branch sits between two comment anchors, with any number of root nodes.
  * The fake DOM below has just what the binding touches: nodes with siblings, fragments, `insertBefore`
  * and `remove`, and a `<template>` whose `innerHTML` is a space-separated list of node names (each
  * set creates fresh nodes, as parsing does). An operation log records the order of insertion,
- * removal, nested initialisation and cleanup. On hide the nodes go first, then the cleanups run,
- * as before A1-3.
+ * removal, nested initialisation and cleanup. On hide the nodes go first, then the cleanups run.
  */
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { __bindIf, __bindIfExpr } from './internal.js';

@@ -1,5 +1,5 @@
 /**
- * Characterisation of the two template scopes (before TA-2): the component template
+ * Characterisation of the two template scopes: the component template
  * (`processHtmlTemplateWithConditionals`) and directive content (`processSubTemplateWithNesting`).
  *
  * The golden file stores each case's full result, raw ids included, so it pins id allocation
@@ -51,7 +51,7 @@ const cases: Record<string, Case> = {
       ['d', false],
     ],
   },
-  // H-46 keeps the first of two duplicates, so the bound copy has to come first to be bound
+  // The parser keeps the first of two duplicates, so the bound copy has to come first to be bound
   'component: pre-rendered when() on a non-void element with a duplicated property-bound attribute, bound first': {
     scope: 'component',
     template: '<div><button ${when(s())} disabled=${d()} disabled>B</button><b>${n()}</b></div>',

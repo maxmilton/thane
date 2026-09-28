@@ -322,7 +322,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
 
           if (componentCalls.length > 0) {
             // Allocates b0, b1, … for child component placeholders, comments the
-            // binding compiler turns into the child's host element or anchor (A1-4). It starts its
+            // binding compiler turns into the child's host element or anchor. It starts its
             // own ids after these.
             let childIdCounter = 0;
             const mounts: ChildMountInfo[] = [];

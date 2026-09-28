@@ -50,7 +50,7 @@ import { VOID } from './dom-model.js';
 
 /**
  * Whitespace before a row text marker whose other side is not a sibling (an element's end, a void
- * element, an anchor or another marker): the parent's start tag, a boundary or a comment (H-53).
+ * element, an anchor or another marker): the parent's start tag, a boundary or a comment.
  */
 const SPACE_BEFORE_MARKER_AFTER_NON_SIBLING = new RegExp(
   `(?<!<\\/[^<>]*|<(?:${[...VOID].join('|')})\\b[^<>]*|<!--[ib]\\d+[(|).]?--)>\\s+(?=<!--[ib]\\d+-->)`,
@@ -134,7 +134,7 @@ export const generateStaticRepeatTemplate = (
   // Rows are cloned from one element and reconciled by that element, so a row template is
   // exactly one root element; anything else is reported rather than rendered another way.
   if (parsed.roots.length !== 1) {
-    // A row that is only directives is only their anchor comments (A1-3, A1-4).
+    // A row that is only directives is only their anchor comments.
     const onlyDirectives = parsed.roots.length === 0 && /<!--[ib]\d+[(|).]-->/.test(itemTemplate);
     throw new Error(
       `${ErrorCode.REPEAT_ROW_ROOT}: a repeat() row template must have exactly one root element` +
@@ -193,7 +193,7 @@ export const generateStaticRepeatTemplate = (
   }
 
   // A when() / whenElse() branch pre-rendered in the row is emitted exactly as its own template, which
-  // its initializer's paths are computed on (RW-2): it is set aside, by its opening anchor, while the
+  // its initializer's paths are computed on: it is set aside, by its opening anchor, while the
   // row's own markup is processed, and put back after.
   const branches = new Map<string, string>();
   let staticHtml = itemTemplate.replace(
@@ -215,17 +215,17 @@ export const generateStaticRepeatTemplate = (
   staticHtml = stripPropertyBoundAttributes(staticHtml, itemBindings);
 
   // The marks stay: the row's code finds its text markers, anchors and child hosts by them in the
-  // template as emitted, which is written without them (A1-4)
+  // template as emitted, which is written without them
 
   // Aggressively strip whitespace BEFORE inserting comment marker placeholders.
   // - Collapse runs to single space
   // - Remove all inter-element whitespace (><), except next to a text marker, where it is text: one
   //   space stays between a binding and a sibling (an element or anchor after it, an element's end, a
-  //   void element or an anchor before it, another binding), as in component templates (H-52, H-53).
+  //   void element or an anchor before it, another binding), as in component templates.
   //   Between a binding and its parent's own tags it goes.
   // - Strip trailing whitespace before > in opening tags (<a > → <a>)
   // Sole-content elements become empty (<td></td>) — the row creates their text node on fill.
-  // Verbatim elements (<pre>, <textarea>, …) keep their whitespace (H-03).
+  // Verbatim elements (<pre>, <textarea>, …) keep their whitespace.
   staticHtml = outsideVerbatim(staticHtml, (html) =>
     html
       .replace(/\s+/g, ' ')
@@ -380,7 +380,7 @@ const soleContentParent = (
 
 /**
  * The signals a row expression reads other than the row's own item, index and row signals, found
- * the way component bindings find theirs (H-01): `it.name.toUpperCase()` reads none.
+ * the way component bindings find theirs: `it.name.toUpperCase()` reads none.
  */
 const outerSignalsOf = (expr: string, itemVar: string, indexVar: string | undefined): string[] =>
   extractSignalsFromExpression(expr).filter((name) => name !== itemVar && name !== `${itemVar}$` && name !== indexVar);
@@ -659,7 +659,7 @@ export const processItemTemplate = (
 } => {
   const parsed = parseHtmlTemplate(templateContent);
   reportParseDiagnostics(parsed);
-  // The reconciler holds each row by its root element, which a when() would replace (H-47)
+  // The reconciler holds each row by its root element, which a when() would replace
   if (parsed.roots.some((root) => root.whenDirective !== undefined)) {
     throw new Error(
       `${ErrorCode.ROW_ROOT_WHEN}: a repeat() row's root element cannot carry when(); filter the list, or put when() on an inner element.`,
@@ -706,7 +706,7 @@ export const processItemTemplate = (
 
   // ── Directive ownership: a whenElse/repeat nested inside another directive of the row (a nested
   //    list, a whenElse branch, a when() element) belongs to that directive's processing, as at
-  //    component level (RW-6) ──
+  //    component level ──
   const ranges = collectDirectiveRanges(parsed);
   const isOwnedByNestedProcessing = (start: number, end: number): boolean =>
     isNestedInsideAny(start, end, ranges.repeat) ||

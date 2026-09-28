@@ -1,10 +1,9 @@
 /**
- * Characterisation of dev-server request routing and compression (F0-2 item 6, before PB-1 and
- * PB-2).
+ * Characterisation of dev-server request routing and compression.
  *
  * Real `DevServer` instances on port 0 serve a temporary dist directory. Each request pins the
- * status, the headers the server sets, and the body (decoded, for compressed responses: PB-1 may
- * change the compressed bytes but not what they decode to).
+ * status, the headers the server sets, and the body (decoded, for compressed responses: a change to the
+ * compression may change the compressed bytes but not what they decode to).
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -146,7 +145,7 @@ describe('dev server routing without compression', () => {
   });
 });
 
-describe('H-37: a dist without index.html', () => {
+describe('a dist without index.html', () => {
   for (const isProd of [false, true]) {
     for (const useGzip of [false, true]) {
       test(`${isProd ? 'production' : 'development'}${useGzip ? ', useGzip' : ''}: client routes get a 404`, async () => {

@@ -1,5 +1,5 @@
 /**
- * Characterisation of asset copying and the asset watcher (before PB-4).
+ * Characterisation of asset copying and the asset watcher.
  *
  * The watcher runs for real on a temporary folder: edits arrive as `change` events, created,
  * moved-in and deleted entries as `rename` events. Each step waits (polling) for the output

@@ -4,7 +4,7 @@
  * lint-rules.test.ts pins codes and counts. These tests pin everything else a user sees, plus the
  * shapes each rule accepts or skips: which return objects THANE401/402 inspect, which calls count as
  * defineComponent, which tags count as html/css, and how THANE411 keys mount targets.
- * THANE406 (no-element-id) was retired in A1-5: compiled code no longer uses ids.
+ * THANE406 (no-element-id) is retired: compiled code no longer uses ids.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -545,7 +545,7 @@ describe('THANE411 diagnostics', () => {
 });
 
 // ============================================================================
-// THANE412: single-return-object (H-38)
+// THANE412: single-return-object
 // ============================================================================
 
 describe('THANE412 diagnostics', () => {

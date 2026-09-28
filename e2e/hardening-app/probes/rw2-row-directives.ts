@@ -4,14 +4,14 @@ import { CountingKid } from '../shared/counting-kid.js';
 
 type Row = { id: number; first: string; last: string; on: boolean; tags: string[] };
 
-// RW-2 (H-18): the content of a row's when() / whenElse() is bound by the same initializer as a
+// The content of a row's when() / whenElse() is bound by the same initializer as a
 // component-level branch, so it may hold anything a branch can: bindings, events, child components,
 // nested directives and lists.
 // - pre: a when() on a component signal that is true at compile time is pre-rendered in the row; its
 //   content (two text bindings separated by a space, an attribute) is the when()'s own template.
 // - events: handlers in both whenElse() branches, one with .stop, under a handler on the row element.
 // - kids: child components in a row's when() on a component signal (pre-rendered), in a when() on the
-//   item, and in both whenElse() branches (the last two did not build before RW-2: THANE202).
+//   item, and in both whenElse() branches (the last two did not build once: THANE202).
 // - nested: a whenElse() and a list inside a row's when(), a list inside a row's whenElse() branch.
 export const RW2 = defineComponent('hardening-rw2', () => {
   const rows = signal<Row[]>([

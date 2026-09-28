@@ -296,7 +296,7 @@ const processTemplate = (
       continue;
     }
 
-    // A bound element is marked with a binding id of its own; a developer's id is left alone (A1-2)
+    // A bound element is marked with a binding id of its own; a developer's id is left alone
     if (!elementIdMap.has(binding.element)) elementIdMap.set(binding.element, `b${state.idCounter++}`);
     const elementId = elementIdMap.get(binding.element)!;
 
@@ -367,7 +367,7 @@ const processTemplate = (
   const edits: TemplateEdit[] = [
     ...buildConditionalEdits(rootConditionals),
     ...buildWhenElseEdits(rootWhenElseBlocks),
-    // A list's rows go before its anchor comment (A1-4)
+    // A list's rows go before its anchor comment
     ...repeatBlocks.map((rep) => ({ start: rep.startIndex, end: rep.endIndex, replacement: anchorMark(rep.id, '.') })),
     ...buildSignalReplacementEdits(
       signalInitializers,

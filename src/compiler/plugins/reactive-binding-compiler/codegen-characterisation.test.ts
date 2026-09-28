@@ -31,7 +31,7 @@ const DEV: EmitOptions = { html: (template) => template, selector: (name) => nam
 const PROD: EmitOptions = { html: minifyHTML, selector: (name) => `m-${name.length}` };
 
 interface Mount {
-  /** The id of the placeholder the precompiler writes into the template, `<!--b900.-->` (A1-4) */
+  /** The id of the placeholder the precompiler writes into the template, `<!--b900.-->` */
   anchorId: string;
   componentName: string;
   propsExpression: string;
@@ -196,7 +196,7 @@ const cases: Case[] = [
     mounts: [{ anchorId: 'b900', componentName: 'Kid', propsExpression: '{ x: t() }', owner: firstCond }],
   },
   {
-    // A1-4: the host goes into the template where the parser keeps an element; in a table row and
+    // The host goes into the template where the parser keeps an element; in a table row and
     // in svg it would not, so those keep a comment anchor that the host replaces
     name: 'mounts: child hosts in the template, and comment anchors where the parser keeps no element',
     template:
@@ -274,7 +274,7 @@ const cases: Case[] = [
       '<ul>${repeat(items(), (it, i) => html`<li><b ${when(show())}>${lbl()}</b><i ${when(it.on && flag())} title="${it.t}" @click=${go}>${it.name}</i>${whenElse(it.done, html`<s>${it.name}</s>`, html`<u style="color: ${col()}">${i}</u>`)}</li>`)}</ul>',
   },
   {
-    // A1-3: a row whose when()/whenElse() content comes and goes keeps its delegated elements on the
+    // A row whose when()/whenElse() content comes and goes keeps its delegated elements on the
     // row (`_el.__eN`), and its selection binding stays per row
     name: 'rows: delegated events and a selection binding after row directives',
     template:
@@ -353,7 +353,7 @@ const render = (c: Case): string => {
       else mounts!.set(owner, [...(mounts!.get(owner) ?? []), { cm, globalIndex }]);
     });
   }
-  // The hosts go into the templates as transformDefineComponentSource puts them (A1-4)
+  // The hosts go into the templates as transformDefineComponentSource puts them
   const component = { template: r.processedContent };
   const hosts = placeChildHosts(
     cms,

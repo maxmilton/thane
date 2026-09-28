@@ -1,5 +1,5 @@
 /**
- * Characterisation of syncProjectTypes (before PB-6): which route paths and route-component
+ * Characterisation of syncProjectTypes: which route paths and route-component
  * selectors a route table yields, where the generated files go, and which old files are removed.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
@@ -133,7 +133,7 @@ describe('syncProjectTypes', () => {
     expect(existsSync(generated('.thane', 'types', 'router', 'nested'))).toBe(false);
   });
 
-  test("client types are one reference to the package's client.d.ts (H-49)", () => {
+  test("client types are one reference to the package's client.d.ts", () => {
     const file = generated('.thane', 'types', 'client.d.ts');
     const packaged = relative(dirname(file), resolve(import.meta.dir, '../../../../client.d.ts')).replace(/\\/g, '/');
     expect(readFileSync(file, 'utf8')).toBe(`/// <reference path="${packaged}" />\n`);

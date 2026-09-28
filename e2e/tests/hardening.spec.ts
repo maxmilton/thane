@@ -3,12 +3,11 @@ import { expect, test, type Page } from '@playwright/test';
 // ═══════════════════════════════════════════════════════════════════════
 // Hardening probes: one test per defect found by probing e4a17f1, run against e2e/hardening-app.
 //
-// Each test asserts the CORRECT behaviour and stays `test.fixme` until the task named in its title
-// fixes the defect; that task changes `test.fixme` to `test`. Every page mounts one probe
+// Each defect is fixed, and its test asserts the correct behaviour. Every page mounts one probe
 // (`/?probe=<id>`), so a test sees only its own component, styles and errors.
 //
-// X1 did not reproduce on e4a17f1 and runs as a normal test. N1 and N2 are defects found while
-// writing these probes; N1 is fixed by H-40 and N2 by H-41.
+// X1 did not reproduce on e4a17f1 and is kept as a regression test. N1 and N2 are defects found while
+// writing these probes.
 // ═══════════════════════════════════════════════════════════════════════
 
 type Probe = {
@@ -50,8 +49,8 @@ const liveSubscribers = (page: Page, name: 'l1Tick' | 'l2Tick'): Promise<number>
 const kidDestroyCounts = (page: Page): Promise<Record<string, number>> =>
   page.evaluate(() => ({ ...((window as any).__counts?.kidDestroy ?? {}) }));
 
-test.describe('F0-3 hardening probes', () => {
-  test('H-01 P1 a method call on the row item renders in row text', async ({ page }) => {
+test.describe('hardening probes', () => {
+  test('a method call on the row item renders in row text', async ({ page }) => {
     const probe = await mountProbe(page, 'p1');
     await expect(page.locator('.p1-row')).toHaveText(['ALPHA', 'BETA']);
 
@@ -60,7 +59,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-3) P2 click handlers in nested repeat() rows fire', async ({ page }) => {
+  test('click handlers in nested repeat() rows fire', async ({ page }) => {
     const probe = await mountProbe(page, 'p2');
     await expect(page.locator('.p2-picked')).toHaveText('none');
 
@@ -71,7 +70,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-3) P3 a when() in a nested repeat() row renders the inner item', async ({ page }) => {
+  test('a when() in a nested repeat() row renders the inner item', async ({ page }) => {
     const probe = await mountProbe(page, 'p3');
     await expect(page.locator('.p3-w')).toHaveText(['a-shown']);
 
@@ -82,7 +81,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-2) P4 click handlers in a whenElse() branch inside a row fire', async ({ page }) => {
+  test('click handlers in a whenElse() branch inside a row fire', async ({ page }) => {
     const probe = await mountProbe(page, 'p4');
     await expect(page.locator('.p4-clicks')).toHaveText('0');
 
@@ -93,7 +92,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-17 P5 a child component in a whenElse() nested in a when() is mounted', async ({ page }) => {
+  test('a child component in a whenElse() nested in a when() is mounted', async ({ page }) => {
     const probe = await mountProbe(page, 'p5');
     await expect(page.locator('.p5-then .card')).toHaveText(['p5-card']);
 
@@ -110,7 +109,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-16 P6 child-component rows inside a when() mount when it shows', async ({ page }) => {
+  test('child-component rows inside a when() mount when it shows', async ({ page }) => {
     const probe = await mountProbe(page, 'p6');
     await expect(page.locator('.card')).toHaveCount(0);
 
@@ -123,33 +122,33 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-2) P7 a child component in a when() inside a row is mounted', async ({ page }) => {
+  test('a child component in a when() inside a row is mounted', async ({ page }) => {
     const probe = await mountProbe(page, 'p7');
     await expect(page.locator('.p7-row .card')).toHaveText(['p7-card']);
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-07 P8 onMount runs when the setup declares a helper that returns an object', async ({ page }) => {
+  test('onMount runs when the setup declares a helper that returns an object', async ({ page }) => {
     const probe = await mountProbe(page, 'p8');
     await expect(page.locator('.p8')).toHaveText('p8');
     await expect(page.locator('#app')).toHaveAttribute('data-mounted', 'yes');
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-03 P12 whitespace inside <pre> is kept', async ({ page }) => {
+  test('whitespace inside <pre> is kept', async ({ page }) => {
     const probe = await mountProbe(page, 'p12');
     expect(await page.locator('.p12-pre').textContent()).toBe('line1\n    line2');
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-02 P13 a backslash and an escaped interpolation in template text render literally', async ({ page }) => {
+  test('a backslash and an escaped interpolation in template text render literally', async ({ page }) => {
     const probe = await mountProbe(page, 'p13');
     expect(await page.locator('.p13-bs').textContent()).toBe('C:\\dir');
     expect(await page.locator('.p13-dollar').textContent()).toBe('${notExpr}');
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-04 P14 hyphenated tags keep their name as a whenElse() root and with when()', async ({ page }) => {
+  test('hyphenated tags keep their name as a whenElse() root and with when()', async ({ page }) => {
     const probe = await mountProbe(page, 'p14');
     await expect(page.locator('.p14-we-else')).toHaveText('B');
     await expect(page.locator('section.p14 my-tag')).toHaveCount(0);
@@ -175,7 +174,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-06 P15 a nested list in the row root does not reorder the outer rows', async ({ page }) => {
+  test('a nested list in the row root does not reorder the outer rows', async ({ page }) => {
     const probe = await mountProbe(page, 'p15');
     const rowIds = () => page.locator('.p15-row').evaluateAll((els) => els.map((el) => el.getAttribute('data-id')));
     expect(await rowIds()).toEqual(['A', 'B']);
@@ -194,7 +193,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-05 P18 static siblings survive clearing a list', async ({ page }) => {
+  test('static siblings survive clearing a list', async ({ page }) => {
     const probe = await mountProbe(page, 'p18');
     await expect(page.locator('ul.p18 > li')).toHaveText(['H', 'a', 'b']);
 
@@ -205,7 +204,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-6, RW-2) P20 a repeat() inside a when() inside a row renders', async ({ page }) => {
+  test('a repeat() inside a when() inside a row renders', async ({ page }) => {
     const probe = await mountProbe(page, 'p20');
     await expect(page.locator('.p20-tag')).toHaveText(['t1', 't2']);
 
@@ -216,7 +215,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-19 P26a :host() with a compound argument applies only while the host matches it', async ({ page }) => {
+  test('host() with a compound argument applies only while the host matches it', async ({ page }) => {
     const probe = await mountProbe(page, 'p26a');
     const text = page.locator('.p26a-a');
     const setHostClasses = (classes: string[]) =>
@@ -237,7 +236,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-19 P26b :host-context() applies inside a matching ancestor', async ({ page }) => {
+  test('host-context() applies inside a matching ancestor', async ({ page }) => {
     const probe = await mountProbe(page, 'p26b');
     const text = page.locator('.p26b-a');
     const red = 'rgb(255, 0, 0)';
@@ -250,7 +249,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-19 P26c a quote in a CSS comment leaves the following rules scoped (dev build)', async ({ page }) => {
+  test('a quote in a CSS comment leaves the following rules scoped (dev build)', async ({ page }) => {
     const probe = await mountProbe(page, 'p26c');
     await expect(page.locator('#app .p26c-a')).toHaveCSS('color', 'rgb(0, 0, 255)');
     await expect(page.locator('#app .p26c-leak')).toHaveCSS('color', 'rgb(1, 2, 3)');
@@ -258,9 +257,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test("H-28 L1 destroying a component releases its rows' subscriptions and destroys row children", async ({
-    page,
-  }) => {
+  test("L1 destroying a component releases its rows' subscriptions and destroys row children", async ({ page }) => {
     const probe = await openProbe(page, 'l1', { manual: true });
     const before = await liveSubscribers(page, 'l1Tick');
     expect(await page.evaluate(() => (window as any).__mountProbe())).toBe(true);
@@ -278,7 +275,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test("H-28 L2 hiding a when() releases its rows' subscriptions and showing it again adds no second set", async ({
+  test("L2 hiding a when() releases its rows' subscriptions and showing it again adds no second set", async ({
     page,
   }) => {
     const probe = await openProbe(page, 'l2', { manual: true });
@@ -294,7 +291,7 @@ test.describe('F0-3 hardening probes', () => {
       await page.evaluate(() => (window as any).__probe.l2.show(false));
       await expect(page.locator('.l2-row')).toHaveCount(0);
       expect(await liveSubscribers(page, 'l2Tick')).toBe(before);
-      // each hide destroys each row's child once (H-40 mounts them in the rows, H-28 cleans the rows up)
+      // each hide destroys each row's child once (the rows mount them, and clean them up)
       expect(await kidDestroyCounts(page)).toEqual({ a: round, b: round });
 
       await page.evaluate(() => (window as any).__probe.l2.show(true));
@@ -306,13 +303,13 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-29 I1 a child component in a row may use a named index in its props', async ({ page }) => {
+  test('I1 a child component in a row may use a named index in its props', async ({ page }) => {
     const probe = await mountProbe(page, 'i1');
     await expect(page.locator('.i1-row .kid')).toHaveText(['x0', 'y1']);
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('A1-3 M1 multi-root and text-only whenElse() branches show and hide completely', async ({ page }) => {
+  test('M1 multi-root and text-only whenElse() branches show and hide completely', async ({ page }) => {
     const probe = await mountProbe(page, 'm1');
     const two = page.locator('section.m1-two');
     const text = page.locator('section.m1-text');
@@ -346,8 +343,8 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test("A1-2 / RW-2 X1 attribute bindings in a row's when() land on that row's elements", async ({ page }) => {
-    // Did not reproduce on e4a17f1 (kept as a regression test for A1-2 and RW-2). Four shapes: the
+  test("X1 attribute bindings in a row's when() land on that row's elements", async ({ page }) => {
+    // Did not reproduce on e4a17f1 (kept as a regression test). Four shapes: the
     // attribute on the when() element (A), on an element inside its content (B), bound to a component
     // signal (C), and inside a whenElse() branch (D). Row 2 starts hidden.
     const probe = await mountProbe(page, 'x1');
@@ -387,7 +384,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-40 N1 child components in the rows of a repeat() inside a when() mount', async ({ page }) => {
+  test('N1 child components in the rows of a repeat() inside a when() mount', async ({ page }) => {
     const probe = await mountProbe(page, 'n1');
     await expect(page.locator('.n1-row .kid')).toHaveText(['a', 'b']);
 
@@ -398,9 +395,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test("H-41 (A1-2) N2 bindings in a row's when() on a component signal apply while it is first shown", async ({
-    page,
-  }) => {
+  test("N2 bindings in a row's when() on a component signal apply while it is first shown", async ({ page }) => {
     const probe = await mountProbe(page, 'n2');
     const titles = () => page.locator('.n2-b').evaluateAll((els) => els.map((el) => el.getAttribute('title')));
     expect(await titles()).toEqual(['one', 'two', 'three']);
@@ -418,7 +413,7 @@ test.describe('F0-3 hardening probes', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-44 K13 a row that is a component call may hold a template literal in its props', async ({ page }) => {
+  test('a row that is a component call may hold a template literal in its props', async ({ page }) => {
     const probe = await mountProbe(page, 'k13');
     await expect(page.locator('.k13 .card')).toHaveText(['x-a', 'x-b']);
 
@@ -450,7 +445,7 @@ const a1Counts = (page: Page): Promise<{ mount: Record<string, number>; destroy:
     destroy: { ...((window as any).__counts?.a1Destroy ?? {}) },
   }));
 
-test.describe('A1-1 lookups and branches', () => {
+test.describe('lookups and branches', () => {
   test('developer ids: two instances of one component and a second component each bind their own elements', async ({
     page,
   }) => {
@@ -516,7 +511,7 @@ test.describe('A1-1 lookups and branches', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test("A1-2 a when() that shows later binds its own element, not a child component's element with the same id", async ({
+  test("a when() that shows later binds its own element, not a child component's element with the same id", async ({
     page,
   }) => {
     const probe = await mountProbe(page, 'a1idsnested');
@@ -747,7 +742,7 @@ test.describe('A1-1 lookups and branches', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('A1-3 M1 a text-only whenElse() branch that starts hidden shows its text and toggles', async ({ page }) => {
+  test('M1 a text-only whenElse() branch that starts hidden shows its text and toggles', async ({ page }) => {
     const probe = await mountProbe(page, 'a1texthidden');
     const section = page.locator('section.a1th');
     await expect(section).toHaveText('else');
@@ -763,9 +758,7 @@ test.describe('A1-1 lookups and branches', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('A1-4 K12 a child component after a row when() of unknown initial value mounts in its own place', async ({
-    page,
-  }) => {
+  test('a child component after a row when() of unknown initial value mounts in its own place', async ({ page }) => {
     const probe = await mountProbe(page, 'a1k12');
     const shape = (rowClass: string) =>
       page
@@ -795,12 +788,12 @@ test.describe('A1-1 lookups and branches', () => {
       ['i:t4', `${card}:g1`],
       ['i:t5', 'i:t6', `${card}:g2`],
     ]);
-    // No placeholder element is left anywhere (A1-4)
+    // No placeholder element is left anywhere
     await expect(page.locator('.a1k12 template, .a1k12n template')).toHaveCount(0);
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('A1-4 H-05 a list anchor is a comment: static siblings and the list survive clearing', async ({ page }) => {
+  test('a list anchor is a comment: static siblings and the list survive clearing', async ({ page }) => {
     // The anchor is the container's last node, a comment; no placeholder element is left
     const lastNode = (container: string) =>
       page.locator(container).evaluate((el) => ({
@@ -828,7 +821,7 @@ test.describe('A1-1 lookups and branches', () => {
     expect(root.pageErrors).toEqual([]);
   });
 
-  test('A1-4 child hosts: in the template where the parser keeps them, replacing a comment where it would not', async ({
+  test('child hosts: in the template where the parser keeps them, replacing a comment where it would not', async ({
     page,
   }) => {
     const probe = await mountProbe(page, 'a1hosts');
@@ -869,7 +862,7 @@ test.describe('A1-1 lookups and branches', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('A1-4 no generated id reaches the DOM', async ({ page }) => {
+  test('no generated id reaches the DOM', async ({ page }) => {
     for (const id of [
       'a1ids',
       'a1idsnested',
@@ -889,7 +882,7 @@ test.describe('A1-1 lookups and branches', () => {
     }
   });
 
-  test('H-45 (A1-2) K14 an event on an element with an empty id attribute is bound', async ({ page }) => {
+  test('an event on an element with an empty id attribute is bound', async ({ page }) => {
     const probe = await mountProbe(page, 'a1k14');
     await page.locator('.a1k14-btn').click();
     await expect(page.locator('.a1k14-btn')).toHaveText('1');
@@ -898,7 +891,7 @@ test.describe('A1-1 lookups and branches', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// H-52: the text between row text bindings, rendered. Text is compared exactly (textContent), not
+// The text between row text bindings, rendered. Text is compared exactly (textContent), not
 // whitespace-normalised.
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -913,8 +906,8 @@ const H52_UPDATED: H52Row[] = [
 /** The exact text of every row of the probe's list `.h52-<shape>`. */
 const h52Texts = (page: Page, shape: string): Promise<string[]> => page.locator(`.h52-${shape} li`).allTextContents();
 
-test.describe('H-52 row text bindings', () => {
-  test('H-52 K23 row text bindings separated by whitespace show one space, and update', async ({ page }) => {
+test.describe('row text bindings', () => {
+  test('row text bindings separated by whitespace show one space, and update', async ({ page }) => {
     const probe = await mountProbe(page, 'h52');
     const check = async (rows: H52Row[], label: string) => {
       for (const shape of ['space', 'two', 'newline', 'padded']) {
@@ -948,9 +941,7 @@ test.describe('H-52 row text bindings', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-53 K24 K25 (found by H-52) the space between a text binding and an element shows, in rows and at component level', async ({
-    page,
-  }) => {
+  test('the space between a text binding and an element shows, in rows and at component level', async ({ page }) => {
     const probe = await mountProbe(page, 'h52');
     await expect.poll(() => h52Texts(page, 'before')).toEqual(['John b']);
     await expect.poll(() => h52Texts(page, 'after')).toEqual(['b John']);
@@ -961,7 +952,7 @@ test.describe('H-52 row text bindings', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// H-53: the whitespace between a text binding and an element or
+// The whitespace between a text binding and an element or
 // directive next to it, rendered. Text is compared exactly (textContent): a hidden when() leaves the
 // space on each side of its anchors, as static text around a removed element would.
 // ═══════════════════════════════════════════════════════════════════════
@@ -970,10 +961,8 @@ test.describe('H-52 row text bindings', () => {
 const h53Rows = (page: Page, shape: string): Promise<string[]> => page.locator(`.h53-${shape} li`).allTextContents();
 const h53Text = (page: Page, shape: string): Promise<string | null> => page.locator(`.h53-${shape}`).textContent();
 
-test.describe('H-53 text bindings next to elements and directives', () => {
-  test('H-53 K24 K25 whitespace between a text binding and an element or directive shows as one space', async ({
-    page,
-  }) => {
+test.describe('text bindings next to elements and directives', () => {
+  test('whitespace between a text binding and an element or directive shows as one space', async ({ page }) => {
     const probe = await mountProbe(page, 'h53');
     await expect.poll(() => h53Rows(page, 'label')).toEqual(['Name: John']);
     await expect.poll(() => h53Rows(page, 'check')).toEqual([' John']);
@@ -1025,7 +1014,7 @@ const texts = (page: Page, selector: string): Promise<string[]> => page.locator(
 const rwLog = (page: Page): Promise<string[]> => page.evaluate(() => [...(window as any).__probe.rw2.log()]);
 
 test.describe('RW nested directives in rows', () => {
-  test('H-18 (RW-2) a when() pre-rendered in a row binds its content: two bindings with a space, an attribute', async ({
+  test('a when() pre-rendered in a row binds its content: two bindings with a space, an attribute', async ({
     page,
   }) => {
     const probe = await mountProbe(page, 'rw2');
@@ -1046,7 +1035,7 @@ test.describe('RW nested directives in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-2) handlers in both whenElse() branches of a row fire; .stop keeps a click from the row handler', async ({
+  test('handlers in both whenElse() branches of a row fire; .stop keeps a click from the row handler', async ({
     page,
   }) => {
     const probe = await mountProbe(page, 'rw2');
@@ -1065,7 +1054,7 @@ test.describe('RW nested directives in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-2) child components in a row when() and whenElse() mount, and go and come back with their branch', async ({
+  test('child components in a row when() and whenElse() mount, and go and come back with their branch', async ({
     page,
   }) => {
     const probe = await mountProbe(page, 'rw2');
@@ -1100,9 +1089,7 @@ test.describe('RW nested directives in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-2) a whenElse() and a list inside a row when(), and a list inside a row whenElse() branch', async ({
-    page,
-  }) => {
+  test('a whenElse() and a list inside a row when(), and a list inside a row whenElse() branch', async ({ page }) => {
     const probe = await mountProbe(page, 'rw2');
     await expect.poll(() => texts(page, '.rw2-in-then')).toEqual(['John']);
     await expect.poll(() => texts(page, '.rw2-in-else')).toEqual(['off']);
@@ -1127,9 +1114,7 @@ test.describe('RW nested directives in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-2) rows whose items are signals: a when() on the item signal and a binding in it', async ({
-    page,
-  }) => {
+  test('rows whose items are signals: a when() on the item signal and a binding in it', async ({ page }) => {
     const probe = await mountProbe(page, 'rw2sig');
     await expect.poll(() => texts(page, '.rw2-sig-row')).toEqual(['s1', '']);
     await page.evaluate(() => (window as any).__probe.rw2sig.set(1, { on: true }));
@@ -1173,9 +1158,7 @@ const rw3Tops = (edit: (tops: RW3Top[]) => void = () => {}): RW3Top[] => {
 const rw3Log = (page: Page): Promise<string[]> => page.evaluate(() => [...(window as any).__probe.rw3.log()]);
 
 test.describe('RW nested lists in rows', () => {
-  test('H-18 (RW-3) three levels of lists: each row reads the rows above it and follows their updates', async ({
-    page,
-  }) => {
+  test('three levels of lists: each row reads the rows above it and follows their updates', async ({ page }) => {
     const probe = await mountProbe(page, 'rw3');
     await expect.poll(() => texts(page, '.rw3-top-title')).toEqual(['A', 'B', 'C']);
     await expect.poll(() => texts(page, '.rw3-mid-name')).toEqual(['A/a1', 'A/a2', 'B/b1']);
@@ -1196,7 +1179,7 @@ test.describe('RW nested lists in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-3) handlers on every level of nested lists fire in bubbling order; .stop keeps a click in its row', async ({
+  test('handlers on every level of nested lists fire in bubbling order; .stop keeps a click in its row', async ({
     page,
   }) => {
     const probe = await mountProbe(page, 'rw3');
@@ -1221,7 +1204,7 @@ test.describe('RW nested lists in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-3) index bindings in inner rows follow a reorder and an insert', async ({ page }) => {
+  test('index bindings in inner rows follow a reorder and an insert', async ({ page }) => {
     const probe = await mountProbe(page, 'rw3');
     await expect.poll(() => texts(page, '.rw3-idx-row')).toEqual(['0:a1', '1:a2', '0:b1']);
     await setProbe(
@@ -1241,7 +1224,7 @@ test.describe('RW nested lists in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-3) child components in inner rows mount with the outer row in their props, and go with their row', async ({
+  test('child components in inner rows mount with the outer row in their props, and go with their row', async ({
     page,
   }) => {
     const probe = await mountProbe(page, 'rw3');
@@ -1269,7 +1252,7 @@ test.describe('RW nested lists in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test("H-18 (RW-3) an inner list's empty template shows while it is empty", async ({ page }) => {
+  test("an inner list's empty template shows while it is empty", async ({ page }) => {
     const probe = await mountProbe(page, 'rw3');
     await expect.poll(() => texts(page, '.rw3-e-row')).toEqual(['a1', 'a2', 'b1']);
     await expect.poll(() => texts(page, '.rw3-e-none')).toEqual(['none']);
@@ -1288,7 +1271,7 @@ test.describe('RW nested lists in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-3) a when() and a whenElse() in inner rows (P3)', async ({ page }) => {
+  test('a when() and a whenElse() in inner rows', async ({ page }) => {
     const probe = await mountProbe(page, 'rw3');
     await expect.poll(() => texts(page, '.rw3-rrw-on')).toEqual(['a1', 'b1']);
     await expect.poll(() => texts(page, '.rw3-rrw-t')).toEqual(['A', 'B']);
@@ -1308,7 +1291,7 @@ test.describe('RW nested lists in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-2) repeat › whenElse › repeat › when() and whenElse()', async ({ page }) => {
+  test('repeat › whenElse › repeat › when() and whenElse()', async ({ page }) => {
     const probe = await mountProbe(page, 'rw3');
     await expect.poll(() => texts(page, '.rw3-mx-row')).toEqual(['A:a1on', 'off', 'B:b1on']);
     await setProbe(page, 'rw3', 'show', false);
@@ -1324,15 +1307,13 @@ test.describe('RW nested lists in rows', () => {
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test("H-18 (RW-3) an inner list whose item has the outer item's name reads its own item", async ({ page }) => {
+  test("an inner list whose item has the outer item's name reads its own item", async ({ page }) => {
     const probe = await mountProbe(page, 'rw3');
     await expect.poll(() => texts(page, '.rw3-sh-row')).toEqual(['a1', 'a2', 'b1']);
     expect(probe.pageErrors).toEqual([]);
   });
 
-  test('H-18 (RW-3) a handler of the outer row on an element after an inner list, in its container', async ({
-    page,
-  }) => {
+  test('a handler of the outer row on an element after an inner list, in its container', async ({ page }) => {
     const probe = await mountProbe(page, 'rw3');
     await expect.poll(() => texts(page, '.rw3-af-row')).toEqual(['a1', 'a2', 'b1']);
     await page.locator('.rw3-af-btn').first().click();
@@ -1342,10 +1323,8 @@ test.describe('RW nested lists in rows', () => {
   });
 });
 
-test.describe('RW nested lists in rows: an outer item named item', () => {
-  test("H-18 (RW-3) a child in an inner row reads an outer row's item named `item` (found in RW-3)", async ({
-    page,
-  }) => {
+test.describe('nested lists in rows: an outer item named item', () => {
+  test("a child in an inner row reads an outer row's item named `item`", async ({ page }) => {
     const probe = await mountProbe(page, 'rw3');
     await expect.poll(() => texts(page, '.rw3-oi-row .card')).toEqual(['A:a1', 'A:a2', 'B:b1']);
     await setProbe(

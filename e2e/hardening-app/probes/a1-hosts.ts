@@ -2,7 +2,7 @@ import { defineComponent, signal } from 'thane';
 import { expose } from '../shared/expose.js';
 import { ProbeCard } from '../shared/probe-card.js';
 
-// A1-4: child hosts in the template where the parser keeps an element there (a paragraph, a row that
+// Child hosts in the template where the parser keeps an element there (a paragraph, a row that
 // is only the child), and comment anchors that the host replaces where it would not (a table row,
 // svg).
 export const A1Hosts = defineComponent('hardening-a1-hosts', () => {

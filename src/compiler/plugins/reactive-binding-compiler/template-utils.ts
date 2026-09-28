@@ -38,7 +38,7 @@ export interface IdState {
 }
 
 /**
- * The attribute that marks a bound element while its template is compiled (A1-2): the element's
+ * The attribute that marks a bound element while its template is compiled: the element's
  * position in the emitted template is computed from it, and the emitted HTML carries none. It is
  * never the developer's `id`, which stays on its element and is not used to find it.
  */
@@ -46,8 +46,8 @@ export const BOUND_MARK = 'data-thane-ref';
 
 /**
  * The comment that marks an anchor while its template is compiled: a `when()` sits between `(` and
- * `)`, a `whenElse()` has `(` then-branch `|` else-branch `)` (A1-3), and `.` is a single anchor, the
- * end of a list or the place of a child component (A1-4), each with the directive's id. A text
+ * `)`, a `whenElse()` has `(` then-branch `|` else-branch `)`, and `.` is a single anchor, the
+ * end of a list or the place of a child component, each with the directive's id. A text
  * binding's marker is the id alone (`<!--b3-->`, the text node after it is the binding's). The
  * emitted HTML carries the same comments without data (`<!---->`).
  */
@@ -56,7 +56,7 @@ export const anchorMark = (id: string, kind: '(' | '|' | ')' | '.'): string => `
 /** A template without its bound-element marks. */
 export const stripBoundMarks = (html: string): string => html.replace(/ data-thane-ref="[^"]*"/g, '');
 
-/** A template without its compile-time marks: the HTML that is emitted, which holds no id (A1-4). */
+/** A template without its compile-time marks: the HTML that is emitted, which holds no id. */
 export const stripMarks = (html: string): string => stripBoundMarks(html).replace(/<!--[ib]\d+[(|).]?-->/g, '<!---->');
 
 export interface TemplateEdit {
@@ -183,7 +183,7 @@ export const collectConditionalBlocks = (
     const signalNames = [
       ...new Set([...(whenBinding.signalNames || [whenBinding.signalName]), ...(rewritten?.extraSignals ?? [])]),
     ].filter((s) => s !== '');
-    // The directive's id is the compiler's: a developer's id stays on the element (A1-3)
+    // The directive's id is the compiler's: a developer's id stays on the element
     const conditionalId = `b${state.idCounter++}`;
     state.elementIdMap.set(condEl, conditionalId);
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
@@ -243,7 +243,7 @@ export const collectWhenElseBlocks = (
     const signalNames = [
       ...new Set([...(binding.signalNames || [binding.signalName]), ...(rewritten?.extraSignals ?? [])]),
     ].filter((s) => s !== '');
-    // The branches' ids are the compiler's; a branch's root keeps any id of its own (A1-3)
+    // The branches' ids are the compiler's; a branch's root keeps any id of its own
     const thenId = `b${state.idCounter++}`;
     const elseId = `b${state.idCounter++}`;
     const initialValue = safeEvaluateCondition(jsExpression, signalNames, signalInitializers);
@@ -293,7 +293,7 @@ const _componentRowRe = /^\s*([A-Za-z_$][\w$]*)\((.*)\)\s*$/s;
 /**
  * A row that is a component call (`(item) => Card({ item })`): the component and its props as
  * written. Read from the row template before processing, which treats every `${…}` in it as row
- * markup (H-44).
+ * markup.
  */
 const componentRowOf = (rowTemplate: string): RepeatBlock['componentRow'] => {
   const match = _componentRowRe.exec(rowTemplate.trim());
@@ -400,11 +400,11 @@ export const applyTemplateEdits = (source: string, edits: TemplateEdit[]): strin
   for (const edit of edits) {
     result = result.substring(0, edit.start) + edit.replacement + result.substring(edit.end);
   }
-  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style> (H-03).
+  // Whitespace collapses everywhere except inside <pre>, <textarea>, <script> and <style>.
   // Between a tag and an anchor comment it goes as it does between two tags: anchors stand where
   // `<template>` placeholders stood before A1, and a list's container must hold only its rows and
-  // its anchor for a clear to empty it at once (H-05). A text marker keeps the whitespace before it,
-  // which is text, and so does a binding's boundary (`<!---->`) before an element or an anchor (H-53);
+  // its anchor for a clear to empty it at once. A text marker keeps the whitespace before it,
+  // which is text, and so does a binding's boundary (`<!---->`) before an element or an anchor;
   // before its parent's end tag it goes.
   return outsideVerbatim(result, (html) =>
     html

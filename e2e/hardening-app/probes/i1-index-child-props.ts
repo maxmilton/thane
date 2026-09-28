@@ -1,7 +1,7 @@
 import { defineComponent, signal } from 'thane';
 import { Kid } from '../shared/kid.js';
 
-// I1 (H-29): a child component in a row whose props use the row index under a custom name.
+// I1: a child component in a row whose props use the row index under a custom name.
 export const I1 = defineComponent('hardening-i1', () => {
   const items = signal(['x', 'y']);
   return {

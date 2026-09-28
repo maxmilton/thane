@@ -1,6 +1,5 @@
 /**
- * Characterisation of setup return-object shapes, compiled end to end (F0-2 item 4, before
- * CE-1, CE-3 and IF-5).
+ * Characterisation of setup return-object shapes, compiled end to end.
  *
  * For each shape of `defineComponent` setup function this pins, in the development bundle:
  * which registration function is used (lean or full), what is left of the return object(s)
@@ -122,8 +121,8 @@ describe('setup shapes: parenthesised bodies', () => {
     );
   });
 
-  test('parenthesised twice with styles: full, styles called and imported (H-33)', async () => {
-    // Before CE-3 the import came from an early styles walk that looked through one level of
+  test('parenthesised twice with styles: full, styles called and imported', async () => {
+    // Before it was fixed, the import came from an early styles walk that looked through one level of
     // parentheses only, while the call followed the strip pass, which unwraps any number: the
     // module called `__enableComponentStyles` without importing it (ReferenceError at mount).
     const r = await compile(`export const App = defineComponent(() => (({
@@ -196,10 +195,10 @@ describe('setup shapes: lifecycle hooks', () => {
 });
 
 describe('setup shapes: several return statements and nested functions', () => {
-  // A second return object cannot work (K5): the compiler builds one template, from the last return
-  // (H-07). Since H-38 the linter makes it a build error, THANE412, reported at each earlier return.
+  // A second return object cannot work: the compiler builds one template, from the last return
+  // The linter makes it a build error, THANE412, reported at each earlier return.
   // (registration-import.test.ts still pins what the compiler itself does with such a setup.)
-  test('return inside if: a build error (H-38)', async () => {
+  test('return inside if: a build error', async () => {
     await expect(
       compile(`export const App = defineComponent(() => {
   if (flag) {
@@ -212,7 +211,7 @@ describe('setup shapes: several return statements and nested functions', () => {
     );
   });
 
-  test('styles only in a later return: a build error (H-38)', async () => {
+  test('styles only in a later return: a build error', async () => {
     await expect(
       compile(`export const App = defineComponent(() => {
   if (flag) {
@@ -223,8 +222,8 @@ describe('setup shapes: several return statements and nested functions', () => {
     ).rejects.toThrow(/\[plugin: thane-linter\] A setup function with more than one return object/);
   });
 
-  test('nested arrow, function expression and function declaration returns are skipped (P8, H-07)', async () => {
-    // Before H-07 the strip pass took `{ a: 1 }` from `function decl()` as the return object: no
+  test('nested arrow, function expression and function declaration returns are skipped', async () => {
+    // Before it was fixed, the strip pass took `{ a: 1 }` from `function decl()` as the return object: no
     // lifecycle was found, the registration was lean and onMount never ran.
     const r = await compile(`export const App = defineComponent(() => {
   const arrow = () => ({ template: 1 });

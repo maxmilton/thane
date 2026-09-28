@@ -165,7 +165,7 @@ describe('computed unsubscribe — constant time, order preserving', () => {
   });
 });
 
-describe('dispose during its own run keeps no subscription (RT-3)', () => {
+describe('dispose during its own run keeps no subscription', () => {
   const live = (sig: unknown): number => slots(sig).filter((cb) => cb != null).length;
 
   test('an effect with two dependencies that disposes itself keeps neither subscription', () => {

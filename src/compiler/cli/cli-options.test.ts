@@ -1,6 +1,6 @@
 /**
  * Characterisation of CLI option handling that the golden matrix (cli-matrix.test.ts) does not
- * reach (before CL-1): the help text verbatim, arguments named like Object.prototype members,
+ * reach: the help text verbatim, arguments named like Object.prototype members,
  * config files with unusual value shapes, and a repeated --config.
  */
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
@@ -69,7 +69,7 @@ describe('arguments named like Object.prototype members', () => {
     });
   }
   for (const arg of ['constructor', 'toString', '__proto__', 'valueOf']) {
-    test(`${arg} is a stray positional (warned about since H-24)`, () => {
+    test(`${arg} is a stray positional, and is warned about`, () => {
       const warn = spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const opts = parseArgs([arg]);
@@ -185,7 +185,7 @@ describe('config files', () => {
   });
 });
 
-describe('H-24: one rule for bare value flags, with or without a config file', () => {
+describe('one rule for bare value flags, with or without a config file', () => {
   const CONFIG = { 'thane.config.json': JSON.stringify({ host: 'cfg-host', port: 5000, entry: './cfg.ts' }) };
 
   for (const [label, files] of [
@@ -222,7 +222,7 @@ describe('H-24: one rule for bare value flags, with or without a config file', (
   }
 });
 
-describe('H-34: --help and --version with a config file', () => {
+describe('help and --version with a config file', () => {
   const CONFIG = { 'thane.config.json': JSON.stringify({ port: 1 }) };
 
   test('each flag is carried over', () => {

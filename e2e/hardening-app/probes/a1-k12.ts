@@ -2,7 +2,7 @@ import { defineComponent, signal } from 'thane';
 import { expose } from '../shared/expose.js';
 import { ProbeCard } from '../shared/probe-card.js';
 
-// A1-4 (K12, H-43): in a row, a when() whose initial value is unknown at compile time, followed by a
+// In a row, a when() whose initial value is unknown at compile time, followed by a
 // child component. The child mounted in place of the when() anchor. The second list has a nested
 // list before the child, whose anchor the child's could be mistaken for the same way.
 export const A1K12 = defineComponent('hardening-a1-k12', () => {

@@ -1,7 +1,7 @@
 /**
- * How a component the compiler cannot process is reported (before PL-2 / H-21): the build fails
- * with the compiler's message, and the logger prints the diagnostic. Before PL-2 the fallback
- * plugin compiled the file a second time, so the diagnostic was printed twice and the esbuild
+ * How a component the compiler cannot process is reported: the build fails
+ * with the compiler's message, and the logger prints the diagnostic. There used to be a fallback
+ * plugin that compiled the file a second time, so the diagnostic was printed twice and the esbuild
  * error carried the label `[plugin: reactive-binding]`.
  */
 import { afterEach, describe, expect, test } from 'bun:test';

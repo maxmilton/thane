@@ -1,6 +1,6 @@
 import { defineComponent } from 'thane';
 
-// P13 (H-02): a backslash and an escaped \${ in template text. The template's value is the text
+// P13: a backslash and an escaped \${ in template text. The template's value is the text
 // `C:\dir` and the literal characters `${notExpr}`; neither is an interpolation.
 export const P13 = defineComponent('hardening-p13', () => ({
   // prettier-ignore

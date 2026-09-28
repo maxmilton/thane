@@ -3,7 +3,7 @@ import { expose } from '../shared/expose.js';
 
 type Row = { id: number; on: boolean; label: string };
 
-// X1 (A1-2, RW-2): attribute bindings inside a when() inside a repeat() row. Three rows, the second
+// X1: attribute bindings inside a when() inside a repeat() row. Three rows, the second
 // starts hidden; showing it must bind the second row's elements, not the first row's.
 export const X1 = defineComponent('hardening-x1', () => {
   const rows = signal<Row[]>([

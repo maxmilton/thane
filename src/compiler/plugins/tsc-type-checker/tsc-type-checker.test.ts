@@ -1,5 +1,5 @@
 /**
- * Characterisation of the type check (before PB-7): what runProjectTypeCheck and the plugin's
+ * Characterisation of the type check: what runProjectTypeCheck and the plugin's
  * onStart resolve or reject with, and what they log, for clean and failing projects, strict and
  * not, with and without a tsconfig.json.
  */

@@ -37,9 +37,9 @@ describe('when() content is processed as a sub-template', () => {
       ['b1', 'a'],
       ['b2', 'b'],
     ]);
-    // Bound elements carry a compile-time mark (stripped from the emitted HTML), not an id (A1-2)
-    // Bound elements carry a compile-time mark (stripped from the emitted HTML), not an id (A1-2),
-    // and the content is the element as written, without the directive's id (A1-3)
+    // Bound elements carry a compile-time mark (stripped from the emitted HTML), not an id
+    // Bound elements carry a compile-time mark (stripped from the emitted HTML), not an id,
+    // and the content is the element as written, without the directive's id
     expect(cond.templateContent).toBe(
       '<div><button data-thane-ref="b1">A</button><button data-thane-ref="b2">B</button></div>',
     );
@@ -88,7 +88,7 @@ describe('when() content is processed as a sub-template', () => {
     const cond = r.conditionals[0]!;
     expect(cond.nestedRepeats).toHaveLength(1);
     const rep = cond.nestedRepeats[0]!;
-    // The list's anchor is a comment (A1-4)
+    // The list's anchor is a comment
     expect(cond.templateContent).toBe(`<ul><!--${rep.id}.--></ul>`);
     expect(r.processedContent).toBe(`<!--b0(--><ul><!--${rep.id}.--></ul><!--b0)--><p>AFTER</p>`);
   });
@@ -152,7 +152,7 @@ describe('generated initializer for when() content', () => {
     // The nested whenElse() is bound over anchors the when() content's initializer reached from `_c`
     expect(code).toContain('__bindIfExpr(_ws_b1, _wm_b1, [inner], () => inner()');
     expect(code).toContain('__bindIfExpr(_wm_b1, _we_b1, [inner], () => !(inner())');
-    // The text binding writes its text node, reached by path from the button (A1-4)
+    // The text binding writes its text node, reached by path from the button
     expect(code).toMatch(
       /const (b\d+) = b\d+\.nextSibling\.firstChild\.nextSibling;[\s\S]*count\.subscribe\(v => \{ \1\.data = v \?\? ''; \}, true\)/,
     );

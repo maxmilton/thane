@@ -16,7 +16,7 @@ const VERBATIM_CLOSE = '';
 
 /**
  * Apply `transform` to the HTML outside verbatim elements, which are masked while it runs and put
- * back as written. Every place that collapses a template's whitespace goes through it (H-03).
+ * back as written. Every place that collapses a template's whitespace goes through it.
  */
 export const outsideVerbatim = (html: string, transform: (html: string) => string): string => {
   const verbatim: string[] = [];
@@ -38,7 +38,7 @@ const collapseHTML = (html: string): string => {
   return (
     html
       .replace(/\s+/g, ' ')
-      // A binding's boundary keeps the space before an element, which is text (H-53)
+      // A binding's boundary keeps the space before an element, which is text
       .replace(/(?<!<!----)>\s+<(?![!-])|>\s+<(?=\/)/g, '><')
       // Strip non-binding HTML comments (preserve <!--bN-->, <!--iN-->, <!--[if]-->, and <!----> boundary)
       .replace(/<!--(?!b\d)(?!i\d)(?!\[)(?!--)[\s\S]*?-->/g, '')

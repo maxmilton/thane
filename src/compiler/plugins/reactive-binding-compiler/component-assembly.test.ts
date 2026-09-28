@@ -1,6 +1,6 @@
 /**
  * transformDefineComponentSource assembles the compiled file from edits positioned on one parse
- * of the source (IF-5, H-08). Text that only mentions `defineComponent(` (a comment, a string,
+ * of the source. Text that only mentions `defineComponent(` (a comment, a string,
  * template text) is left alone, and the call itself is renamed however it is written.
  */
 import { describe, expect, test } from 'bun:test';
@@ -18,8 +18,8 @@ const compile = (source: string): string => {
 const registrationHead = (out: string): string =>
   /__registerComponent(?:Lean)?\([^)]*?(?=\(|function)/.exec(out)?.[0] ?? '';
 
-describe('component assembly (H-08)', () => {
-  test('C1: a doc comment mentioning defineComponent() above the call is left alone', () => {
+describe('component assembly', () => {
+  test('a doc comment mentioning defineComponent() above the call is left alone', () => {
     const out = compile(`import { defineComponent } from 'thane';
 /** Built with defineComponent() like every component. */
 export const Cmt = defineComponent(() => ({ template: html\`<p>a</p>\` }));
@@ -38,7 +38,7 @@ export const Doc = defineComponent(() => ({ template: html\`<code>defineComponen
     expect(out).toContain("export const Doc = __registerComponentLean('doc', () => ({ }), __tpl);");
   });
 
-  test('type arguments containing parentheses are renamed with the call (found in IF-4)', () => {
+  test('type arguments containing parentheses are renamed with the call', () => {
     // A call signature in the props type: the textual rename stopped at its `(`, so the call
     // stayed `defineComponent<…>(…)`, which the compiled file no longer imports
     const out = compile(`import { defineComponent } from 'thane';

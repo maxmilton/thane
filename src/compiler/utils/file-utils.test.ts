@@ -1,7 +1,7 @@
 /**
- * Characterisation of createBuildContext (before CL-3): it scans the working directory, skips the
+ * Characterisation of createBuildContext: it scans the working directory, skips the
  * excluded folders and .d.ts files, and indexes every exported defineComponent by name and by
- * selector. Since H-15 it also scans the project root when that lies outside the working directory.
+ * selector. It also scans the project root when that lies outside the working directory.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -88,7 +88,7 @@ const scanFrom = async (cwd: string, projectRoot?: string): Promise<string[]> =>
   }
 };
 
-describe('H-15: the project root is scanned too when it lies outside the working directory', () => {
+describe('the project root is scanned too when it lies outside the working directory', () => {
   test('a project root inside the working directory adds nothing', async () => {
     expect(await scanFrom(root, join(root, 'src'))).toEqual(await scanFrom(root));
     expect(await scanFrom(root, root)).toEqual(await scanFrom(root));

@@ -1,12 +1,7 @@
 /**
- * Compile-time defects found by probing e4a17f1 (C1–C8).
- *
- * Each test asserts the correct behaviour and stays `test.todo` until the task named in its title
- * fixes the defect; that task turns it into `test`. The runtime defects are in
- * e2e/tests/hardening.spec.ts (`test.fixme`), R1/R2 in src/runtime/hardening.test.ts.
- *
- * `bun test --todo src/compiler/hardening.test.ts` runs the open items: a todo that fails is listed as
- * todo, a todo that passes is reported as a failure ("Remove `.todo`"), which means it has been fixed.
+ * Compile-time defects found by probing e4a17f1, each fixed and kept as a regression test asserting the
+ * correct behaviour. The runtime defects are in e2e/tests/hardening.spec.ts, the signal ones in
+ * src/runtime/hardening.test.ts.
  */
 import { describe, expect, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -64,8 +59,8 @@ const undeclaredNames = (js: string): string[] => {
 /** The runtime `defineComponent` is called: the component shipped uncompiled. */
 const callsRuntimeDefineComponent = (js: string): boolean => /(?<!function\s+)\bdefineComponent\s*\(/.test(js);
 
-describe('F0-3 compile-time defects (turned on by the task in each title)', () => {
-  test('H-08 C1 a doc comment mentioning defineComponent() above the component leaves the component intact', async () => {
+describe('compile-time defects', () => {
+  test('a doc comment mentioning defineComponent() above the component leaves the component intact', async () => {
     const js = await buildAndReadJs(mainFor('Cmt', 'cmt'), {
       ...DEV,
       extraFiles: {
@@ -82,7 +77,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(callsRuntimeDefineComponent(js)).toBe(false);
   });
 
-  test('H-09 C2 a component whose path contains "scripts" is compiled', async () => {
+  test('a component whose path contains "scripts" is compiled', async () => {
     const js = await buildAndReadJs(mainFor('Tr', 'transcripts/tr'), {
       ...DEV,
       extraFiles: {
@@ -96,7 +91,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test('H-10 C3 a component file importing thane/router before thane builds', async () => {
+  test('a component file importing thane/router before thane builds', async () => {
     const js = await buildAndReadJs(mainFor('Rt', 'rt'), {
       ...DEV,
       extraFiles: {
@@ -114,7 +109,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test('H-11 C4 a style binding of a CSS custom property to a bare signal builds and sets the property', async () => {
+  test('a style binding of a CSS custom property to a bare signal builds and sets the property', async () => {
     const js = await buildAndReadJs(mainFor('Cp', 'cp'), {
       ...DEV,
       extraFiles: {
@@ -128,7 +123,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test('H-12 C5 braces inside a string inside a template expression build', async () => {
+  test('braces inside a string inside a template expression build', async () => {
     const js = await buildAndReadJs(mainFor('Br', 'br'), {
       ...DEV,
       extraFiles: {
@@ -142,7 +137,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test('H-13 C6 an entry with two mount() calls on different targets defines mount for both', async () => {
+  test('an entry with two mount() calls on different targets defines mount for both', async () => {
     const js = await buildAndReadJs(
       "import { mount } from 'thane';\n" +
         "import { Mo } from './mo.js';\n" +
@@ -159,7 +154,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     expect(undeclaredNames(js)).toEqual([]);
   });
 
-  test("H-14 C7 importing an .scss file fails with esbuild's no-loader error", async () => {
+  test("importing an .scss file fails with esbuild's no-loader error", async () => {
     await expect(
       buildAndReadJs(mainFor('Sc', 'sc'), {
         ...DEV,
@@ -174,7 +169,7 @@ describe('F0-3 compile-time defects (turned on by the task in each title)', () =
     ).rejects.toThrow(/No loader is configured for "\.scss" files/);
   });
 
-  test('H-15 C8 building from a working directory outside the project gives the same output', async () => {
+  test('building from a working directory outside the project gives the same output', async () => {
     // The same project built twice: from the repository (an ancestor of the project), then from a
     // folder that is not an ancestor. Child components must be compiled and the entry script injected
     // either way.

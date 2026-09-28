@@ -1,9 +1,8 @@
 /**
- * Characterisation of string skipping in runtime style scoping (before RT-9).
+ * Characterisation of string skipping in runtime style scoping.
  *
- * RT-9 replaces the two copies of the quote state machine in `splitSelectorList` and
- * `findMatchingBrace` with one `skipString`. scope-css.test.ts (F0-2 item 1) pins scoping as a
- * whole; these rows add the string shapes the shared scanner must treat exactly as today: one
+ * `splitSelectorList` and `findMatchingBrace` share one string scanner, `skipString`. scope-css.test.ts
+ * pins scoping as a whole; these rows add the string shapes the scanner must treat exactly as today: one
  * quote kind inside the other, empty and adjacent strings, brackets and parentheses inside strings
  * in a selector list, an unterminated string in a selector list, the backslash rule in a selector
  * list, and strings inside a grouping at-rule's body.
@@ -50,7 +49,7 @@ describe('scopeCssRules: strings inside selector lists', () => {
   ]);
 });
 
-describe('scopeCssRules: strings inside :host(…) (H-19 (i))', () => {
+describe('scopeCssRules: strings inside :host(…)', () => {
   table([
     // A parenthesis inside a string does not close `:host(`
     [':host([a=")"]) .b { c: d }', '.sel[a=")"] .b{ c: d }'],

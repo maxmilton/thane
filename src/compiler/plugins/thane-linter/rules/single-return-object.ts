@@ -14,7 +14,7 @@
  *
  * The compiler builds one template per component, from the last return object, so every branch
  * would render it (and the earlier objects' hooks and styles would be lost). Returns are found as
- * the compiler finds them: at any depth, but not inside a nested function (H-38, H-07).
+ * the compiler finds them: at any depth, but not inside a nested function.
  */
 
 import ts from 'typescript';

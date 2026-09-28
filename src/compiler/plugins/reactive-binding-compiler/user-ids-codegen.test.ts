@@ -19,7 +19,7 @@ mount({ component: App });
 
 const componentTemplate = (js: string): string => js.match(/__tpl = __T\(`([^`]*)`\)/)?.[1] ?? '';
 
-// A1-2: a bound element is reached by its position in the template (`_ns[i]`, the template's
+// A bound element is reached by its position in the template (`_ns[i]`, the template's
 // elements in document order); its developer id stays on it and is not used to find it.
 describe('Developer ids are kept on bound elements and not used to find them', () => {
   test('an attribute-bound element keeps its id and is reached by position', async () => {
@@ -50,14 +50,14 @@ describe('Developer ids are kept on bound elements and not used to find them', (
     expect(js).toMatch(/const (b\d+) = _ns\[2\];\s+\1\.value = /);
   });
 
-  test('an empty id attribute is left alone and does not break the lookup (K14, H-45)', async () => {
+  test('an empty id attribute is left alone and does not break the lookup', async () => {
     const js = await buildAndReadJs(app('<button id="" @click=${() => kind("x")}>b</button>'));
     expect(componentTemplate(js)).toMatch(/<button id="">b<\/button>/);
     expect(js).toMatch(/_ns\[1\]\.addEventListener\("click", /);
     expect(js).not.toMatch(/querySelector\("#/);
   });
 
-  test('whenElse() branch roots keep their ids; the directive does not use them (A1-3)', async () => {
+  test('whenElse() branch roots keep their ids; the directive does not use them', async () => {
     const js = await buildAndReadJs(
       app('${whenElse(show(), html`<div id="on-panel">${kind()}</div>`, html`<div id="off-panel">off</div>`)}'),
     );
@@ -72,13 +72,13 @@ describe('Developer ids are kept on bound elements and not used to find them', (
     );
   });
 
-  test('an id of the compiler form is a developer id like any other (THANE406 retired, A1-5)', async () => {
+  test('an id of the compiler form is a developer id like any other (THANE406 is retired)', async () => {
     const js = await buildAndReadJs(app('<p id="b0" title=${kind()}>x</p><i id="b1">${kind()}</i>'));
     expect(componentTemplate(js)).toMatch(/^<div><p id="b0" title="on">x<\/p><i id="b1"><!---->on<!----><\/i><\/div>$/);
     expect(js).toMatch(/\.setAttribute\("title", /);
   });
 
-  test("a comment written in the form of the compiler's markers is reported, not taken for one (A1-5)", async () => {
+  test("a comment written in the form of the compiler's markers is reported, not taken for one", async () => {
     // Ids count from 0 in every file, so the first text binding's marker is <!--b0--> too
     await expect(buildAndReadJs(app('<!--b0--><p>${kind()}</p>'))).rejects.toThrow(
       /THANE009: a comment in this template/,

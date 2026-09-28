@@ -1,16 +1,16 @@
 /**
  * Characterisation of the router's lifecycle, scroll restoration and route context with a fake
- * browser (before RT-10 and RT-11).
+ * browser.
  *
  * router.ts has little other unit coverage; the e2e router suite covers it in a
  * browser, but only with `scrollRestoration: true`. These tests pin, as an operation log over a fake
  * `window` / `document`, what `startRouter`, `navigate`, popstate and `stopRouter` do for every
- * shape of the scroll-restoration option (RT-11's `normalizeScrollRestoration`), for every shape
- * of `history.state` (RT-11's `readScrollPositionFromHistoryState`), the globals the router
+ * shape of the scroll-restoration option (`normalizeScrollRestoration`), for every shape
+ * of `history.state` (`readScrollPositionFromHistoryState`), the globals the router
  * installs, the route-context provider, and Modes B and C of `mount({ router })`.
  *
  * Not pinned on purpose: a scroll state whose `__thaneScroll` is a function. History states are
- * structured clones, which cannot hold functions (RT-11 removes that branch).
+ * structured clones, which cannot hold functions.
  *
  * Every test restores the module state it touched: `teardown()` stops the router with an empty
  * path and title, so `currentPath()` is '' again for router.test.ts.

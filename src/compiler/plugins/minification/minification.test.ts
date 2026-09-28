@@ -227,7 +227,7 @@ export const ChildCard = defineComponent(() => ({
 }));
 `;
 
-  // The child's host element is in the parent's template (A1-4), so host creation is the template's tag
+  // The child's host element is in the parent's template, so host creation is the template's tag
   test('component selectors are renamed consistently in registration, host creation and CSS', async () => {
     const js = await prod(
       `

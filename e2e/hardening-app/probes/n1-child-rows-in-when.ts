@@ -2,7 +2,7 @@ import { defineComponent, signal } from 'thane';
 import { expose } from '../shared/expose.js';
 import { Kid } from '../shared/kid.js';
 
-// N1 (new, not in §1.8): a child component in the rows of a repeat() inside a when(). On e4a17f1 the
+// N1: a child component in the rows of a repeat() inside a when(). On e4a17f1 the
 // child's mount is emitted at component level (`_gid("b0").replaceWith(...)`, with the row item out of
 // scope), so the component fails to mount.
 export const N1 = defineComponent('hardening-n1', () => {

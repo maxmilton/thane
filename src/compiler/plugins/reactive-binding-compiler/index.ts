@@ -47,7 +47,7 @@ const isEmptyArrowFunction = (node: ts.Node): boolean => {
 };
 
 /**
- * The setup function's return objects, in source order (H-07): every `return {…}` in its body,
+ * The setup function's return objects, in source order: every `return {…}` in its body,
  * at any depth, but not inside a nested function-like (arrow, function expression or
  * declaration, method, accessor, constructor). A concise body's object literal is its single
  * return. With several, the last one is the component's (THANE412 reports the others).
@@ -175,7 +175,7 @@ const importRank = (helper: string): number => {
   return rank === -1 ? HELPER_IMPORT_ORDER.length : rank;
 };
 
-/** The import declaration that imports `defineComponent`: the compiler's helpers are imported next to it (H-10). */
+/** The import declaration that imports `defineComponent`: the compiler's helpers are imported next to it. */
 export const findServicesImport = (sourceFile: ts.SourceFile): ImportInfo | null => {
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
@@ -204,7 +204,7 @@ export const findServicesImport = (sourceFile: ts.SourceFile): ImportInfo | null
  * Recursively extract template content from an html tagged template,
  * inlining any ${identifier} references that resolve to other html`` fragment variables.
  * The text is taken as written (raw), like every directive template the parser cuts from it:
- * the escape sequences stay in place until the template is emitted (H-02).
+ * the escape sequences stay in place until the template is emitted.
  */
 const extractAndInlineFragment = (
   tplNode: ts.TaggedTemplateExpression,
@@ -393,20 +393,20 @@ export const transformDefineComponentSource = (
   // The regex pipeline natively matches bare signal() calls.
   const servicesImport = findServicesImport(sourceFile);
   const setupArg = getSetupFunction(dcCall);
-  // Every return object's template is compiled; the last object is the component's (H-07): it
+  // Every return object's template is compiled; the last object is the component's: it
   // decides the features, loses its dead properties and receives the binding function.
   const returnObjects = setupArg ? findReturnObjects(setupArg) : [];
   const returnObj = returnObjects[returnObjects.length - 1];
   const htmlTemplates = setupArg ? findHtmlTemplates(sourceFile, setupArg, returnObjects) : [];
 
-  // Every change to the file, positioned on this one parse of it (H-08)
+  // Every change to the file, positioned on this one parse of it
   const edits: SourceEdit[] = [];
   let allBindings: BindingInfo[] = [];
   let allConditionals: ConditionalBlock[] = [];
   let allWhenElseBlocks: WhenElseBlock[] = [];
   let allRepeatBlocks: RepeatBlock[] = [];
   let allEventBindings: EventBinding[] = [];
-  // Ids are names inside this file only (A1-5): they count from 0, after the child placeholders'
+  // Ids are names inside this file only: they count from 0, after the child placeholders'
   // (b0…, numbered by the precompiler), and no longer depend on where the file is
   let idCounter = childMounts?.length ?? 0;
   let lastProcessedTemplateContent = '';
@@ -471,7 +471,7 @@ export const transformDefineComponentSource = (
   const topLevelChildMounts: { cm: ChildMountInfo; globalIndex: number }[] = [];
 
   // A child is mounted by the innermost directive whose own template holds its placeholder: a
-  // branch's initializer, or the row factory of a list, at any depth (H-40, RW-2). The templates that
+  // branch's initializer, or the row factory of a list, at any depth. The templates that
   // hold it are nested in one another (a pre-rendered branch is in its parent's too), and the walk
   // visits a block before the blocks inside it, so the last one found is the innermost. A child in
   // no directive is a top-level mount.
@@ -499,7 +499,7 @@ export const transformDefineComponentSource = (
     html: options.minify ? minifyHTML : (template) => template,
     selector: (name) => options.selectorMap?.get(name) ?? name,
   };
-  // Each child's host goes into the template in place of its placeholder, where it fits (A1-4)
+  // Each child's host goes into the template in place of its placeholder, where it fits
   const component = { template: lastProcessedTemplateContent };
   const childHosts = placeChildHosts(
     childMounts ?? [],

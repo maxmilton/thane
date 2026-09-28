@@ -28,7 +28,7 @@ const LITERAL = '`((?:\\\\[\\s\\S]|[^`\\\\])*)`';
 /** The string a template literal body evaluates to, which is what the runtime hands to innerHTML. */
 const cooked = (body: string | undefined): string => new Function(`return \`${body}\`;`)() as string;
 
-describe('H-02 template text reads back as the source means it', () => {
+describe('template text reads back as the source means it', () => {
   // Written out, the component is:
   //   const v = signal('v\\1 `2` ${3}');
   //   template: html`<div><p>C:\\dir \${notExpr} \`q\`</p><b ${when(on())}>w\\x</b><i>${v()}</i>
@@ -72,7 +72,7 @@ describe('H-02 template text reads back as the source means it', () => {
   });
 });
 
-describe('H-03 whitespace inside verbatim elements', () => {
+describe('whitespace inside verbatim elements', () => {
   const body = [
     '  const on = signal(true);',
     "  const items = signal(['a']);",
@@ -98,7 +98,7 @@ describe('H-03 whitespace inside verbatim elements', () => {
   }
 });
 
-describe('H-12 quote-aware expression scanning', () => {
+describe('quote-aware expression scanning', () => {
   test('rows with braces in strings or two levels deep, and a branch with an escaped backtick', async () => {
     const body = [
       '  const on = signal(true);',
@@ -121,7 +121,7 @@ describe('H-12 quote-aware expression scanning', () => {
   });
 });
 
-describe('H-40 child components in the rows of a list inside a directive', () => {
+describe('child components in the rows of a list inside a directive', () => {
   // A name of its own: the build context scans the whole working directory, where the hardening app
   // has a `Kid` too
   const kid =
@@ -143,7 +143,7 @@ describe('H-40 child components in the rows of a list inside a directive', () =>
     test(`inside ${shape}: the row factory mounts the child with the row's item`, async () => {
       const js = await buildAndReadJs(withKid(template), { ...DEV, extraFiles: { 'src/kid.ts': kid } });
       // The mount is in the row factory (the row element `_el` holds the child's host, reached by
-      // path, A1-4) and reads the row's item
+      // path) and reads the row's item
       expect(js).toMatch(
         /const (_cm\d+) = _el\.(?:first|last)ElementChild;[\s\S]*H40Kid\.__f\(\1, \{ label: it\.n \}\)/,
       );
@@ -154,7 +154,7 @@ describe('H-40 child components in the rows of a list inside a directive', () =>
   }
 });
 
-describe('H-44 a row that is a component call with a template literal in its props', () => {
+describe('a row that is a component call with a template literal in its props', () => {
   test('the props are emitted as written', async () => {
     const card =
       "import { defineComponent } from 'thane';\nexport const H44Card = defineComponent<{ label: string }>('x-h44-card', ({ props }) => ({ template: html`<b>${props.label}</b>` }));\n";
@@ -169,7 +169,7 @@ describe('H-44 a row that is a component call with a template literal in its pro
   });
 });
 
-describe("H-47 when() on a repeat() row's root element", () => {
+describe("when() on a repeat() row's root element", () => {
   const rows = (row: string): string =>
     app(
       "  const on = signal(true);\n  const items = signal([{ id: 1, on: true, n: 'a' }]);\n" +
@@ -193,7 +193,7 @@ describe("H-47 when() on a repeat() row's root element", () => {
   });
 });
 
-describe('H-46 duplicate attributes', () => {
+describe('duplicate attributes', () => {
   test('the first of two is kept: a bound first keeps its binding, a bound second leaves nothing live', async () => {
     const js = await buildAndReadJs(
       app(
@@ -237,7 +237,7 @@ describe('H-46 duplicate attributes', () => {
   });
 });
 
-describe('H-42 a literal < in template text', () => {
+describe('a literal < in template text', () => {
   test('text and bindings after the < keep their places', async () => {
     const js = await buildAndReadJs(
       app(
@@ -251,10 +251,10 @@ describe('H-42 a literal < in template text', () => {
   });
 });
 
-describe('A1-4 whitespace between a tag and an anchor comment', () => {
+describe('whitespace between a tag and an anchor comment', () => {
   // Anchors stand where <template> placeholders stood: the whitespace between a tag and an anchor goes
   // as it does between two tags, so a list's container holds only its rows and its anchor (the
-  // reconciler then clears it at once, H-05). Whitespace before a text marker is text and stays.
+  // reconciler then clears it at once). Whitespace before a text marker is text and stays.
   const body =
     "  const on = signal(true);\n  const t = signal('t');\n  const items = signal(['a']);\n" +
     '  return { template: html`<div>\n  <table><tbody>\n    ${repeat(items(), (it) => html`<tr><td>${it}</td></tr>`)}\n  </tbody></table>\n' +

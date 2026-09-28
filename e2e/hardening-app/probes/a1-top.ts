@@ -1,7 +1,7 @@
 import { defineComponent, signal } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// A1-1: directives at the top level of the template: a when() element and a whenElse() that are
+// Directives at the top level of the template: a when() element and a whenElse() that are
 // direct children of the component root, next to a static element.
 export const A1Top = defineComponent('hardening-a1-top', () => {
   const t = signal('t0');

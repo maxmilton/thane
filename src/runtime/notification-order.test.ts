@@ -1,5 +1,5 @@
 /**
- * Characterisation of signal notification order (F0-2 item 10, before RT-2 and A2-2).
+ * Characterisation of signal notification order.
  *
  * Each test logs subscriber calls and pins the exact order observed on e4a17f1. The runtime's
  * rules, as they show up here:

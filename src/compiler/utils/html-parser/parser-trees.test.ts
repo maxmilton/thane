@@ -1,5 +1,5 @@
 /**
- * Characterisation of the HTML template parser (F0-2 item 8, before HP-1 and HP-2).
+ * Characterisation of the HTML template parser.
  *
  * Each case pins the whole parse result of `parseHtmlTemplate`: the element tree with every
  * recorded position, attributes, `when()` directives and text nodes, then the bindings in the
@@ -127,7 +127,7 @@ describe('attributes', () => {
       '  text "${product.name}" 51-66',
     ],
   );
-  // H-46: of two attributes with one name the first is kept, as browsers do, and the second is reported
+  // Of two attributes with one name the first is kept, as browsers do, and the second is reported
   tree('a duplicated attribute keeps the first', '<input checked=${c()} checked value="a" value=${v()}>', [
     '<input> tag 0-6 open-end 53 close 53-53 void',
     '  attr checked="${c()}" 7-21 value 15-21',
@@ -136,7 +136,7 @@ describe('attributes', () => {
     'warning @22: Duplicate attribute "checked" on <input>: the first one is kept',
     'warning @40: Duplicate attribute "value" on <input>: the first one is kept',
   ]);
-  // H-35: a namespaced closing tag matches its opening tag
+  // A namespaced closing tag matches its opening tag
   tree('namespaced names', '<svg:rect xlink:href="#a"></svg:rect>', [
     '<svg:rect> tag 0-9 open-end 26 close 26-37',
     '  attr xlink:href="#a" 10-25 value 22-24',
@@ -172,7 +172,7 @@ describe('when() in a tag', () => {
     '  attr value="1" 21-28 value 27-28',
     'binding when on <input@0> signalName="on" signalNames=["on"] expressionStart=7 expressionEnd=20 fullExpression="${when(on())}" jsExpression="on()"',
   ]);
-  // H-12: a brace inside a string does not end the directive (it did before)
+  // A brace inside a string does not end the directive (it did before)
   tree('a quoted brace inside the condition', "<p ${when(x() === '}')}>a</p>", [
     '<p> tag 0-2 open-end 24 close 25-29',
     '  when "${when(x() === \'}\')}" 3-23',
@@ -280,9 +280,9 @@ describe('text', () => {
   ]);
 });
 
-// Added by the parser stream before HP-1 and HP-2: paths the cases above do not reach (unterminated
-// scans, when() on self-closed tags, every binding shape), captured from the parser at simplify-w0.
-describe('more tag and attribute paths (added before HP-1)', () => {
+// Paths the cases above do not reach (unterminated scans, when() on self-closed tags, every binding
+// shape).
+describe('more tag and attribute paths', () => {
   tree('an unterminated ${when( in a tag is read as attribute names', '<p ${when(a()>x</p>', [
     '<p> tag 0-2 open-end 14 close 15-19',
     '  attr whena="" 5-13 value 13-13',
@@ -332,7 +332,7 @@ describe('more tag and attribute paths (added before HP-1)', () => {
     'binding attr on <a@0> signalName="y" signalNames=["y"] jsExpression="`x > ${y()}`" property="title" expressionStart=10 expressionEnd=20 fullExpression="x > ${y()}"',
     'binding attr on <a@0> signalName="z" property="b" expressionStart=25 expressionEnd=31 fullExpression="${z()}"',
   ]);
-  // H-42: a text node that starts with a stray "<" starts at that "<" (it used to keep the start of
+  // A text node that starts with a stray "<" starts at that "<" (it used to keep the start of
   // the text before it, so later bindings got positions that were too small)
   tree('a < that does not open a tag is text', '<p>a < b <1 c</p>', [
     '<p> tag 0-2 open-end 3 close 13-17',
@@ -391,7 +391,7 @@ describe('more tag and attribute paths (added before HP-1)', () => {
     ],
   );
 });
-describe('binding shapes (added before HP-2)', () => {
+describe('binding shapes', () => {
   tree(
     'attribute: several expressions, a bare read with spaces, a complex single expression',
     '<a href="/u/${id()}/${tab()}" title="${ t() }" data-n="${n() + 1}" class="${a()}${b()}">x</a>',
@@ -514,9 +514,9 @@ describe('binding shapes (added before HP-2)', () => {
   );
 });
 
-// H-12: one expression scanner. Braces inside strings and nested template literals (any depth,
-// escapes included) no longer end an expression; an escaped `\${` is text (H-02).
-describe('quotes and nested template literals in expressions (H-12)', () => {
+// One expression scanner. Braces inside strings and nested template literals (any depth,
+// escapes included) no longer end an expression; an escaped `\${` is text.
+describe('quotes and nested template literals in expressions', () => {
   tree('text: braces inside strings', "<p>${on() ? '}' : '{'} <b>x</b></p>", [
     '<p> tag 0-2 open-end 3 close 31-35',
     "  text \"${on() ? '}' : '{'} \" 3-23",
@@ -554,7 +554,7 @@ describe('quotes and nested template literals in expressions (H-12)', () => {
   );
 });
 
-describe('quotes and escapes in directive arguments (H-12)', () => {
+describe('quotes and escapes in directive arguments', () => {
   tree(
     'a row template with braces inside strings',
     '<ul>${repeat(items(), (it) => html`<li>${it.on ? "}" : "{"}</li>`)}</ul>',
@@ -564,7 +564,7 @@ describe('quotes and escapes in directive arguments (H-12)', () => {
       'binding repeat on <ul@0> signalName="items" signalNames=["items"] expressionStart=4 expressionEnd=67 fullExpression="${repeat(items(), (it) => html`<li>${it.on ? \\"}\\" : \\"{\\"}</li>`)}" itemsExpression="items()" itemVar="it" itemTemplate="<li>${it.on ? \\"}\\" : \\"{\\"}</li>"',
     ],
   );
-  // Before H-12 the escaped backtick ended the branch template: no whenElse, and the rest of the
+  // Before it was fixed, the escaped backtick ended the branch template: no whenElse, and the rest of the
   // template was read as one expression (an unclosed <p>)
   tree('a branch template with an escaped backtick', '<p>${whenElse(on(), html`<i>\\`</i>`, html`<b>{</b>`)}</p>', [
     '<p> tag 0-2 open-end 3 close 53-57',

@@ -149,7 +149,7 @@ const lostNode = (): Error =>
 
 /**
  * The node marked `id` in a template's model; its absence is a compiler bug. Ids count from 0 in
- * every file (A1-5), so a comment the developer wrote in the marker's form (`<!--b0-->`) could be
+ * every file, so a comment the developer wrote in the marker's form (`<!--b0-->`) could be
  * taken for the marker: that is reported instead.
  */
 const markedNode = (model: DomModel, id: string): DomNode => {
@@ -830,7 +830,7 @@ export const generateInitBindingsFunction = (
   childHosts: ReadonlySet<string> = new Set(),
 ): GeneratedInitBindingsArtifact => {
   const lines: string[] = [];
-  // The component template's elements, by position (A1-2)
+  // The component template's elements, by position
   const top = componentScope(modelOf(componentTemplate, emit));
   const staticTemplates: string[] = []; // Collect static templates for repeat optimizations
   const helpers = new Set<RuntimeHelperName>();
@@ -843,7 +843,7 @@ export const generateInitBindingsFunction = (
   // source's names (rowItemName), so the props read the row's item, and an outer row's, as written.
   const rowProps = (props: string, rep: RepeatBlock | undefined): string => (rep ? inRow(rep, props) : props);
 
-  // A child component, mounted where its placeholder was (A1-4): into its host element when the host
+  // A child component, mounted where its placeholder was: into its host element when the host
   // is in the template (see child-hosts.ts), otherwise into a new host that replaces its anchor
   // comment. `setup` holds the statements, `cleanup` the expression that mounts it and returns its
   // destroy function; the host and the anchor are reached through `scope`.
@@ -906,7 +906,7 @@ export const generateInitBindingsFunction = (
   // Separate expression bindings (multi-signal) from simple bindings
   const simpleBindings = topLevelBindings.filter(isSimpleBinding);
   const expressionBindings = topLevelBindings.filter(isExpressionBinding);
-  // Each bound node by path (A1-2, A1-4): a text binding's text node is declared in the head, an
+  // Each bound node by path: a text binding's text node is declared in the head, an
   // element is `_ns[i]`
   for (const id of new Set(topLevelBindings.map((b) => b.id))) {
     if (topLevelBindings.some((b) => b.id === id && b.type === 'text')) top.text(id, id);
@@ -941,7 +941,7 @@ export const generateInitBindingsFunction = (
 
   // The call that binds a when() block between its two anchors (reached through `scope`):
   // `__bindIf` for a bare signal read, otherwise `__bindIfExpr` over every signal the condition
-  // reads. The content's initializer is the branch initializer at every level, a row's too (RW-2).
+  // reads. The content's initializer is the branch initializer at every level, a row's too.
   // Callers add their wrapper.
   const whenCall = (cond: ConditionalBlock, scope: NavScope): string => {
     const initCode = generateNestedInitializer(
@@ -1030,7 +1030,7 @@ export const generateInitBindingsFunction = (
         `    ${cleanups}.push(typeof ${sourceVar}?.subscribe === 'function' ? ${sourceVar}.subscribe(() => { ${onChange} }, true) : () => {});`,
       );
     });
-    // When the scope ends (destroy, a branch hiding, a row going), the rows' own cleanups run too (H-28)
+    // When the scope ends (destroy, a branch hiding, a row going), the rows' own cleanups run too
     lines.push(`    ${cleanups}.push(() => ${reconcilerVar}.clearAll());`);
   };
 
@@ -1075,10 +1075,10 @@ export const generateInitBindingsFunction = (
   // unsubscribes go into `cleanups`. Component-level lists write straight into the binding function
   // (`_subs`); a list inside a when()/whenElse() branch writes into that branch's initializer, where a
   // block-scoped `_subs` collects them; a list inside a row writes into the row factory, into the
-  // row's `_cleanups` (RW-3). A row factory is a function of its own, and its item has the source's
+  // row's `_cleanups`. A row factory is a function of its own, and its item has the source's
   // name, so an inner list's `_el`, item and guards shadow the outer row's, as the source's scoping does.
   const emitRepeat = (rep: RepeatBlock, lines: string[], scope: NavScope, cleanups = '_subs'): void => {
-    // The list's anchor comment, reached through the scope, which declares it in its head (A1-4)
+    // The list's anchor comment, reached through the scope, which declares it in its head
     const anchorLine = (anchorVar: string): void => void scope.at(`${rep.id}.`, anchorVar);
     const indexVar = rep.indexVar || '_idx';
     const itemName = rowItemName(rep);
@@ -1119,7 +1119,7 @@ export const generateInitBindingsFunction = (
         rep.signalBindings,
       );
       // The row's text nodes, directive and list anchors and child hosts, reached from `_el` by
-      // path in the row template as emitted (A1-3, A1-4). Every one is declared (the scope's head)
+      // path in the row template as emitted. Every one is declared (the scope's head)
       // before the row's first write.
       const rowModel = modelOf(staticInfo.staticHtml, emit);
       const rowScope = createScope(rowModel, '        ', [{ node: rowModel.roots[0]!, expr: '_el', cost: 2 }]);
@@ -1267,7 +1267,7 @@ export const generateInitBindingsFunction = (
         const selectionSubscriptions: string[] = [];
         // In a row whose when()/whenElse() content or inner list rows come and go, positions are only
         // known when the row is created: selection bindings, which a list-level subscription reaches
-        // later by position, stay per row there (A1-3, RW-3)
+        // later by position, stay per row there
         const rowHasRanges = hasNestedConditionals || rep.nestedWhenElse.length > 0 || hasNestedRepeats;
         const mixedKeyProp = rep.trackByFn && !rowHasRanges ? extractKeyProperty(rep.trackByFn) : null;
         if (staticInfo.mixedSignalItemBindings && staticInfo.mixedSignalItemBindings.length > 0) {
@@ -1352,7 +1352,7 @@ export const generateInitBindingsFunction = (
           : { delegatedByType: new Map<string, DelegatedEvent[]>(), nonDelegatable: [] as ItemEventBinding[] };
 
         // A row with ranges keeps each delegated element on the row (`_el.__eN`, set at creation),
-        // because the delegated listener cannot find it by position later (A1-3)
+        // because the delegated listener cannot find it by position later
         const capturedEvents = new Map<DelegatedEvent, string>();
         if (rowHasRanges) {
           for (const events of delegatedEventsByType.values()) {
@@ -1429,7 +1429,7 @@ export const generateInitBindingsFunction = (
         }
         // Nested conditionals (Step 14) and lists (Step 15): the row reaches each one's anchors from
         // `_el`. A directive that shows changes the row, so they are declared with the rest. Their
-        // content is bound by the branch initializer, as at component level (RW-2).
+        // content is bound by the branch initializer, as at component level.
         const directiveCalls: string[] = [];
         for (const cond of rep.nestedConditionals) {
           directiveCalls.push(`        _cleanups.push(${whenCall(cond, rowScope)});`);
@@ -1438,7 +1438,7 @@ export const generateInitBindingsFunction = (
           for (const call of whenElseCalls(we, rowScope)) directiveCalls.push(`        _cleanups.push(${call});`);
         }
         // A list inside the row is generated like any other list, its unsubscribes in the row's
-        // cleanups (RW-3)
+        // cleanups
         for (const nr of rep.nestedRepeats) {
           const listLines: string[] = [];
           emitRepeat(nr, listLines, rowScope, '_cleanups');
@@ -1620,7 +1620,7 @@ export const generateInitBindingsFunction = (
     }
 
     const initLines: string[] = [];
-    // Each bound element and text node, by path from the branch's first node (A1-2, A1-4)
+    // Each bound element and text node, by path from the branch's first node
     // Elements first: a text node's path can then start from one of them
     for (const b of bindings) if (b.type !== 'text') scope.at(b.id, b.id);
     for (const evt of nestedEvents) scope.at(evt.elementId, evt.elementId);

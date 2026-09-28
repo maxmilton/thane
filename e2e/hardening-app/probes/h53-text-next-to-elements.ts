@@ -1,7 +1,7 @@
 import { defineComponent, signal } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// H-53 (K24, K25): the whitespace between a text binding and an element or directive next to it,
+// The whitespace between a text binding and an element or directive next to it,
 // rendered. Rows first, then the same at component level and in a whenElse() branch. The last
 // paragraph is whitespace between two elements, which is not text and still goes.
 export const H53 = defineComponent('hardening-h53', () => {

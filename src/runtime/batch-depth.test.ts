@@ -1,6 +1,6 @@
 /**
- * `batch()` defers the writes inside its function by raising the notification depth (A2-2), the
- * same way a write inside a subscriber is deferred. Beyond the order F0-2 item 10 pins
+ * `batch()` defers the writes inside its function by raising the notification depth, the
+ * same way a write inside a subscriber is deferred. Beyond the order
  * (notification-order.test.ts), this is what that must keep: the depth comes back however a
  * batch ends, and a subscriber that runs inside the batch's function (its first call on
  * `subscribe`) has its writes deferred to the batch's flush. Each test also passes on the

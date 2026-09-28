@@ -1,7 +1,7 @@
 import { defineComponent, signal } from 'thane';
 import { expose } from '../shared/expose.js';
 
-// P1 (H-01): a method call on the row item in a row text binding.
+// P1: a method call on the row item in a row text binding.
 export const P1 = defineComponent('hardening-p1', () => {
   const items = signal([
     { id: 1, name: 'alpha' },
