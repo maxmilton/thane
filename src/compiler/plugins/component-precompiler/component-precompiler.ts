@@ -22,7 +22,7 @@ import { INTERNAL_RUNTIME_SPECIFIER, RUNTIME_HELPER } from '../../../contracts/i
 
 const NAME = PLUGIN_NAME.COMPONENT;
 
-/** Child component mount point data, passed from CTFE to the binding compiler. */
+/** Child component mount point data, passed from the precompiler to the binding compiler. */
 export interface ChildMountInfo {
   /** Component class name, e.g. "MyElementComponent" */
   componentName: string;
@@ -30,23 +30,23 @@ export interface ChildMountInfo {
   selector: string;
   /** Raw source text of the props argument, e.g. "{ color: myColor }" */
   propsExpression: string;
-  /** Pre-allocated id from the CTFE counter ("b0", "b1", …): the child's placeholder is `<!--b0.-->` */
+  /** Pre-allocated id ("b0", "b1", …): the child's placeholder is `<!--b0.-->` */
   anchorId: string;
 }
 
-interface CTFECallInfo {
+interface ComponentCallInfo {
   componentName: string;
   propsExpression: string;
   startIndex: number;
   endIndex: number;
 }
 
-const findComponentCallsCTFE = (
+const findComponentCalls = (
   source: string,
   sourceFile: ts.SourceFile,
   knownComponents: Map<string, ComponentDefinition>,
-): CTFECallInfo[] => {
-  const calls: CTFECallInfo[] = [];
+): ComponentCallInfo[] => {
+  const calls: ComponentCallInfo[] = [];
 
   const visit = (node: ts.Node) => {
     if (ts.isTaggedTemplateExpression(node)) {
@@ -115,7 +115,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
       const buildContext = ctx ?? (await createBuildContext());
       resolver = createComponentResolver(buildContext.projectRoot, buildContext.components);
       if (buildContext.components.length > 0) {
-        logger.info(NAME, `Found ${buildContext.components.length} component(s) for CTFE`);
+        logger.info(NAME, `Found ${buildContext.components.length} component(s)`);
       }
     });
 
@@ -318,10 +318,10 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
         const sourceFile = sourceCache.parse(args.path, source);
         const componentsInScope = resolver ? await resolver.componentsInScope(sourceFile) : new Map();
         if (componentsInScope.size > 0) {
-          const componentCalls = findComponentCallsCTFE(source, sourceFile, componentsInScope);
+          const componentCalls = findComponentCalls(source, sourceFile, componentsInScope);
 
           if (componentCalls.length > 0) {
-            // CTFE counter — allocates b0, b1, … for child component placeholders, comments the
+            // Allocates b0, b1, … for child component placeholders, comments the
             // binding compiler turns into the child's host element or anchor (A1-4). It starts its
             // own ids after these.
             let childIdCounter = 0;

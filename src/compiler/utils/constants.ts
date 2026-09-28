@@ -3,7 +3,7 @@ export { FRAMEWORK_FN as FN, RUNTIME_HELPER as BIND_FN } from '../../contracts/i
 export const PLUGIN_NAME = {
   TYPE_CHECK: 'type-check',
   TYPES_SYNC: 'types-sync',
-  COMPONENT: 'component-ctfe',
+  COMPONENT: 'component-compiler',
   REACTIVE: 'reactive-binding',
   LINTER: 'thane-linter',
   GLOBAL_CSS_BUNDLER: 'global-css-bundler',

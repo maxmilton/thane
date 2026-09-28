@@ -53,7 +53,7 @@ describe('a component the compiler cannot process', () => {
   test('fails the build with the compiler message, printed once, labelled with the precompiler', async () => {
     const r = await buildFailing(COLON_ATTRIBUTE);
     expect(r.outcome).toStartWith('Build failed: Build failed with 1 error:');
-    expect(r.outcome).toContain('[plugin: component-ctfe] Error processing ');
+    expect(r.outcome).toContain('[plugin: component-compiler] Error processing ');
     expect(r.outcome).toContain('THANE006: attribute ":src"');
     expect(r.errors.filter((line) => line.includes('THANE006'))).toHaveLength(1);
   }, 60000);

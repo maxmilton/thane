@@ -47,6 +47,7 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 - **`thane/runtime` is the compiler's own entry.** Compiled components import their helpers from it, including `mountComponent`, `__batchRows`, `__T` and `__nc`. Apps must not import it: it is not an API, and it changes whenever the compiled output does.
 - **A path with a trailing slash matches its route:** `/about/` shows `/about`, where it showed `notFound`. A host that serves a route's own page from `about/index.html` often redirects to `/about/`.
 - **Route parameters are decoded.** `/users/ada%20lovelace` gives `route.params.id` the value `ada lovelace`, as other routers do; it was `ada%20lovelace`. A segment that is not valid percent-encoding is kept as written.
+- The component compiler's log label is `component-compiler` (build errors read `[plugin component-compiler]`). It was `component-ctfe`, after a compile-time evaluator that no longer exists.
 - **`thane dev` reloads the open pages** after each rebuild, and when an asset or `index.html` changes. The server's socket, which relayed browser errors, also sends the reload. Development files are served with `Cache-Control: no-cache`, so a reloaded page sees an edited asset (`immutable` was sent, and assets keep their names).
 
 ### Fixed
