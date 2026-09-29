@@ -198,9 +198,16 @@ describe('THANE404 — no-nested-html-tags', () => {
     expect(noNestedHtmlTags.check(parse(src), 'test.ts')).toEqual([]);
   });
 
-  test('fails with directly nested html template', () => {
+  test('passes with an html template that is the whole ${}', () => {
     const src = `export const A = defineComponent(() => ({
       template: html\`<div>\${html\`<span>nested</span>\`}</div>\`,
+    }));`;
+    expect(noNestedHtmlTags.check(parse(src), 'test.ts')).toEqual([]);
+  });
+
+  test('fails with an html template in a ternary', () => {
+    const src = `export const A = defineComponent(() => ({
+      template: html\`<div>\${show() ? html\`<span>nested</span>\` : ''}</div>\`,
     }));`;
     const d = noNestedHtmlTags.check(parse(src), 'test.ts');
     expect(d).toHaveLength(1);

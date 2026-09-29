@@ -1,22 +1,16 @@
 /**
  * THANE404 — no-nested-html-tags
  *
- * An `html` tagged template literal must not appear inside another
- * `html` tagged template literal:
+ * An `html` tagged template inside another is compiled where it is the whole `${}` (it is inlined) or an
+ * argument of a directive (a branch, a row, an empty template). Anywhere else in a `${}` it would be a
+ * plain value, and it is reported:
  *
- *   html`<div>${count()}</div>`                           // ✅
- *   html`<div>${whenElse(show(), html`<p>Yes</p>`)}</div>` // ✅ (directive arg)
- *   html`<div>${repeat(items(), (i) => html`…`)}</div>`    // ✅ (repeat arg)
+ *   html`<div>${html`<span>${count()}</span>`}</div>`             // ✅ inlined
+ *   html`<div>${whenElse(show(), html`<p>Yes</p>`, html``)}</div>` // ✅ directive arguments
+ *   html`<div>${repeat(items(), (i) => html`…`)}</div>`            // ✅
  *
- *   html`<div>${html`<span>${count()}</span>`}</div>`     // ❌ THANE404
- *
- * The compiler's `findHtmlTemplates()` deliberately skips nested html``
- * expressions to avoid double-processing. The inner template will NOT be
- * processed for signal bindings, ID injection, or subscription generation —
- * it will be treated as raw text at runtime.
- *
- * Exception: html`` inside arguments to `repeat()`, `when()`, or `whenElse()`
- * are processed by the compiler as sub-templates and are therefore allowed.
+ *   html`<div>${show() ? html`<p>Yes</p>` : ''}</div>`            // ❌ THANE404: use whenElse()
+ *   html`<ul>${items().map((i) => html`<li>${i}</li>`)}</ul>`     // ❌ THANE404: use repeat()
  */
 
 import ts from 'typescript';
@@ -43,13 +37,16 @@ const check = (sourceFile: ts.SourceFile, filePath: string): Diagnostic[] => {
       if (insideHtmlTag) {
         report(
           node,
-          "Nested 'html' tagged templates are not supported. The inner template will not be " +
-            'processed for signal bindings or subscriptions. Extract it into a const variable instead.',
+          "An 'html' template here is not compiled: inside another template, one is compiled where it is the whole " +
+            '${…} or a directive argument. Use whenElse() to choose between templates, and repeat() for a list.',
         );
         // Still visit children to catch deeper nesting
       }
-      // Children of this html`` are now "inside"
-      ts.forEachChild(node, (child) => visit(child, true));
+      // A template that is the whole `${}` is inlined; anything else in a `${}` is inside this one
+      const template = node.template;
+      if (ts.isTemplateExpression(template)) {
+        for (const span of template.templateSpans) visit(span.expression, !isTaggedWith(span.expression, [FN.HTML]));
+      }
       return;
     }
 
@@ -72,7 +69,7 @@ export const noNestedHtmlTags: LintRuleDefinition = {
     code: ErrorCode.NO_NESTED_HTML_TAGS,
     name: 'no-nested-html-tags',
     severity: 'error',
-    description: 'html`` tagged templates must not be nested inside another html``.',
+    description: 'An html`` template inside another is the whole ${…} or a directive argument.',
   },
   check,
 };

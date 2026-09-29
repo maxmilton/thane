@@ -54,6 +54,7 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 
 ### Changed
 
+- **An `html` template written as a whole `${…}` of another is inlined**, like a const fragment. THANE404 now reports an `html` template inside another only where it would be a plain value: in a ternary, a `map()`, or any other expression that is not a directive. See [Templates](docs/templates.md#fragments).
 - **A component that is not exported takes a short selector in a production build**, like an exported one. The cart e2e app's root component, `cart-e2e-app`, is now `a-a` in its production bundle.
 - Compiled files with a list share one read of Node's `cloneNode` and `insertBefore`: each imports them from `thane/runtime/dom` (a new entry, for compiled code only) instead of declaring its own. An app with many list files is smaller (the hardening test app −1,360 B raw, −434 B gzip; the store example −43 B raw); an app with one gains about 3 B. The compiled output's contract changes: components compiled by an earlier version must be rebuilt.
 - A plain `<a href>` to one of the app's routes navigates in the app (see Added); it used to load the page again. A link with its own click handler that calls `preventDefault()` is not affected.
@@ -72,6 +73,9 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 
 ### Fixed
 
+- **A fragment passed to `whenElse()` or as a `repeat()` empty template is its markup.** `whenElse(loading(), spinner, done)`, with `spinner` and `done` html`` consts, rendered the words "spinner" and "done". A fragment named where a directive takes a template is now inlined like one used as `${spinner}`.
+- **A fragment used twice in a template is inlined twice.** The second `${spinner}` was left as an expression and rendered its markup as text. A child component in a fragment used twice is mounted in each place.
+- **An inlined fragment's markup is no longer shipped twice.** A fragment whose every use is inlined is emptied, so esbuild drops it (the contract e2e app: -118 B raw).
 - A call in a template to a function the component declares is no longer taken for a signal read. `${total()}`, where `const total = () => price() * qty()`, compiled to `total.subscribe(…)` and threw; it now follows `price` and `qty`. A plain function (`${label()}`) renders once, and a helper called with arguments also follows the signals its own body reads (`${format(amount())}` where `format` reads `currency()`). The component's setup, the file's top level, and the helpers they call are looked into; an imported name called without arguments is still read as a signal, as a store's exported signal is.
 - `thane dev` recognises a component file added while it runs: every rebuild scans the project again, so a child component call to the new component compiles on the next rebuild instead of after a restart. Unchanged files are not parsed again (the scan takes about 35 ms for 300 files).
 - Two route tables in one project, such as two apps that share a `tsconfig.json`, no longer collide in the generated route types. Both declared the same `Register.routePaths`; under `skipLibCheck` the first table's paths silently won, so `navigate()` in the second app rejected its own paths. Each table is now an entry of its own, keyed by its file, and the paths, head fields and page selectors of all tables add up.

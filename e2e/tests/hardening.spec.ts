@@ -1437,6 +1437,29 @@ test.describe('several components in one file', () => {
   });
 });
 
+test.describe('fragments', () => {
+  test('F1 fragments go wherever a template goes: branches, twice with a child, an empty template', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 'f1');
+    await expect(page.locator('.f1-busy')).toHaveText('busy');
+    await expect(page.locator('.f1-done')).toHaveCount(0);
+    await expect(page.locator('.f1-count')).toHaveText(['1', '1']);
+    await expect(page.locator('.f1-kid-n')).toHaveText(['7', '7']);
+    await expect(page.locator('.f1-empty')).toHaveText('none');
+
+    await setProbe(page, 'f1', 'loading', false);
+    await expect(page.locator('.f1-busy')).toHaveCount(0);
+    await expect(page.locator('.f1-done')).toHaveText('done');
+    await setProbe(page, 'f1', 'count', 2);
+    await expect(page.locator('.f1-count')).toHaveText(['2', '2']);
+    await setProbe(page, 'f1', 'rows', [1, 2]);
+    await expect(page.locator('.f1-row')).toHaveText(['1', '2']);
+    await expect(page.locator('.f1-empty')).toHaveCount(0);
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
 test.describe('a keyed list reordered while a row goes', () => {
   test('R1 the rows stay before the list anchor, so a later append goes last', async ({ page }) => {
     const probe = await mountProbe(page, 'r1');

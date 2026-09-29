@@ -284,23 +284,25 @@ describe('THANE403 diagnostics', () => {
 describe('THANE404 diagnostics', () => {
   const error = diag('error', ErrorCode.NO_NESTED_HTML_TAGS);
   const MESSAGE =
-    "Nested 'html' tagged templates are not supported. The inner template will not be " +
-    'processed for signal bindings or subscriptions. Extract it into a const variable instead.';
+    "An 'html' template here is not compiled: inside another template, one is compiled where it is the whole " +
+    '${…} or a directive argument. Use whenElse() to choose between templates, and repeat() for a list.';
 
-  test('reports every nested html template at its tag; directive calls reset the nesting', () => {
+  test('reports a nested html template at its tag unless it is the whole ${} or in a directive call', () => {
     const src = [
       'const t = html`<div>${html`<p>${html`<i/>`}</p>`}</div>`;',
       'const u = html`${when(x(), html`<b/>`)}${whenElse(x(), html`<c/>`, html`<d/>`)}`;',
       'const v = html`${fmt(html`<e/>`)}`;',
       'const w = html`${repeat(xs, (i) => html`${html`<s/>`}`)}`;',
       'const m = html`${lib.html`<q/>`}${lib.when(x(), html`<r/>`)}`;',
+      "const y = html`${on() ? html`<y/>` : ''}${xs.map((i) => html`<z/>`)}`;",
+      'const k = html`${fmt(html`${html`<k/>`}`)}`;',
     ];
     expect(run(noNestedHtmlTags, src)).toStrictEqual([
-      error(src, 1, 'html`<p>', MESSAGE),
-      error(src, 1, 'html`<i/>', MESSAGE),
       error(src, 3, 'html`<e/>', MESSAGE),
-      error(src, 4, 'html`<s/>', MESSAGE),
       error(src, 5, 'html`<r/>', MESSAGE),
+      error(src, 6, 'html`<y/>', MESSAGE),
+      error(src, 6, 'html`<z/>', MESSAGE),
+      error(src, 7, 'html`${html', MESSAGE),
     ]);
   });
 });

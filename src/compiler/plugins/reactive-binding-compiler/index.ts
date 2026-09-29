@@ -11,6 +11,7 @@ import {
   type SourceEdit,
   sourceCache,
   BIND_FN,
+  FN,
 } from '../../utils/index.js';
 import { getSetupFunction, unwrapParens } from '../../utils/component-ast.js';
 import { checkBindingNames } from './binding-names.js';
@@ -202,18 +203,35 @@ export const findServicesImport = (sourceFile: ts.SourceFile): ImportInfo | null
 // defineComponent Support
 // ============================================================================
 
+/** Where a directive takes a template, by argument position: whenElse()'s branches, repeat()'s empty template */
+const TEMPLATE_ARGUMENTS: ReadonlyMap<string, readonly number[]> = new Map([
+  [FN.WHEN_ELSE, [1, 2]],
+  [FN.REPEAT, [2]],
+]);
+
+/** Where a component's templates find their fragments, and the uses of each fragment that were inlined */
+interface InlineScope {
+  sourceFile: ts.SourceFile;
+  /** The component's setup function; the module is looked in after it */
+  scopeRoot: ts.Node;
+  /** Each fragment inlined, by its template, with the names that used it */
+  inlined: Map<ts.TaggedTemplateExpression, Set<ts.Identifier>>;
+}
+
 /**
- * Recursively extract template content from an html tagged template,
- * inlining any ${identifier} references that resolve to other html`` fragment variables.
- * The text is taken as written (raw), like every directive template the parser cuts from it:
- * the escape sequences stay in place until the template is emitted.
+ * The text of an html template, with the fragments it uses inlined, at any depth: a `${name}` that names an
+ * html`` const of the component or the module, an html template written as a whole `${}`, and, inside any
+ * other `${}`, a fragment named where a directive takes a template (`whenElse(open(), details, summary)`)
+ * and the html templates written in it. The text is taken as written (raw), like every directive template the
+ * parser cuts from it: the escape sequences stay in place until the template is emitted. `path` holds the
+ * fragments being inlined, so a fragment that uses itself is left as it is written.
  */
 const extractAndInlineFragment = (
   tplNode: ts.TaggedTemplateExpression,
-  sourceFile: ts.SourceFile,
-  scopeRoot: ts.Node,
-  visited: Set<string>,
+  scope: InlineScope,
+  path: ReadonlySet<string> = new Set(),
 ): string => {
+  const { sourceFile } = scope;
   const templateLiteral = tplNode.template;
 
   if (ts.isNoSubstitutionTemplateLiteral(templateLiteral)) {
@@ -222,23 +240,93 @@ const extractAndInlineFragment = (
 
   if (!ts.isTemplateExpression(templateLiteral)) return '';
 
+  /** The text of the fragment `name` names, or null when it names none */
+  const fragment = (name: ts.Identifier): string | null => {
+    if (path.has(name.text)) return null;
+    const resolved = resolveTemplateIdentifier(sourceFile, scope.scopeRoot, name);
+    if (!resolved) return null;
+    const uses = scope.inlined.get(resolved) ?? new Set();
+    scope.inlined.set(resolved, uses.add(name));
+    return extractAndInlineFragment(resolved, scope, new Set([...path, name.text]));
+  };
+  const template = (node: ts.TaggedTemplateExpression): string => extractAndInlineFragment(node, scope, path);
+
   let content = templateLiteral.head.rawText!;
   for (const span of templateLiteral.templateSpans) {
     const expr = span.expression;
-    if (ts.isIdentifier(expr) && !visited.has(expr.text)) {
-      const resolved = resolveTemplateIdentifier(sourceFile, scopeRoot, expr);
-      if (resolved) {
-        visited.add(expr.text);
-        content += extractAndInlineFragment(resolved, sourceFile, scopeRoot, visited);
-        content += span.literal.rawText!;
-        continue;
-      }
-    }
-    const exprText = span.expression.getText(sourceFile);
-    content += '${' + exprText + '}';
+    const inlined = ts.isIdentifier(expr)
+      ? fragment(expr)
+      : ts.isTaggedTemplateExpression(expr) && isHtmlTemplate(expr)
+        ? template(expr)
+        : null;
+    content += inlined ?? '${' + inlineInExpression(expr, sourceFile, fragment, template) + '}';
     content += span.literal.rawText!;
   }
   return content;
+};
+
+/**
+ * The text of a `${}` expression, with the fragments named where a directive takes a template, and the html
+ * templates written in it, inlined (see extractAndInlineFragment). A template left as it is keeps its text.
+ */
+const inlineInExpression = (
+  expr: ts.Expression,
+  sourceFile: ts.SourceFile,
+  fragment: (name: ts.Identifier) => string | null,
+  template: (node: ts.TaggedTemplateExpression) => string,
+): string => {
+  const start = expr.getStart(sourceFile);
+  const edits: SourceEdit[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isTaggedTemplateExpression(node) && isHtmlTemplate(node)) {
+      const text = template(node);
+      const literal = node.template;
+      if (text !== literal.getText(sourceFile).slice(1, -1)) {
+        edits.push({
+          start: literal.getStart(sourceFile) - start,
+          end: literal.getEnd() - start,
+          replacement: `\`${text}\``,
+        });
+      }
+      return;
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      for (const at of TEMPLATE_ARGUMENTS.get(node.expression.text) ?? []) {
+        const arg = node.arguments[at];
+        const text = arg && ts.isIdentifier(arg) ? fragment(arg) : null;
+        if (arg && text !== null) {
+          edits.push({
+            start: arg.getStart(sourceFile) - start,
+            end: arg.getEnd() - start,
+            replacement: `html\`${text}\``,
+          });
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(expr);
+  return applyEdits(expr.getText(sourceFile), edits);
+};
+
+/** Every identifier of the file with the name `name` declares, other than the declaration and property names */
+const referencesOf = (sourceFile: ts.SourceFile, name: ts.Identifier): ts.Identifier[] => {
+  const found: ts.Identifier[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === name.text && node !== name) {
+      const parent = node.parent;
+      const isPropertyName =
+        ((ts.isPropertyAccessExpression(parent) ||
+          ts.isPropertyAssignment(parent) ||
+          ts.isPropertyDeclaration(parent)) &&
+          parent.name === node) ||
+        (ts.isMethodDeclaration(parent) && parent.name === node);
+      if (!isPropertyName) found.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return found;
 };
 
 const resolveTemplateIdentifier = (
@@ -363,6 +451,8 @@ interface FileCompilation {
   moduleSignals: Map<string, string | number | boolean>;
   /** The next id. Ids are names inside the file: its components share one count. */
   nextId: number;
+  /** The fragments the components' templates inlined, with the names that used them */
+  inlined: Map<ts.TaggedTemplateExpression, Set<ts.Identifier>>;
 }
 
 /** What compiling one component contributes to its file */
@@ -406,6 +496,7 @@ const transformComponent = (
     moduleSignals: findSignalInitializers(sourceFile, new Set(components.map((component) => component.call))),
     // Ids count from 0, after the child placeholders' (b0…), and do not depend on where the file is
     nextId: childMounts?.length ?? 0,
+    inlined: new Map(),
   };
   const { edits } = file;
 
@@ -442,6 +533,17 @@ const transformComponent = (
   if (domPrototype && !importsDomPrototype) {
     const first = compiled.find((component) => component.statement.parent === sourceFile) ?? compiled[0]!;
     first.declarations += '\n  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;';
+  }
+
+  // A fragment whose every use was inlined is left empty, so that its markup is not shipped twice
+  for (const [fragment, uses] of file.inlined) {
+    const declaration = fragment.parent;
+    if (!ts.isVariableDeclaration(declaration) || !ts.isIdentifier(declaration.name)) continue;
+    const at = fragment.template.getStart(sourceFile);
+    if (edits.some((edit) => edit.start <= at && at < edit.end)) continue;
+    if (referencesOf(sourceFile, declaration.name).every((reference) => uses.has(reference))) {
+      edits.push({ start: at, end: fragment.getEnd(), replacement: '``' });
+    }
   }
 
   for (const { statement, declarations } of compiled) {
@@ -519,10 +621,27 @@ const compileComponent = (
   let lastProcessedTemplateContent = '';
   // The templates as written, with the child placeholders in them
   const writtenTemplates: string[] = [];
+  // A fragment used twice brings its child placeholders twice: each later one is a child of its own,
+  // under a new id, and a copy of the child's mount
+  const seenAnchors = new Set<string>();
+  const copiedMounts: ChildMountInfo[] = [];
+  const ownAnchors = (template: string): string =>
+    template.replace(/<!--(b\d+)\.-->/g, (mark, id: string) => {
+      const mount = file.childMounts.find((cm) => cm.anchorId === id);
+      if (!mount || !seenAnchors.has(id)) {
+        seenAnchors.add(id);
+        return mark;
+      }
+      const copy = { ...mount, anchorId: `b${idCounter++}` };
+      copiedMounts.push(copy);
+      return anchorMark(copy.anchorId, '.');
+    });
 
   for (const templateInfo of htmlTemplates) {
     // htmlTemplates is empty without a setup function
-    let templateContent = extractAndInlineFragment(templateInfo.node, sourceFile, setupArg!, new Set());
+    let templateContent = ownAnchors(
+      extractAndInlineFragment(templateInfo.node, { sourceFile, scopeRoot: setupArg!, inlined: file.inlined }),
+    );
     writtenTemplates.push(templateContent);
 
     const result = processHtmlTemplateWithConditionals(templateContent, signalInitializers, idCounter);
@@ -563,7 +682,7 @@ const compileComponent = (
 
   // The component's children: the ones whose placeholder is in its templates. Each keeps its index
   // in the file, which names its variables.
-  const ownMounts = file.childMounts
+  const ownMounts = [...file.childMounts, ...copiedMounts]
     .map((cm, globalIndex) => ({ cm, globalIndex }))
     .filter(({ cm }) => writtenTemplates.some((template) => template.includes(anchorMark(cm.anchorId, '.'))));
 

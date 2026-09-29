@@ -138,23 +138,20 @@ const styles = css`
 
 **Severity:** Error
 
-`html` tagged templates must not be nested directly inside other `html` tagged templates. The compiler skips inner templates, so signal bindings inside them won't be processed.
+An `html` template inside another is compiled where it is the whole `${…}` (it is inlined) or an argument of a directive (a `whenElse()` branch, a `repeat()` row or empty template). Anywhere else, such as in a ternary or a `map()`, it would be a plain value, and it is reported.
 
 ```typescript
-// ❌ BAD — nested html tag
+// ❌ BAD — an html template in a ternary, and in map()
+template: html`<div>${open() ? html`<p>Open</p>` : ''}</div>`;
+template: html`<ul>${items().map((i) => html`<li>${i}</li>`)}</ul>`;
+
+// ✅ GOOD — a directive chooses, or repeats
+template: html`<div>${whenElse(open(), html`<p>Open</p>`, html``)}</div>`;
+template: html`<ul>${repeat(items(), (i) => html`<li>${i}</li>`)}</ul>`;
+
+// ✅ GOOD — a whole ${…} is inlined, like a const fragment
 template: html`<div>${html`<span>nested</span>`}</div>`;
-
-// ✅ GOOD — extract to const variable
-const span = html`<span>nested</span>`;
-template: html`<div>${span}</div>`;
-
-// ✅ GOOD — inside directives (allowed exception)
-template: html`<ul
-  >${repeat(items(), (i) => html`<li>${i}</li>`)}</ul
->`;
 ```
-
-Templates inside directive callbacks (`repeat`, `whenElse`) are allowed because the compiler processes each callback's template independently.
 
 ---
 

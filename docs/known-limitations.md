@@ -4,20 +4,9 @@ This page documents current constraints, browser requirements, and by-design dec
 
 ## Compiler Constraints
 
-### No Nested `html` Tags
+### `html` Templates Inside Others
 
-`html` tagged templates cannot be nested inside other `html` templates (THANE404). Inner templates must be extracted to `const` variables:
-
-```typescript
-// ❌ Not allowed
-template: html`<div>${html`<span>nested</span>`}</div>`;
-
-// ✅ Allowed
-const inner = html`<span>nested</span>`;
-template: html`<div>${inner}</div>`;
-```
-
-Templates inside directive callbacks (`repeat`, `whenElse`) are the exception — these are processed independently.
+An `html` template inside another is compiled where it is the whole `${…}` or a directive argument. In a ternary or a `map()` it would be a plain value (THANE404): use `whenElse()` and `repeat()`.
 
 ### Template Variables Must Be Local
 

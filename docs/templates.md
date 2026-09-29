@@ -174,19 +174,30 @@ The compiler manages the child's lifecycle and binding initialization.
 
 ## Rules and Constraints
 
-### No Nested `html` Tags
+### Fragments
 
-You cannot nest an `html` template inside another `html` template (lint rule THANE404). Instead, assign inner templates to `const` variables:
+An `html` template can be a fragment of another: a `const` of the component or the module, used as `${name}`
+wherever markup goes, as a `whenElse()` branch, or as a `repeat()` empty template. An `html` template can also
+be written as a whole `${…}`. The compiler inlines each fragment where it is used, so a fragment costs nothing
+at run time, and it can be used any number of times:
 
 ```typescript
-// ❌ BAD — nested html tag
-template: html` <div> ${html`<span>Nested</span>`} </div> `;
+const spinner = html`<span class="spinner"></span>`;
 
-// ✅ GOOD — const variable
-const inner = html`<span>Nested</span>`;
-
-template: html` <div> ${inner} </div> `;
+export const Orders = defineComponent(() => {
+  const loading = signal(true);
+  const empty = html`<li>No orders</li>`;
+  return {
+    template: html`
+      ${whenElse(loading(), spinner, html`<p>Ready</p>`)}
+      <ul>${repeat(orders(), (o) => html`<li>${o.name}</li>`, empty)}</ul>
+    `,
+  };
+});
 ```
+
+Anywhere else in a `${…}`, such as a ternary or a `map()`, an `html` template would be a plain value, and the
+build reports it (lint rule THANE404): use `whenElse()` to choose between templates, and `repeat()` for a list.
 
 ### `const` Required for Tagged Templates
 
