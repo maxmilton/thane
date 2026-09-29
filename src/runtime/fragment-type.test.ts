@@ -2,7 +2,8 @@
  * The Fragment type (markers.ts): an html template is a Fragment, and so is a child component call and a
  * directive, so each goes where a template goes. A component's `template` takes an html template only (the
  * compiler compiles nothing else there); a directive's templates take a plain template literal of markup
- * too, as the compiler does.
+ * too, as the compiler does. A child call in a template is TypeScript like any other: a callback prop's
+ * parameters are typed from the component's props, and a prop can be typed as a Fragment.
  *
  * One program holds the runtime and a usage file with one case per function; a case's diagnostics are the
  * ones on its lines.
@@ -18,6 +19,8 @@ const VALID: Record<string, string> = {
   'fragments and plain markup as whenElse() branches': 'return whenElse(true, spinner, `<b></b>`);',
   'a component call as a row': 'return repeat(items, (it) => Card({ n: it.id }), spinner);',
   'a directive in a template': 'return html`<div>${whenElse(true, spinner, html``)}</div>`;',
+  "a callback prop's parameters are typed at a child call site":
+    'return html`<ul>${Picker({ onPick: (id) => id.toFixed(0), label: spinner })}</ul>`;',
 };
 const INVALID: Record<string, [call: string, message: RegExp]> = {
   "a string as a component's template": [
@@ -27,6 +30,14 @@ const INVALID: Record<string, [call: string, message: RegExp]> = {
   'a number as a whenElse() branch': ['return whenElse(true, 1, spinner);', /not assignable/],
   'a row that is not a template': ['return repeat(items, (it) => it.id);', /not assignable/],
   "a fragment's members": ['return spinner.length;', /does not exist on type 'Fragment'/],
+  'a callback prop used with the wrong type': [
+    'return html`${Picker({ onPick: (id) => id.toUpperCase(), label: spinner })}`;',
+    /Property 'toUpperCase' does not exist on type 'number'/,
+  ],
+  'a string where a prop takes a Fragment': [
+    "return html`${Picker({ onPick: () => {}, label: '<b>x</b>' })}`;",
+    /not assignable to type 'Fragment'/,
+  ],
 };
 
 const USAGE = '/fragment-type/usage.ts';
@@ -41,6 +52,7 @@ const usage = [
   'const items = [{ id: 1 }];',
   'const spinner = html`<span></span>`;',
   'const Card = defineComponent<{ n: number }>(({ props }) => ({ template: html`<b>${props.n}</b>` }));',
+  'const Picker = defineComponent<{ onPick: (id: number) => void; label: Fragment }>(() => ({ template: html`<i></i>` }));',
   ...cases.map(([, body], i) => `export function case${i}() {\n  ${body}\n}`),
 ].join('\n');
 
