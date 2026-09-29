@@ -171,3 +171,28 @@ mount({ router: { routes: Routes } });
     expect(await buildAndReadJs(app(''), { config: { strictTypeCheck: false } })).toContain(mark);
   });
 });
+
+describe('the router link handling', () => {
+  const app = (markup: string) => `
+import { defineComponent, html, mount } from 'thane';
+import { defineRoutes } from 'thane/router';
+export const Home = defineComponent('home-page', () => ({ template: html\`${markup}\` }));
+const Routes = defineRoutes({ '/': { component: Home }, '/about': { component: Home }, notFound: { component: Home } });
+mount({ router: { routes: Routes } });
+`;
+  const PROD = { strictTypeCheck: false, ...PROD_BUILD };
+  const mark = 'a[href]';
+
+  test('a production build keeps it for a plain link to a path, and leaves it out otherwise', async () => {
+    expect(await buildAndReadJs(app('<a href="/about">About</a>'), { config: PROD })).toContain(mark);
+    expect(await buildAndReadJs(app('<p>no link</p>'), { config: PROD })).not.toContain(mark);
+    expect(
+      await buildAndReadJs(app('<a href="/about" @click.prevent=${() => 0}>About</a>'), { config: PROD }),
+    ).not.toContain(mark);
+    expect(await buildAndReadJs(app('<a href="https://example.com">Elsewhere</a>'), { config: PROD })).not.toContain(
+      mark,
+    );
+    // A development build always keeps it
+    expect(await buildAndReadJs(app('<p>no link</p>'), { config: { strictTypeCheck: false } })).toContain(mark);
+  });
+});

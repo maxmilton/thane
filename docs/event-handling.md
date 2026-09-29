@@ -98,7 +98,7 @@ template: html`<form @submit=${handleSubmit}>...</form>`;
 
 ## Navigate on Click
 
-When using the router, bind `navigate()` directly to click handlers:
+With the router, a plain `<a href="/about">` to a route already navigates in the app ([Links](routing.md#links)). To navigate from a click on something else, bind `navigate()` directly:
 
 ```typescript
 template: html`

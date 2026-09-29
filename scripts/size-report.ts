@@ -9,9 +9,9 @@
  *    baseline table (the files hold some non-ASCII comment characters); elsewhere it is bytes;
  *  - bundles: esbuild bundles of src/runtime feature sets (ESM, es2022, minified, tree-shaken),
  *    that is, what an app that imports that set pays, built as production builds them (`__THANE_DEV__`
- *    false: no development checks). The router rows define `__THANE_HEAD__` and `__THANE_GUARDS__` as a
- *    production build would: false for an app whose routes set nothing but titles and have no guards or
- *    redirects, true with route heads or with guards;
+ *    false: no development checks). The router rows define `__THANE_HEAD__`, `__THANE_GUARDS__` and
+ *    `__THANE_LINKS__` as a production build would: false for an app whose routes set nothing but titles,
+ *    have no guards or redirects, and whose templates have no plain link; true for each feature's own row;
  *  - apps: `thane build --prod` of the apps in the snapshot set (total of the emitted .js files).
  *    example-apps/benchmark is left out: it is the same source as bench/app, built from a tarball.
  *    Minified names can differ between two checkouts of the same commit, which moves gzip by a few
@@ -67,15 +67,19 @@ const FEATURE_SETS: Record<string, string | { contents: string; define: Record<s
   'when/whenElse + keyed reconciler': `import { __bindIf, __bindIfExpr, createKeyedReconciler } from './src/runtime/internal.ts'; export const x = [__bindIf, __bindIfExpr, createKeyedReconciler];`,
   'router (defineRoutes+navigate+mount)': {
     contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,
-    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'false' },
+    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'false' },
   },
   'router with guards and redirects': {
     contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,
-    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'true' },
+    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'true', __THANE_LINKS__: 'false' },
+  },
+  'router with link handling': {
+    contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,
+    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'true' },
   },
   'router with route heads (+setMeta, metaName)': {
     contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate, setMeta } from './src/runtime/router.ts'; import { metaName } from './src/runtime/router-head.ts'; export const x = [mount, defineRoutes, navigate, setMeta, metaName];`,
-    define: { __THANE_HEAD__: 'true', __THANE_GUARDS__: 'false' },
+    define: { __THANE_HEAD__: 'true', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'false' },
   },
 };
 

@@ -84,6 +84,30 @@ No shell component. Page components render directly into `document.body` (or a `
 
 ## Navigation
 
+### Links
+
+A plain link to one of the app's routes navigates in the app: the router takes the click, so the page is not
+loaded again, and the link keeps everything a link does (open in a new tab, copy the address, a crawler
+follows it).
+
+```typescript
+template: html`
+  <a href="/">Home</a>
+  <a href=${href('/users/:id', { id: user.id })}>${user.name}</a>
+`;
+```
+
+The browser keeps these clicks:
+- a click that a handler of the link has already taken (`@click.prevent=${…}`);
+- a click with a modifier key or another mouse button (a new tab or window);
+- a link with a `target` other than `_self`, a `download`, or `rel="external"`;
+- a link to another site, or to a `#hash` on this page;
+- a link to a path that no route has, such as a file (`/sitemap.xml`, `/report.pdf`): it loads as usual.
+
+A production build leaves the link handling out when no template, and no `index.html`, has a plain link
+to a path (an `<a href>` without its own click handler); an app that has one pays about 565 B raw, 220 B
+gzipped.
+
 ### `navigate(path)`
 
 Navigate programmatically using HTML5 History pushState:
@@ -93,7 +117,7 @@ navigate('/about');
 navigate('/users/42');
 ```
 
-In templates, bind directly to click handlers:
+In templates, a [link](#links) is usually the better choice; to navigate from a click on something else, bind it directly:
 
 ```typescript
 template: html`

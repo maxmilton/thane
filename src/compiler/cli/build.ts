@@ -72,13 +72,17 @@ export async function runBuild(config: BuildConfig): Promise<void> {
   // The runtime's build constants. A production build leaves out the development checks (a cycle of
   // signals), and the router's head renderer when the routes use no head field but `title`. A
   // development build keeps both, so a head field added while `thane dev` runs works at once.
-  const routeTables = config.isProd ? await routeTablesOf(config.entryPoints, projectRoot) : undefined;
+  const routeTables = config.isProd
+    ? await routeTablesOf(config.entryPoints, projectRoot, config.inputHTMLFilePath)
+    : undefined;
   const define: Record<string, string> = {
     ...config.define,
     __THANE_DEV__: String(!config.isProd),
     __THANE_HEAD__: String(routeTables?.usesHead ?? true),
     // The router's guard and redirect step, left out when no route has canEnter or redirectTo
     __THANE_GUARDS__: String(routeTables?.usesGuards ?? true),
+    // The router's link handling, left out when no template (nor index.html) has a plain <a href>
+    __THANE_LINKS__: String(routeTables?.usesLinks ?? true),
   };
 
   const plugins = [

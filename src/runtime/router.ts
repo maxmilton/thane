@@ -39,6 +39,11 @@ declare const __THANE_HEAD__: boolean | undefined;
  * reads them): the guard and redirect step is then left out. Undefined everywhere else, which keeps it.
  */
 declare const __THANE_GUARDS__: boolean | undefined;
+/**
+ * False in a production build of an app with no plain link (an `<a href>` without its own click
+ * handler) in its templates or its index.html: the router's link handling is then left out.
+ */
+declare const __THANE_LINKS__: boolean | undefined;
 
 // ─────────────────────────────────────────────────────────────
 //  Route type registry — augmented by generated files
@@ -902,6 +907,36 @@ export function setMeta(meta: AppRouteMeta): void {
  * @param config - Router configuration with routes map and notFound.
  * @param target - The element to render pages into (outlet in Mode B, body/target in Mode C).
  */
+/**
+ * A plain click on a link to one of the app's routes navigates in the app instead of loading the page
+ * again, so `<a href="/about">` is a router link. The browser keeps a click that is already handled
+ * (`@click.prevent`), a modified one (a new tab, a download), a link with a `target`, a `download` or
+ * `rel="external"`, one to another origin or to a hash on this page, and one to a path that no route
+ * has (a file such as `/sitemap.xml`).
+ */
+const followLink = (event: MouseEvent): void => {
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+  const link = (event.target as Element | null)?.closest?.('a[href]');
+  if (!link || link.hasAttribute('download') || /\bexternal\b/.test(link.getAttribute('rel') ?? '')) return;
+  const target = link.getAttribute('target');
+  if (target && target !== '_self') return;
+  // An SVG link has no href property, so the attribute is read, resolved against the page
+  const url = new URL(link.getAttribute('href')!, window.location.href);
+  if (url.origin !== window.location.origin || (url.hash && url.pathname + url.search === locationUrl())) return;
+  if (!_config || !matchRoute(url.pathname, _config.routes)) return;
+  event.preventDefault();
+  navigate((url.pathname + url.search + url.hash) as RoutePaths);
+};
+
 export function startRouter(
   config: { routes: RoutesMap; notFound: Route; error?: Route | undefined },
   target: HTMLElement,
@@ -948,6 +983,7 @@ export function startRouter(
     void loadRoute();
   };
   window.addEventListener('popstate', _popstateHandler);
+  if (typeof __THANE_LINKS__ === 'undefined' || __THANE_LINKS__) window.addEventListener('click', followLink);
 
   // Load the initial route
   void loadRoute();
@@ -977,6 +1013,7 @@ export function stopRouter(): void {
     window.removeEventListener('popstate', _popstateHandler);
     _popstateHandler = null;
   }
+  if (typeof __THANE_LINKS__ === 'undefined' || __THANE_LINKS__) window.removeEventListener('click', followLink);
 
   if (_scrollHandler) {
     window.removeEventListener('scroll', _scrollHandler);

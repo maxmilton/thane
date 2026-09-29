@@ -11,7 +11,7 @@
  */
 import path from 'node:path';
 import ts from 'typescript';
-import { sourceCache } from '../../utils/index.js';
+import { safeReadFile, sourceCache } from '../../utils/index.js';
 import { collectModuleGraph, createModuleResolver, type ModuleResolver } from '../../utils/module-graph.js';
 import {
   headTagHtml,
@@ -524,20 +524,37 @@ export const routePages = (html: string, table: RouteTableHead): Array<{ file: s
  * The route tables the entry points reach, and whether the app needs head support: another app's
  * routes elsewhere in the project change nothing in this one.
  */
+/**
+ * Whether markup holds a plain link to what may be a route: an `<a>` without a click handler of its own
+ * whose `href` is a path (`/about`, `./x`) or an expression, which the router's link handling follows in
+ * the app. An `href` to another site, `mailto:` or `#` never is. A tag that the scan cuts short (a `>`
+ * inside an expression) may be missed; such a link then loads the page, as without the link handling.
+ */
+export const hasPlainLink = (markup: string): boolean => {
+  for (const [tag] of markup.matchAll(/<a\s[^>]*>/gi)) {
+    if (/\shref\s*=\s*["']?(\/(?!\/)|\.{1,2}\/|\$\{)/i.test(tag) && !/\s@click\b/.test(tag)) return true;
+  }
+  return false;
+};
+
 export const routeTablesOf = async (
   entryPoints: string[],
   projectRoot: string,
-): Promise<{ tables: RouteTableHead[]; usesHead: boolean; usesGuards: boolean }> => {
+  htmlFile?: string,
+): Promise<{ tables: RouteTableHead[]; usesHead: boolean; usesGuards: boolean; usesLinks: boolean }> => {
   const resolve = createModuleResolver(projectRoot);
   const tables: RouteTableHead[] = [];
   let usesSetMeta = false;
+  let usesLinks = htmlFile !== undefined && hasPlainLink((await safeReadFile(htmlFile)) ?? '');
   for (const file of await collectModuleGraph(entryPoints, resolve)) {
     tables.push(...(await readRouteTableHeads(file, resolve)));
     if (await importsSetMeta(file)) usesSetMeta = true;
+    if (!usesLinks) usesLinks = hasPlainLink((await sourceCache.get(file))?.source ?? '');
   }
   return {
     tables,
     usesHead: usesSetMeta || tables.some((table) => table.usesHead),
     usesGuards: tables.some((table) => table.usesGuards),
+    usesLinks,
   };
 };

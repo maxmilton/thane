@@ -183,6 +183,26 @@ test.describe('3. Route Parameters', () => {
 //  4. 404 / Not Found
 // ─────────────────────────────────────────────────────────────
 
+test.describe('3a. Links', () => {
+  test('a plain <a href> to a route navigates in the app, without loading the page again', async ({ page }) => {
+    await goto(page, '/');
+    await page.evaluate(() => ((window as any).__stillHere = true));
+    await page.getByTestId('nav-plain-about').click();
+    await expect(page.getByTestId('about-page')).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/about');
+    expect(await page.evaluate(() => (window as any).__stillHere)).toBe(true);
+  });
+
+  test('a link to a path no route has, such as a file, is left to the browser', async ({ page }) => {
+    await goto(page, '/');
+    await page.evaluate(() => ((window as any).__stillHere = true));
+    await page.getByTestId('nav-file').click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/robots.txt');
+    // The browser loaded the address itself: the page's window is a new one
+    await expect.poll(() => page.evaluate(() => (window as any).__stillHere ?? false)).toBe(false);
+  });
+});
+
 test.describe('3b. Redirects and guards', () => {
   test('redirectTo replaces the entry: the target loads, and back skips the redirected path', async ({ page }) => {
     await goto(page, '/');

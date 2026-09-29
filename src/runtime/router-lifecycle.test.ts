@@ -214,6 +214,7 @@ describe('scroll restoration option', () => {
     'replaceState {"__thaneScroll":{"left":11,"top":22}} http://app.test/a',
     'addEventListener scroll {"passive":true}',
     'addEventListener popstate',
+    'addEventListener click',
     'outlet.innerHTML = ""',
     'mount A into outlet',
     '--- navigate /b',
@@ -237,6 +238,7 @@ describe('scroll restoration option', () => {
     'outlet.innerHTML = ""',
     'outlet.innerHTML = ""',
     'removeEventListener popstate',
+    'removeEventListener click',
     'removeEventListener scroll',
     'history.scrollRestoration = auto',
   ];
@@ -251,6 +253,7 @@ describe('scroll restoration option', () => {
   test('false: nothing is saved, reset or restored, and navigate pushes no scroll state', async () => {
     expect(await scenario({ scrollRestoration: false })).toEqual([
       'addEventListener popstate',
+      'addEventListener click',
       'outlet.innerHTML = ""',
       'mount A into outlet',
       '--- navigate /b',
@@ -270,6 +273,7 @@ describe('scroll restoration option', () => {
       'outlet.innerHTML = ""',
       'outlet.innerHTML = ""',
       'removeEventListener popstate',
+      'removeEventListener click',
     ]);
   });
 
@@ -767,6 +771,75 @@ describe('route context', () => {
     });
   });
 
+  describe('links to routes', () => {
+    /** A click on a link with these attributes, and whether the router took it (prevented the browser's load) */
+    const click = (b: Browser, attributes: Record<string, string>, init: Partial<MouseEvent> = {}): boolean => {
+      const link = {
+        closest: (selector: string) => (selector === 'a[href]' ? link : null),
+        getAttribute: (name: string) => attributes[name] ?? null,
+        hasAttribute: (name: string) => name in attributes,
+      };
+      let prevented = false;
+      const event = {
+        target: { closest: link.closest },
+        button: 0,
+        defaultPrevented: false,
+        preventDefault: () => (prevented = true),
+        ...init,
+      };
+      for (const fn of b.listeners.get('click') ?? []) fn(event);
+      return prevented;
+    };
+    const start = () => {
+      const b = install('http://app.test/a');
+      b.window.location.origin = 'http://app.test';
+      startRouter(routes(), new FakeElement('outlet') as any, { scrollRestoration: false });
+      return b;
+    };
+
+    test('a plain click on a link to a route navigates in the app, query and hash included', async () => {
+      const b = start();
+      await settle();
+      log = [];
+      expect(click(b, { href: '/b?x=1#h' })).toBe(true);
+      await settle();
+      expect(log).toContain('pushState null /b?x=1#h');
+      expect(log).toContain('mount B into outlet');
+    });
+
+    test('the browser keeps a handled or modified click, a target, a download, rel="external" and another origin', async () => {
+      const b = start();
+      await settle();
+      log = [];
+      expect(click(b, { href: '/b' }, { defaultPrevented: true })).toBe(false);
+      expect(click(b, { href: '/b' }, { ctrlKey: true })).toBe(false);
+      expect(click(b, { href: '/b' }, { metaKey: true })).toBe(false);
+      expect(click(b, { href: '/b' }, { button: 1 })).toBe(false);
+      expect(click(b, { href: '/b', target: '_blank' })).toBe(false);
+      expect(click(b, { href: '/b', download: '' })).toBe(false);
+      expect(click(b, { href: '/b', rel: 'noopener external' })).toBe(false);
+      expect(click(b, { href: 'https://elsewhere.test/b' })).toBe(false);
+      expect(log.filter((line) => line.startsWith('pushState'))).toEqual([]);
+    });
+
+    test('a hash on this page, and a path no route has (a file), are left to the browser', async () => {
+      const b = start();
+      await settle();
+      expect(click(b, { href: '#section' })).toBe(false);
+      expect(click(b, { href: '/sitemap.xml' })).toBe(false);
+      expect(click(b, { href: '/nowhere' })).toBe(false);
+      // target="_self" is the page itself, like no target
+      expect(click(b, { href: '/b', target: '_self' })).toBe(true);
+    });
+
+    test('after stopRouter no click is taken', async () => {
+      const b = start();
+      await settle();
+      stopRouter();
+      expect(b.listeners.get('click') ?? []).toEqual([]);
+    });
+  });
+
   test('a lazy route: the default export is mounted', async () => {
     install('http://app.test/a');
     startRouter(
@@ -835,7 +908,7 @@ describe('route context', () => {
       scrollRestoration: false,
     });
     await settle();
-    expect(log).toEqual(['addEventListener popstate', 'outlet.innerHTML = ""']);
+    expect(log).toEqual(['addEventListener popstate', 'addEventListener click', 'outlet.innerHTML = ""']);
     const r = providerRoute();
     expect(r.pattern).toBe('/x');
     expect(r.title).toBe('Doc');
@@ -859,10 +932,21 @@ describe('mount({ router })', () => {
     const handle = mount({ router: { routes: table(), scrollRestoration: false }, target: target as any });
     expect(handle.root).toBe(target as any);
     await settle();
-    expect(log).toEqual(['addEventListener popstate', 'body.innerHTML = ""', 'mount A into body']);
+    expect(log).toEqual([
+      'addEventListener popstate',
+      'addEventListener click',
+      'body.innerHTML = ""',
+      'mount A into body',
+    ]);
     log = [];
     expect(handle.destroy()).toBeUndefined();
-    expect(log).toEqual(['destroy A', 'body.innerHTML = ""', 'body.innerHTML = ""', 'removeEventListener popstate']);
+    expect(log).toEqual([
+      'destroy A',
+      'body.innerHTML = ""',
+      'body.innerHTML = ""',
+      'removeEventListener popstate',
+      'removeEventListener click',
+    ]);
     expect('navigate' in g).toBe(false);
   });
 
@@ -888,6 +972,7 @@ describe('mount({ router })', () => {
     expect(log).toEqual([
       'mount Shell into body',
       'addEventListener popstate',
+      'addEventListener click',
       'router-outlet.innerHTML = ""',
       'mount A into router-outlet',
     ]);
@@ -898,6 +983,7 @@ describe('mount({ router })', () => {
       'router-outlet.innerHTML = ""',
       'router-outlet.innerHTML = ""',
       'removeEventListener popstate',
+      'removeEventListener click',
       'destroy Shell',
       'body.innerHTML = ""',
     ]);

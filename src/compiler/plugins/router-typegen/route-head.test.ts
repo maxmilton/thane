@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createModuleResolver } from '../../utils/module-graph.js';
-import { readRouteTableHeads, routePages, routeTablesOf, withHead } from './route-head.js';
+import { hasPlainLink, readRouteTableHeads, routePages, routeTablesOf, withHead } from './route-head.js';
 
 let root = '';
 let n = 0;
@@ -225,6 +225,45 @@ describe('whether an app needs the guard and redirect step', () => {
         "import { defineRoutes } from 'thane/router';\nconst t = { '/': {} };\nexport default defineRoutes(t as never);\n",
       ),
     ).toBe(true);
+  });
+});
+
+describe('whether an app needs the link handling', () => {
+  test('a plain link to a path or an expression counts; one with its own click handler, or to elsewhere, does not', () => {
+    const cases: Array<[string, boolean]> = [
+      ['<a href="/about">x</a>', true],
+      ["<a class='x' href='/about'>", true],
+      ['<a href=${href("/u/:id", { id })}>', true],
+      ['<a href="./x">', true],
+      ['<a href="../x">', true],
+      ['<a href="/about" @click.prevent=${go}>', false],
+      ['<a href="https://x.test">', false],
+      ['<a href="//cdn.test/x">', false],
+      ['<a href="mailto:a@b.c">', false],
+      ['<a href="#top">', false],
+      ['<abbr href="/x">', false],
+      ['<area href="/x">', false],
+    ];
+    for (const [markup, expected] of cases)
+      expect({ markup, plain: hasPlainLink(markup) }).toEqual({ markup, plain: expected });
+  });
+
+  test("a plain link in a module the entry reaches, or in index.html, turns it on; another app's does not", async () => {
+    const links = async (files: Record<string, string>, html?: string) => {
+      const { dir } = project({ 'src/main.ts': "import './page.js';\n", 'src/page.ts': 'export {};\n', ...files });
+      if (html !== undefined) writeFileSync(join(dir, 'index.html'), html);
+      return (
+        await routeTablesOf(
+          [join(dir, 'src', 'main.ts')],
+          dir,
+          html === undefined ? undefined : join(dir, 'index.html'),
+        )
+      ).usesLinks;
+    };
+    expect(await links({})).toBe(false);
+    expect(await links({ 'src/page.ts': 'export const t = html`<a href="/about">About</a>`;\n' })).toBe(true);
+    expect(await links({ 'src/other.ts': 'export const t = html`<a href="/about">About</a>`;\n' })).toBe(false);
+    expect(await links({}, '<body><nav><a href="/about">About</a></nav></body>')).toBe(true);
   });
 });
 
