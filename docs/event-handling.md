@@ -36,7 +36,7 @@ template: html`<button @click=${(e: KeyboardEvent) => e.key}>Go</button>`;
 // error TS1360: Type '(e: KeyboardEvent) => string' does not satisfy the expected type 'ThaneEventListener<"click">'.
 ```
 
-An event that lib.dom does not know, such as a custom event, is typed `any`. Editors do not run this check, so
+Outside a list row the handler is the element's own listener, so `e.currentTarget` is typed as the element: in `<input @input=${(e) => query(e.currentTarget.value)} />` it is an `HTMLInputElement`. A handler in a `repeat()` row is delegated to the list container, so there it stays `EventTarget | null`. An event that lib.dom does not know, such as a custom event, is typed `any`. Editors do not run this check, so
 an untyped parameter is `any` in the editor; type it explicitly for completions there:
 
 ```typescript

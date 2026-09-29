@@ -11,25 +11,34 @@ const rewritten = (markup: string): string | undefined => rewriteEventHandlers('
 describe('rewriteEventHandlers', () => {
   test('a listener is typed by its event: an arrow, a function, a reference, a member reference', () => {
     expect(rewritten('<b @click=${(e) => go(e)}>x</b>')).toBe(
-      inTemplate("<b @click=${((e) => go(e)) satisfies ThaneEventListener<'click'>}>x</b>"),
+      inTemplate("<b @click=${((e) => go(e)) satisfies ThaneEventListener<'click', 'b'>}>x</b>"),
     );
     expect(rewritten('<b @keydown=${function (e) { go(e); }}></b>')).toBe(
-      inTemplate("<b @keydown=${(function (e) { go(e); }) satisfies ThaneEventListener<'keydown'>}></b>"),
+      inTemplate("<b @keydown=${(function (e) { go(e); }) satisfies ThaneEventListener<'keydown', 'b'>}></b>"),
     );
     expect(rewritten('<b @input=${onInput} @blur=${menu.close}></b>')).toBe(
       inTemplate(
-        "<b @input=${(onInput) satisfies ThaneEventListener<'input'>} @blur=${(menu.close) satisfies ThaneEventListener<'blur'>}></b>",
+        "<b @input=${(onInput) satisfies ThaneEventListener<'input', 'b'>} @blur=${(menu.close) satisfies ThaneEventListener<'blur', 'b'>}></b>",
       ),
     );
   });
 
   test('modifiers, a quoted value and a self-closing tag keep the event name', () => {
     expect(rewritten('<form @submit.prevent.stop="${onSubmit}"/>')).toBe(
-      inTemplate(`<form @submit.prevent.stop="\${(onSubmit) satisfies ThaneEventListener<'submit'>}"/>`),
+      inTemplate(`<form @submit.prevent.stop="\${(onSubmit) satisfies ThaneEventListener<'submit', 'form'>}"/>`),
     );
   });
 
-  test('a handler in a nested template (a row) is typed too', () => {
+  test('the element is the tag still open before the attribute, past other substitutions', () => {
+    expect(rewritten('<input class=${c} value=${v} @input=${onInput} />')).toContain(
+      "satisfies ThaneEventListener<'input', 'input'>",
+    );
+    expect(rewritten('<p>a</p><my-widget @change=${onChange}></my-widget>')).toContain(
+      "satisfies ThaneEventListener<'change', 'my-widget'>",
+    );
+  });
+
+  test('a handler in a nested template (a row) is typed too, without its element: rows are delegated', () => {
     const source = 'const t = html`<ul>${repeat(items(), (it) => html`<li @click=${() => pick(it)}>x</li>`)}</ul>`;';
     expect(rewriteEventHandlers('x.ts', source)?.text).toContain(
       "@click=${(() => pick(it)) satisfies ThaneEventListener<'click'>}",
