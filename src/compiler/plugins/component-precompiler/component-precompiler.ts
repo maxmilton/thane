@@ -224,9 +224,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
     // into `import { mountComponent } from 'thane/runtime'` + `mountComponent(X, T, P)` when there is no
     // `router` key, so the generic mount() wrapper, _routerMount hook, and __setRouterMount
     // are all tree-shaken away for non-router apps.
-    const rewriteMountToMountComponent = (source: string): string | null => {
-      const sf = ts.createSourceFile('__mount.ts', source, ts.ScriptTarget.Latest, true);
-
+    const rewriteMountToMountComponent = (source: string, sf: ts.SourceFile): string | null => {
       // 1. Only thane's `mount`, imported under its own name, and only when it is called once: the
       //    rewrite takes `mount` out of the import, so a second call, or a local function of that
       //    name, would be left without a definition
@@ -326,9 +324,15 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
     /**
      * Replace tagged templates with plain ones using the AST: html`...` loses its tag, and
      * css`...` is compiled (its tag goes, and a production build minifies the stylesheet).
+     * `parsed` is the code's parse, when there is one.
      */
-    const stripTemplateTags = (code: string, filePath: string, options: CompileOptions = compileOptions()): string => {
-      const sf = ts.createSourceFile(filePath, code, ts.ScriptTarget.Latest, true);
+    const stripTemplateTags = (
+      code: string,
+      filePath: string,
+      options: CompileOptions,
+      parsed?: ts.SourceFile,
+    ): string => {
+      const sf = parsed ?? ts.createSourceFile(filePath, code, ts.ScriptTarget.Latest, true);
       // Collect positions to strip in reverse order (end → start)
       const edits: { start: number; end: number; replacement: string }[] = [];
       const ownCssTag = declaresOwnCssTag(sf);
@@ -360,31 +364,39 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
     /**
      * Apply reactive binding transformation, strip template tags, and produce loader result.
      * When childMounts are present, passes them to the binding compiler so it can
-     * emit mount calls in __b and start its idCounter at the correct offset.
+     * emit mount calls in __b and start its idCounter at the correct offset. `parsed` is the
+     * parse of `modifiedSource`, when the precompiler changed nothing.
      */
     const buildTransformedResult = (
       source: string,
       modifiedSource: string,
       filePath: string,
-      childMounts?: ChildMountInfo[],
+      childMounts: ChildMountInfo[] | undefined,
+      parsed: ts.SourceFile | undefined,
     ): { contents: string; loader: 'ts' } => {
-      let result = modifiedSource;
       let keyframes = false;
       const options = { ...compileOptions(), onKeyframes: () => (keyframes = true) };
-      if (extendsComponentQuick(source) || EXPORTED_FRAGMENT.test(source)) {
-        const transformed = transformDefineComponentSource(result, filePath, childMounts, options);
-        if (transformed) {
-          result = transformed;
-        }
-      }
-      result = stripTemplateTags(result, filePath, options);
+      // The binding compiler strips the templates' tags along with its other edits
+      const transformed =
+        extendsComponentQuick(source) || EXPORTED_FRAGMENT.test(source)
+          ? transformDefineComponentSource(modifiedSource, filePath, childMounts, options, parsed)
+          : null;
+      // Binding code that repeats a template expression as written (a when() used as text) can hold a
+      // tag of its own, which only a parse of the compiled code finds
+      const result =
+        transformed === null
+          ? stripTemplateTags(modifiedSource, filePath, options, parsed)
+          : transformed.includes(FN.HTML + '`')
+            ? stripTemplateTags(transformed, filePath, options)
+            : transformed;
       return createLoaderResult(keyframes ? result + '\n' + KEYFRAME_SCOPING : result);
     };
 
     /** css`` templates compiled, and keyframe scoping added when one of them defines keyframes */
-    const compileCssOnly = (code: string, filePath: string): string => {
+    const compileCssOnly = (code: string, filePath: string, parsed?: ts.SourceFile): string => {
       let keyframes = false;
-      const result = stripTemplateTags(code, filePath, { ...compileOptions(), onKeyframes: () => (keyframes = true) });
+      const options = { ...compileOptions(), onKeyframes: () => (keyframes = true) };
+      const result = stripTemplateTags(code, filePath, options, parsed);
       return keyframes ? result + '\n' + KEYFRAME_SCOPING : result;
     };
 
@@ -394,13 +406,16 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           return undefined;
         }
 
-        const source = await fs.promises.readFile(args.path, 'utf8');
+        // The file as read and parsed once for the build (the scan and the linter read the same)
+        const cached = await sourceCache.get(args.path);
+        const source = cached?.source ?? (await fs.promises.readFile(args.path, 'utf8'));
+        const parse = (): ts.SourceFile => cached?.sourceFile ?? sourceCache.parse(args.path, source);
 
         // ── Mount-call optimiser ──
         // For Mode A (component-only), rewrite mount({component: X}) → mountComponent(X)
         // so the generic mount() wrapper + router hook are tree-shaken away entirely.
         if (source.includes('mount(') && !source.includes('router') && !source.includes(FN.HTML + '`')) {
-          const rewritten = rewriteMountToMountComponent(source);
+          const rewritten = rewriteMountToMountComponent(source, parse());
           if (rewritten) {
             logger.info(NAME, `Optimised mount() → mountComponent() in ${args.path}`);
             return createLoaderResult(source.includes(FN.CSS + '`') ? compileCssOnly(rewritten, args.path) : rewritten);
@@ -411,7 +426,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           // A module with only css`` templates (shared styles) still needs them compiled:
           // the tag is a compile-time marker and does not exist at runtime.
           if (source.includes(FN.CSS + '`')) {
-            return createLoaderResult(compileCssOnly(source, args.path));
+            return createLoaderResult(compileCssOnly(source, args.path, parse()));
           }
           return undefined;
         }
@@ -422,7 +437,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
         // Child mount data to pass to the binding compiler
         let childMounts: ChildMountInfo[] | undefined;
 
-        const sourceFile = sourceCache.parse(args.path, source);
+        const sourceFile = parse();
         reportSharedSelectors(sourceFile, args.path);
         const componentsInScope = resolver ? await resolver.componentsInScope(sourceFile) : new Map();
         const fragmentsInScope = resolver ? await resolver.fragmentsInScope(sourceFile) : new Map();
@@ -470,7 +485,13 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           childMounts = mounts;
         }
 
-        return buildTransformedResult(source, modifiedSource, args.path, childMounts);
+        return buildTransformedResult(
+          source,
+          modifiedSource,
+          args.path,
+          childMounts,
+          modifiedSource === source ? sourceFile : undefined,
+        );
       } catch (error) {
         const diagnostic = createError(
           `Error processing ${args.path}: ${error instanceof Error ? error.message : error}`,

@@ -436,9 +436,10 @@ export const transformDefineComponentSource = (
   filePath: string,
   childMounts?: ChildMountInfo[],
   options: CompileOptions = {},
+  parsed?: ts.SourceFile,
 ): string | null => {
   try {
-    return transformComponent(source, filePath, childMounts, options);
+    return transformComponent(source, filePath, childMounts, options, parsed);
   } finally {
     // A component's scope is its own alone
     setTemplateScope(undefined);
@@ -486,8 +487,9 @@ const transformComponent = (
   filePath: string,
   childMounts: ChildMountInfo[] | undefined,
   options: CompileOptions,
+  parsed: ts.SourceFile | undefined,
 ): string | null => {
-  const sourceFile = sourceCache.parse(filePath, source);
+  const sourceFile = parsed?.text === source ? parsed : sourceCache.parse(filePath, source);
   const components = findComponentDeclarations(sourceFile);
   const fragments = findExportedFragments(sourceFile);
   if (components.length === 0 && fragments.length === 0) return null;
@@ -590,6 +592,17 @@ const transformComponent = (
   if (hasStyles) {
     edits.push({ start: source.length, end: source.length, replacement: '\n__enableComponentStyles();\n' });
   }
+
+  // Every other html template of the file loses its tag: it is a plain template literal at run time
+  const stripTags = (node: ts.Node): void => {
+    if (ts.isTaggedTemplateExpression(node) && isHtmlTemplate(node)) {
+      const start = node.tag.getStart(sourceFile);
+      const end = node.template.getStart(sourceFile);
+      if (!edits.some((edit) => edit.start < end && start < edit.end)) edits.push({ start, end, replacement: '' });
+    }
+    ts.forEachChild(node, stripTags);
+  };
+  stripTags(sourceFile);
 
   return applyEdits(source, edits);
 };

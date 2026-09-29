@@ -124,7 +124,8 @@ export interface SelectorPlanInput {
   selectors: string[];
   /** Selectors of components outside the project: never renamed, never used as a new name */
   reserved?: string[];
-  tsFiles: Array<{ path: string; text: string }>;
+  /** Every TypeScript file in the project, with its parse when the build has one */
+  tsFiles: Array<{ path: string; text: string; sourceFile?: ts.SourceFile | undefined }>;
   /** Every stylesheet in the project, imported by a module or not */
   cssFiles: Array<{ path: string; text: string }>;
   /** The source index.html */
@@ -169,7 +170,8 @@ const analyseSources = (tsFiles: SelectorPlanInput['tsFiles']): AnalysedSources 
   const cssImports: AnalysedSources['cssImports'] = [];
 
   for (const file of tsFiles) {
-    const sourceFile = ts.createSourceFile(file.path, file.text, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+    const sourceFile =
+      file.sourceFile ?? ts.createSourceFile(file.path, file.text, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
     const literalText = (node: ts.Node): string => file.text.slice(node.getStart(sourceFile), node.getEnd());
     const thaneCssTag = !declaresOwnCssTag(sourceFile);
 
