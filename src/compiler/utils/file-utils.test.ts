@@ -1,13 +1,14 @@
 /**
  * Characterisation of createBuildContext: it scans the working directory, skips the
- * excluded folders and .d.ts files, and indexes every exported defineComponent by name and by
+ * excluded folders and .d.ts files, and indexes every defineComponent, exported or not, by name and by
  * selector. It also scans the project root when that lies outside the working directory.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
-import { createBuildContext, projectRootWarning } from './file-utils.js';
+import { createBuildContext, getContentType, projectRootWarning, refreshBuildContext } from './file-utils.js';
+import { sourceCache } from './cache.js';
 
 const FILES: Record<string, string> = {
   'src/main.ts': `import { AppShell } from './app-shell';\nconsole.log(AppShell);\n`,
@@ -61,18 +62,20 @@ test('createBuildContext scans the working directory', async () => {
   ]);
   expect(Object.keys(ctx).sort()).toEqual(['components', 'componentsBySelector', 'projectRoot', 'tsFiles']);
   expect(relative(root, ctx.projectRoot)).toBe('');
-  const byName = Object.fromEntries(ctx.components.map((d) => [d.name, [d.selector, rel(d.filePath)]]));
+  const byName = Object.fromEntries(ctx.components.map((d) => [d.name, [d.selector, rel(d.filePath), d.exported]]));
   const bySelector = Object.fromEntries([...ctx.componentsBySelector].map(([k, d]) => [k, [d.name, rel(d.filePath)]]));
   expect(byName).toEqual({
-    AppShell: ['app-shell', 'src/app-shell.ts'],
-    Card: ['x-card', 'src/widgets/card.ts'],
-    Other: ['x-other', 'src/widgets/card.ts'],
-    LeafNode: ['leaf-node', 'deep/a/b/c/leaf.ts'],
+    AppShell: ['app-shell', 'src/app-shell.ts', true],
+    Card: ['x-card', 'src/widgets/card.ts', true],
+    Other: ['x-other', 'src/widgets/card.ts', true],
+    Hidden: ['x-hidden', 'src/widgets/card.ts', false],
+    LeafNode: ['leaf-node', 'deep/a/b/c/leaf.ts', true],
   });
   expect(bySelector).toEqual({
     'app-shell': ['AppShell', 'src/app-shell.ts'],
     'x-card': ['Card', 'src/widgets/card.ts'],
     'x-other': ['Other', 'src/widgets/card.ts'],
+    'x-hidden': ['Hidden', 'src/widgets/card.ts'],
     'leaf-node': ['LeafNode', 'deep/a/b/c/leaf.ts'],
   });
 });
@@ -121,4 +124,50 @@ describe('projectRootWarning', () => {
     expect(projectRootWarning(join(root, 'apps', 'site'), root)).toBeNull();
     expect(projectRootWarning(join(root, 'other'), join(root, 'scratch'))).toBeNull();
   });
+});
+
+describe('getContentType', () => {
+  test('the files a web app serves get their type, text with its charset', () => {
+    expect(getContentType('/main-ABC.js')).toBe('text/javascript; charset=utf-8');
+    expect(getContentType('/index.html')).toBe('text/html; charset=utf-8');
+    expect(getContentType('/assets/fonts/inter.woff2')).toBe('font/woff2');
+    expect(getContentType('/assets/hero.WEBP')).toBe('image/webp');
+    expect(getContentType('/manifest.webmanifest')).toBe('application/manifest+json');
+    expect(getContentType('/sitemap.xml')).toBe('application/xml');
+    expect(getContentType('/lib.wasm')).toBe('application/wasm');
+    expect(getContentType('/favicon.ico')).toBe('image/x-icon');
+  });
+
+  test('an unknown extension, or none, is application/octet-stream; a dot in a folder name is not an extension', () => {
+    expect(getContentType('/data.bin')).toBe('application/octet-stream');
+    expect(getContentType('/LICENSE')).toBe('application/octet-stream');
+    expect(getContentType('/v1.2/LICENSE')).toBe('application/octet-stream');
+  });
+});
+
+test('refreshBuildContext finds a component file added since the scan and forgets a removed one, in place', async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'thane-rescan-')));
+  const component = (name: string) =>
+    `export const ${name} = defineComponent(() => ({ template: html\`<p></p>\` }));\n`;
+  writeFileSync(join(dir, 'a.ts'), component('Alpha'));
+  writeFileSync(join(dir, 'b.ts'), component('Beta'));
+  process.chdir(dir);
+  try {
+    const ctx = await createBuildContext(dir);
+    const parsedA = (await sourceCache.get(join(dir, 'a.ts')))!.sourceFile;
+    expect(ctx.components.map((d) => d.name).sort()).toEqual(['Alpha', 'Beta']);
+
+    writeFileSync(join(dir, 'c.ts'), component('Gamma'));
+    rmSync(join(dir, 'b.ts'));
+    await refreshBuildContext(ctx);
+
+    expect(ctx.components.map((d) => d.name).sort()).toEqual(['Alpha', 'Gamma']);
+    expect([...ctx.componentsBySelector.keys()].sort()).toEqual(['alpha', 'gamma']);
+    expect(ctx.tsFiles.map((f) => relative(dir, f)).sort()).toEqual(['a.ts', 'c.ts']);
+    // An unchanged file is not parsed again
+    expect((await sourceCache.get(join(dir, 'a.ts')))!.sourceFile).toBe(parsedA);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

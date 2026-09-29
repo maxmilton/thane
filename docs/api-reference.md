@@ -10,6 +10,8 @@ Complete API surface for the Thane framework, covering all public exports, the t
 | `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`, `href`, `setMeta`, and the head-field helpers `metaName`, `metaProperty`, `linkTag` |
 | `thane/client`  | Type declarations for `.css` imports, which `thane` includes (see below)                                   |
 | `thane/runtime` | The helpers that compiled code calls. Only the compiler imports it: never import it in an app. It is not an API and changes with every version |
+| `thane/runtime/dom` | Node's `cloneNode` and `insertBefore`, for compiled lists. Only compiled code imports it |
+| `thane/ts-plugin` | The TypeScript plugin for the editor ([Event Handling](event-handling.md#in-the-editor)) |
 
 ### `thane` (main entry)
 
@@ -41,21 +43,22 @@ Complete API surface for the Thane framework, covering all public exports, the t
 
 | Export     | Signature                                                                                                                                                                         | Description                                  |
 | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------- |
-| `html`     | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for HTML content             |
+| `html`     | `(strings: TemplateStringsArray, ...values: any[]) => Fragment`                                                                                                                   | Tagged template for HTML content             |
 | `css`      | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for CSS content              |
 | `when`     | `(condition: boolean \| (() => boolean)) => string`                                                                                                                               | Conditional rendering — show/hide an element |
-| `whenElse` | `<T, F>(condition: boolean \| (() => boolean), thenTemplate: T, elseTemplate: F) => T \| F`                                                                                       | If/else conditional rendering                |
-| `repeat`   | `<T>(items: T[] \| (() => T[]), templateFn: (item: T, index: number) => any, emptyTemplate?: string \| null, trackBy?: (item: T, index: number) => string \| number) => any[]` | List rendering with keyed reconciliation     |
+| `whenElse` | `(condition: boolean \| (() => boolean), thenTemplate: Fragment \| string, elseTemplate: Fragment \| string) => Fragment`                                                        | If/else conditional rendering                |
+| `repeat`   | `<T>(items: T[] \| (() => T[]), templateFn: (item: T, index: number) => Fragment \| string, emptyTemplate?: Fragment \| string \| null, trackBy?: (item: T, index: number) => string \| number) => Fragment` | List rendering with keyed reconciliation     |
 
-`repeat()`'s third argument is the empty template (an `html` template, or `null`); the key function goes fourth: `repeat(items(), row, null, (item) => item.id)`. A function in third place is a build error (THANE010).
+`repeat()`'s third argument is the empty template (an `html` template, or `null`); the key function goes fourth: `repeat(items(), row, null, (item) => item.id)`. A function in third place is a build error (THANE010). A directive's templates may also be plain template literals of markup; a component's `template` is an `html` template.
 
 ### `thane/router` (subpath export)
 
 | Export         | Signature                                               | Description                                                              |
 | :------------- | :------------------------------------------------------ | :----------------------------------------------------------------------- |
-| `defineRoutes` | `(routes: { [pattern: string]: Route; notFound: Route }, options?: RouterOptions) => typeof routes` | Define the route map with type-safe keys; required before `mount()` with a `router` option. `options` gives the site's head and the app's own head fields ([Route Heads](routing.md#route-heads)) |
+| `defineRoutes` | `(routes: { [pattern: string]: Route; notFound: Route; error?: Route }, options?: RouterOptions) => typeof routes` | Define the route map with type-safe keys; required before `mount()` with a `router` option. `options` gives the site's head and the app's own head fields ([Route Heads](routing.md#route-heads)) |
 | `navigate`     | `(path: RoutePaths) => void`, `(pattern, params) => void` | Navigate to a path, or to a route pattern with its parameters filled in (also available as a global) |
-| `href`         | `(pattern, params) => RoutePaths`                       | A route pattern's path with its parameters filled in, URL-encoded: `href('/users/:id', { id: 7 })` is `/users/7` |
+| `href`         | `(pattern, params) => RoutePaths`                       | A route pattern's path with its parameters filled in, URL-encoded: `href('/users/:id', { id: 7 })` is `/users/7`; the route's search values go into the query |
+| `searchString`, `searchNumber`, `searchFlag`, `searchOneOf` | `(…) => SearchParser<T>` | Parsers for a route's `search` schema ([Search Parameters](routing.md#search-parameters)) |
 | `navigateBack` | `() => void`                                            | Navigate back in browser history (also available as a global)            |
 | `setMeta`      | `(meta: AppRouteMeta) => void`                          | Set head fields of the page on screen, until the next route loads         |
 | `metaName`     | `(name: string) => CustomMetaField<string>`             | A custom head field for `<meta name="…">`                                |
@@ -93,11 +96,20 @@ The router installs these as globals when it starts, so a template calls them wi
 | `ReadonlySignal<T>`        | A signal that others may only read, such as state a service owns and exposes                |
 | `ComponentContext<P>`      | The setup function's parameter, for example in a helper shared by several setup functions  |
 | `ComponentHTMLSelector<P>` | What `defineComponent()` returns: a parameter that receives a component to `mount()`        |
+| `Fragment`                 | An `html` template as a value: a fragment a module exports, a prop that holds one           |
 | `MountHandle`              | The result of `mount()`, kept to destroy the component later                                |
 | `RoutePaths`               | A variable or prop that holds a navigation target                                           |
 
 ```typescript
-import type { Signal, ReadonlySignal, ComponentContext, ComponentHTMLSelector, MountHandle, RoutePaths } from 'thane';
+import type {
+  Signal,
+  ReadonlySignal,
+  ComponentContext,
+  ComponentHTMLSelector,
+  Fragment,
+  MountHandle,
+  RoutePaths,
+} from 'thane';
 ```
 
 ### Core Types
@@ -122,7 +134,11 @@ interface ComponentContext<P = {}, S extends string = string> {
   route?: RouteContextForSelector<S>; // Route context (when mounted by the router)
 }
 
-type ComponentHTMLSelector<P> = (props: P) => string;
+// Calling a component in a template gives a Fragment
+type ComponentHTMLSelector<P> = (props: P) => Fragment;
+
+// An html template, a child component call or a directive: it has no members
+interface Fragment {}
 
 interface MountHandle {
   root: HTMLElement; // Host element
@@ -149,7 +165,7 @@ The objects below are typed where you write them — TypeScript infers them, and
 
 ```typescript
 type ComponentReturnType = {
-  template?: string; // html`` template
+  template?: Fragment; // html`` template
   styles?: string; // css`` template or an imported .css file
   onMount?: () => void;
   onDestroy?: () => void;
@@ -183,7 +199,7 @@ interface RouterOptions {
 }
 
 interface RouterConfig {
-  routes: { [pattern: string]: Route; notFound: Route }; // From defineRoutes()
+  routes: { [pattern: string]: Route; notFound: Route; error?: Route }; // From defineRoutes()
   outletId?: `router-${string}`; // Default: 'router-outlet'
   scrollRestoration?: boolean | ScrollRestorationConfig; // Default: enabled
 }

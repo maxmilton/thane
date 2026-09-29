@@ -183,6 +183,51 @@ test.describe('3. Route Parameters', () => {
 //  4. 404 / Not Found
 // ─────────────────────────────────────────────────────────────
 
+test.describe('3a. Links', () => {
+  test('a plain <a href> to a route navigates in the app, without loading the page again', async ({ page }) => {
+    await goto(page, '/');
+    await page.evaluate(() => ((window as any).__stillHere = true));
+    await page.getByTestId('nav-plain-about').click();
+    await expect(page.getByTestId('about-page')).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/about');
+    expect(await page.evaluate(() => (window as any).__stillHere)).toBe(true);
+  });
+
+  test('a link to a path no route has, such as a file, is left to the browser', async ({ page }) => {
+    await goto(page, '/');
+    await page.evaluate(() => ((window as any).__stillHere = true));
+    await page.getByTestId('nav-file').click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/robots.txt');
+    // The browser loaded the address itself: the page's window is a new one
+    await expect.poll(() => page.evaluate(() => (window as any).__stillHere ?? false)).toBe(false);
+  });
+});
+
+test.describe('3b. Redirects and guards', () => {
+  test('redirectTo replaces the entry: the target loads, and back skips the redirected path', async ({ page }) => {
+    await goto(page, '/');
+    await page.evaluate(`window.navigate('/old-about')`);
+    await expect(page.getByTestId('about-page')).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/about');
+    await page.goBack();
+    await expect(page.getByTestId('home-page')).toBeVisible();
+  });
+
+  test('a redirect function gets the route parameters; a direct load redirects too', async ({ page }) => {
+    await goto(page, '/members/7');
+    await expect(page.getByTestId('user-id')).toHaveText('7');
+    expect(new URL(page.url()).pathname).toBe('/users/7');
+  });
+
+  test('a guard that returns a path sends the user there; one that returns true enters', async ({ page }) => {
+    await goto(page, '/private');
+    await expect(page.getByTestId('home-page')).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/');
+    await page.evaluate(`window.navigate('/private?key=open')`);
+    await expect(page.getByTestId('about-page')).toBeVisible();
+  });
+});
+
 test.describe('4. Not Found', () => {
   test('unknown path renders the not-found page', async ({ page }) => {
     await goto(page, '/nonexistent');
@@ -490,16 +535,18 @@ test.describe('10. Route Swap', () => {
     expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
   });
 
-  test('a page whose chunk fails to load leaves the outlet empty and the router usable', async ({ page }) => {
+  test('a page whose chunk fails to load shows the error route, given the error, and the router stays usable', async ({
+    page,
+  }) => {
     await page.route(/\/about-[^/]*\.js$/, (route: any) => route.abort());
     await goto(page, '/');
 
-    // Production builds drop the router's console report, so the test waits for the failed request and
-    // then for the outlet: the home page stays on screen until the load has failed, then the outlet empties.
-    const failed = page.waitForEvent('requestfailed', (request: any) => /\/about-[^/]*\.js$/.test(request.url()));
+    // The home page stays on screen until the load has failed, then the error route replaces it
     await page.getByTestId('nav-about').click();
-    await failed;
-    await expect(page.locator('#router-outlet [data-testid$="-page"]')).toHaveCount(0);
+    await expect(page.getByTestId('error-page')).toBeVisible();
+    await expect(page.getByTestId('home-page')).toHaveCount(0);
+    await expect(page.getByTestId('error-message')).not.toBeEmpty();
+    await expect(page).toHaveTitle('Error');
 
     await page.getByTestId('nav-user').click();
     await expect(page.getByTestId('user-page')).toBeVisible();

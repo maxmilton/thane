@@ -4,6 +4,11 @@
  */
 
 import type { RouteContextForSelector, UntypedRouteContext } from './router.js';
+import type { Fragment } from './markers.js';
+import { hotRegister, hotRuntime, hotStyles } from './hot.js';
+
+/** False in a production build, which leaves the development server's hot swapping out */
+declare const __THANE_DEV__: boolean | undefined;
 import type { ComponentRoot } from './types.js';
 
 // ============================================================================
@@ -11,7 +16,7 @@ import type { ComponentRoot } from './types.js';
 // ============================================================================
 
 type ComponentProps = Record<string, any>;
-export type ComponentHTMLSelector<T> = (props: T) => string;
+export type ComponentHTMLSelector<T> = (props: T) => Fragment;
 
 /**
  * Context object passed to the defineComponent setup function.
@@ -31,7 +36,7 @@ export interface ComponentContext<P = {}, S extends string = string> {
  */
 export type ComponentReturnType = {
   /** HTML template (html tagged template literal) */
-  template?: string;
+  template?: Fragment;
   /** Scoped styles (css tagged template literal) */
   styles?: string;
 } & {
@@ -219,6 +224,23 @@ export function scopeCssRules(cssText: string, hostSelector: string): string {
 }
 
 /**
+ * The keyframes a component's stylesheet defines are its own: `@keyframes spin` becomes
+ * `@keyframes card-spin`, and so does every `animation` or `animation-name` in the stylesheet
+ * that names it. A name the stylesheet does not define, such as a global animation, stays.
+ */
+export const scopeKeyframes = (cssText: string, scope: string): string => {
+  const names = new Set(Array.from(cssText.matchAll(/keyframes\s+([\w-]+)/g), (match) => match[1]));
+  // One pass renames the names after `keyframes` (a definition) and in an `animation` or `animation-name` value
+  return names.size
+    ? cssText.replace(
+        /(keyframes\s+|animation(?:-name)?\s*:)([^;{}]*)/g,
+        (_, head: string, rest: string) =>
+          head + rest.replace(/[\w-]+/g, (name) => (names.has(name) ? scope + '-' + name : name)),
+      )
+    : cssText;
+};
+
+/**
  * Register global styles (deduped by CSS text).
  *
  * Tree-shakable: if no component imports this, esbuild strips it.
@@ -247,6 +269,11 @@ export function __enableComponentStyles(): void {
   if (_onStyles) return;
   const registered = new Set<string>();
   _onStyles = (selector, cssText) => {
+    // A page the development server serves replaces a component's sheet when its file changes
+    if ((typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) && hotRuntime()) {
+      hotStyles(hotRuntime()!, selector, scopeCssRules(cssText, `.${selector}`));
+      return;
+    }
     if (!registered.has(selector)) {
       registered.add(selector);
       const scopedCss = scopeCssRules(cssText, `.${selector}`);
@@ -255,6 +282,21 @@ export function __enableComponentStyles(): void {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
     }
   };
+}
+
+let _keyframesScoped = false;
+
+/**
+ * Scope the keyframes of component stylesheets as well (see scopeKeyframes). The compiler calls it
+ * from each module whose stylesheet defines keyframes, so an app without any bundles none of this.
+ * @internal
+ */
+export function __enableKeyframeScoping(): void {
+  if (_keyframesScoped) return;
+  _keyframesScoped = true;
+  __enableComponentStyles();
+  const register = _onStyles!;
+  _onStyles = (selector, cssText) => register(selector, scopeKeyframes(cssText, selector));
 }
 
 // ============================================================================
@@ -325,9 +367,9 @@ export function defineComponent<P extends ComponentProps = {}>(
       stylesRegistered = true;
     }
 
-    // Apply template
+    // Apply template: uncompiled, it is the markup string the caller passed
     if (result.template) {
-      root.innerHTML = result.template;
+      root.innerHTML = result.template as unknown as string;
     }
 
     // Initialize reactive bindings (injected by the compiler into the return object)
@@ -418,6 +460,10 @@ export function __registerComponent(
     return instance;
   };
 
+  // In a page the development server serves, a component is swapped when its file changes
+  if ((typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) && hotRuntime()) {
+    return hotRegister(hotRuntime()!, selector, { __f: factory });
+  }
   return { __f: factory };
 }
 
@@ -459,6 +505,9 @@ export function __registerComponentLean(
     if (bindingsCleanup) instance.__bindingsCleanup = bindingsCleanup;
     return instance;
   };
+  if ((typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) && hotRuntime()) {
+    return hotRegister(hotRuntime()!, selector, { __f: factory });
+  }
   return { __f: factory };
 }
 

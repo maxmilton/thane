@@ -19,6 +19,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { __registerComponentLean, mount } from './component.js';
 import { defineRoutes, navigate, navigateBack, startRouter, stopRouter } from './router.js';
 import type { Route, RoutesMap } from './router.js';
+import { searchFlag, searchNumber, searchOneOf, searchString } from './router-search.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Fake browser with an operation log
@@ -214,6 +215,7 @@ describe('scroll restoration option', () => {
     'replaceState {"__thaneScroll":{"left":11,"top":22}} http://app.test/a',
     'addEventListener scroll {"passive":true}',
     'addEventListener popstate',
+    'addEventListener click',
     'outlet.innerHTML = ""',
     'mount A into outlet',
     '--- navigate /b',
@@ -237,6 +239,7 @@ describe('scroll restoration option', () => {
     'outlet.innerHTML = ""',
     'outlet.innerHTML = ""',
     'removeEventListener popstate',
+    'removeEventListener click',
     'removeEventListener scroll',
     'history.scrollRestoration = auto',
   ];
@@ -251,6 +254,7 @@ describe('scroll restoration option', () => {
   test('false: nothing is saved, reset or restored, and navigate pushes no scroll state', async () => {
     expect(await scenario({ scrollRestoration: false })).toEqual([
       'addEventListener popstate',
+      'addEventListener click',
       'outlet.innerHTML = ""',
       'mount A into outlet',
       '--- navigate /b',
@@ -270,6 +274,7 @@ describe('scroll restoration option', () => {
       'outlet.innerHTML = ""',
       'outlet.innerHTML = ""',
       'removeEventListener popstate',
+      'removeEventListener click',
     ]);
   });
 
@@ -517,7 +522,19 @@ describe('route context', () => {
     );
     await settle();
     const r = seen.route;
-    expect(Object.keys(r)).toEqual(['params', 'path', 'pattern', 'searchParams', 'hash', 'title', 'state']);
+    expect(Object.keys(r)).toEqual([
+      'params',
+      'path',
+      'pattern',
+      'searchParams',
+      'search',
+      'hash',
+      'title',
+      'state',
+      'error',
+    ]);
+    expect(r.search).toEqual({});
+    expect(r.error).toBeUndefined();
     expect(r.params).toEqual({ id: '42' });
     expect(r.path).toBe('/users/42');
     expect(r.pattern).toBe('/users/:id');
@@ -573,6 +590,297 @@ describe('route context', () => {
     expect(seen.route.pattern).toBe('notFound');
     expect(seen.route.title).toBe('404');
     expect(seen.route.params).toEqual({});
+  });
+
+  describe('the error route', () => {
+    const errors: unknown[][] = [];
+    const consoleError = console.error;
+    const capture = () => {
+      errors.length = 0;
+      console.error = (...args: unknown[]) => errors.push(args);
+    };
+    afterEach(() => {
+      console.error = consoleError;
+    });
+
+    const mounts = () => log.filter((line) => line.startsWith('mount') || line.startsWith('destroy'));
+
+    const throwing = (name: string) =>
+      ({
+        __f: () => {
+          log.push(`mount ${name}`);
+          throw new Error(`${name} failed`);
+        },
+      }) as any;
+
+    test('a chunk that fails to load shows the error route, given the error, with its head', async () => {
+      capture();
+      const seen: { route?: any } = {};
+      const failure = new Error('chunk failed');
+      install('http://app.test/a');
+      startRouter(
+        {
+          routes: { '/a': { component: () => Promise.reject(failure), meta: { title: 'A' } } },
+          notFound: { component: page('NF') },
+          error: { component: page('ERR', seen), meta: { title: 'Something went wrong' } },
+        },
+        new FakeElement('outlet') as any,
+        { scrollRestoration: false },
+      );
+      await settle();
+      await settle();
+      expect(log).toContain('mount ERR into outlet');
+      expect(seen.route.pattern).toBe('error');
+      expect(seen.route.error).toBe(failure);
+      expect(seen.route.path).toBe('/a');
+      expect(g.document.title).toBe('Something went wrong');
+      expect(errors[0]).toEqual(['[thane-router] Failed to load route:', failure]);
+    });
+
+    test('a component that throws while mounting shows the error route too, and the next route is normal again', async () => {
+      capture();
+      const seen: { route?: any } = {};
+      install('http://app.test/a');
+      startRouter(
+        {
+          routes: { '/a': { component: throwing('A') }, '/b': { component: page('B', seen) } },
+          notFound: { component: page('NF') },
+          error: { component: () => Promise.resolve({ default: page('ERR') }) },
+        },
+        new FakeElement('outlet') as any,
+        { scrollRestoration: false },
+      );
+      await settle();
+      await settle();
+      expect(mounts()).toEqual(['mount A', 'mount ERR into outlet']);
+      navigate('/b');
+      await settle();
+      expect(log).toContain('destroy ERR');
+      expect(log).toContain('mount B into outlet');
+      expect(seen.route.pattern).toBe('/b');
+      expect(seen.route.error).toBeUndefined();
+    });
+
+    test('without an error route the outlet stays empty, and the failure is reported', async () => {
+      capture();
+      install('http://app.test/a');
+      const outlet = new FakeElement('outlet');
+      startRouter(
+        { routes: { '/a': { component: throwing('A') } }, notFound: { component: page('NF') } },
+        outlet as any,
+        { scrollRestoration: false },
+      );
+      await settle();
+      expect(mounts()).toEqual(['mount A']);
+      expect(errors.map((e) => e[0])).toEqual(['[thane-router] Failed to load route:']);
+    });
+  });
+
+  describe('redirects and guards', () => {
+    const mounts = () => log.filter((line) => /^(mount|destroy|replaceState|pushState)/.test(line));
+    const start = (routeMap: Record<string, Route>, url = 'http://app.test/a') => {
+      install(url);
+      startRouter({ routes: routeMap, notFound: { component: page('NF') } }, new FakeElement('outlet') as any, {
+        scrollRestoration: false,
+      });
+    };
+
+    test('redirectTo replaces the history entry and loads the target', async () => {
+      start({ '/old': { redirectTo: '/new' }, '/new': { component: page('New') } }, 'http://app.test/old');
+      await settle();
+      expect(mounts()).toEqual(['replaceState null /new', 'mount New into outlet']);
+      expect(g.window.location.pathname).toBe('/new');
+      expect(g.currentPath()).toBe('/new');
+    });
+
+    test('a redirectTo function gets the route, with its parameters', async () => {
+      const seen: { route?: any } = {};
+      start(
+        {
+          '/u/:id': { redirectTo: (r) => `/users/${r.params['id']}` },
+          '/users/:id': { component: page('User', seen) },
+        },
+        'http://app.test/u/7',
+      );
+      await settle();
+      expect(mounts()).toEqual(['replaceState null /users/7', 'mount User into outlet']);
+      expect(seen.route.params).toEqual({ id: '7' });
+    });
+
+    test('canEnter: true enters, a path redirects, and the guard gets the route it guards', async () => {
+      const guarded: string[] = [];
+      start({
+        '/a': { component: page('A') },
+        '/open/:id': {
+          component: page('Open'),
+          canEnter: (r) => (guarded.push(`${r.pattern} ${r.params['id']}`), true),
+        },
+        '/admin': { component: page('Admin'), canEnter: () => '/a' },
+      });
+      await settle();
+      navigate('/open/3');
+      await settle();
+      expect(guarded).toEqual(['/open/:id 3']);
+      expect(log).toContain('mount Open into outlet');
+      log = [];
+      navigate('/admin');
+      await settle();
+      expect(mounts()).toEqual([
+        'pushState null /admin',
+        'replaceState null /a',
+        'destroy Open',
+        'mount A into outlet',
+      ]);
+    });
+
+    test('canEnter false keeps the page on screen, and the address bar shows its URL again', async () => {
+      start({ '/a': { component: page('A') }, '/locked': { component: page('Locked'), canEnter: () => false } });
+      await settle();
+      log = [];
+      navigate('/locked');
+      await settle();
+      expect(mounts()).toEqual(['pushState null /locked', 'replaceState null /a']);
+      expect(g.currentPath()).toBe('/a');
+      expect(log).not.toContain('mount Locked into outlet');
+    });
+
+    test('canEnter false on the first load shows the notFound route', async () => {
+      start({ '/locked': { component: page('Locked'), canEnter: () => false } }, 'http://app.test/locked');
+      await settle();
+      expect(mounts()).toEqual(['mount NF into outlet']);
+    });
+
+    test('an async guard is awaited, and a newer navigation meanwhile wins', async () => {
+      let release: (v: boolean) => void = () => {};
+      start({
+        '/a': { component: page('A') },
+        '/slow': { component: page('Slow'), canEnter: () => new Promise<boolean>((r) => (release = r)) },
+        '/b': { component: page('B') },
+      });
+      await settle();
+      navigate('/slow');
+      await settle();
+      navigate('/b');
+      await settle();
+      release(true);
+      await settle();
+      expect(log).toContain('mount B into outlet');
+      expect(log).not.toContain('mount Slow into outlet');
+    });
+
+    test('a loop of redirects stops, with an error', async () => {
+      const errors: unknown[][] = [];
+      const consoleError = console.error;
+      console.error = (...args: unknown[]) => errors.push(args);
+      try {
+        start({ '/a': { redirectTo: '/b' }, '/b': { redirectTo: '/a' } });
+        for (let i = 0; i < 30; i++) await settle();
+        expect(log.filter((line) => line.startsWith('replaceState')).length).toBe(10);
+        expect(errors).toEqual([['[thane-router] Redirect loop at', '/b']]);
+      } finally {
+        console.error = consoleError;
+      }
+    });
+  });
+
+  describe('links to routes', () => {
+    /** A click on a link with these attributes, and whether the router took it (prevented the browser's load) */
+    const click = (b: Browser, attributes: Record<string, string>, init: Partial<MouseEvent> = {}): boolean => {
+      const link = {
+        closest: (selector: string) => (selector === 'a[href]' ? link : null),
+        getAttribute: (name: string) => attributes[name] ?? null,
+        hasAttribute: (name: string) => name in attributes,
+      };
+      let prevented = false;
+      const event = {
+        target: { closest: link.closest },
+        button: 0,
+        defaultPrevented: false,
+        preventDefault: () => (prevented = true),
+        ...init,
+      };
+      for (const fn of b.listeners.get('click') ?? []) fn(event);
+      return prevented;
+    };
+    const start = () => {
+      const b = install('http://app.test/a');
+      b.window.location.origin = 'http://app.test';
+      startRouter(routes(), new FakeElement('outlet') as any, { scrollRestoration: false });
+      return b;
+    };
+
+    test('a plain click on a link to a route navigates in the app, query and hash included', async () => {
+      const b = start();
+      await settle();
+      log = [];
+      expect(click(b, { href: '/b?x=1#h' })).toBe(true);
+      await settle();
+      expect(log).toContain('pushState null /b?x=1#h');
+      expect(log).toContain('mount B into outlet');
+    });
+
+    test('the browser keeps a handled or modified click, a target, a download, rel="external" and another origin', async () => {
+      const b = start();
+      await settle();
+      log = [];
+      expect(click(b, { href: '/b' }, { defaultPrevented: true })).toBe(false);
+      expect(click(b, { href: '/b' }, { ctrlKey: true })).toBe(false);
+      expect(click(b, { href: '/b' }, { metaKey: true })).toBe(false);
+      expect(click(b, { href: '/b' }, { button: 1 })).toBe(false);
+      expect(click(b, { href: '/b', target: '_blank' })).toBe(false);
+      expect(click(b, { href: '/b', download: '' })).toBe(false);
+      expect(click(b, { href: '/b', rel: 'noopener external' })).toBe(false);
+      expect(click(b, { href: 'https://elsewhere.test/b' })).toBe(false);
+      expect(log.filter((line) => line.startsWith('pushState'))).toEqual([]);
+    });
+
+    test('a hash on this page, and a path no route has (a file), are left to the browser', async () => {
+      const b = start();
+      await settle();
+      expect(click(b, { href: '#section' })).toBe(false);
+      expect(click(b, { href: '/sitemap.xml' })).toBe(false);
+      expect(click(b, { href: '/nowhere' })).toBe(false);
+      // target="_self" is the page itself, like no target
+      expect(click(b, { href: '/b', target: '_self' })).toBe(true);
+    });
+
+    test('after stopRouter no click is taken', async () => {
+      const b = start();
+      await settle();
+      stopRouter();
+      expect(b.listeners.get('click') ?? []).toEqual([]);
+    });
+  });
+
+  test("route.search holds the values the route's schema parses from the query; its guard gets them too", async () => {
+    const seen: { route?: any } = {};
+    const guarded: unknown[] = [];
+    install('http://app.test/products?page=3&sort=bogus&sale');
+    startRouter(
+      {
+        routes: {
+          '/products': {
+            component: page('Products', seen),
+            search: {
+              page: searchNumber(1),
+              sort: searchOneOf(['price', 'name'], 'name'),
+              sale: searchFlag(),
+              q: searchString(),
+            },
+            canEnter: (r) => (guarded.push(r.search), true),
+          },
+        },
+        notFound: { component: page('NF') },
+      },
+      new FakeElement('outlet') as any,
+      { scrollRestoration: false },
+    );
+    await settle();
+    expect(seen.route.search).toEqual({ page: 3, sort: 'name', sale: true, q: undefined });
+    expect(guarded).toEqual([{ page: 3, sort: 'name', sale: true, q: undefined }]);
+    navigate('/products', { page: 4, q: 'x' });
+    await settle();
+    expect(seen.route.search).toEqual({ page: 4, sort: 'name', sale: false, q: 'x' });
   });
 
   test('a lazy route: the default export is mounted', async () => {
@@ -643,7 +951,7 @@ describe('route context', () => {
       scrollRestoration: false,
     });
     await settle();
-    expect(log).toEqual(['addEventListener popstate', 'outlet.innerHTML = ""']);
+    expect(log).toEqual(['addEventListener popstate', 'addEventListener click', 'outlet.innerHTML = ""']);
     const r = providerRoute();
     expect(r.pattern).toBe('/x');
     expect(r.title).toBe('Doc');
@@ -667,10 +975,21 @@ describe('mount({ router })', () => {
     const handle = mount({ router: { routes: table(), scrollRestoration: false }, target: target as any });
     expect(handle.root).toBe(target as any);
     await settle();
-    expect(log).toEqual(['addEventListener popstate', 'body.innerHTML = ""', 'mount A into body']);
+    expect(log).toEqual([
+      'addEventListener popstate',
+      'addEventListener click',
+      'body.innerHTML = ""',
+      'mount A into body',
+    ]);
     log = [];
     expect(handle.destroy()).toBeUndefined();
-    expect(log).toEqual(['destroy A', 'body.innerHTML = ""', 'body.innerHTML = ""', 'removeEventListener popstate']);
+    expect(log).toEqual([
+      'destroy A',
+      'body.innerHTML = ""',
+      'body.innerHTML = ""',
+      'removeEventListener popstate',
+      'removeEventListener click',
+    ]);
     expect('navigate' in g).toBe(false);
   });
 
@@ -696,6 +1015,7 @@ describe('mount({ router })', () => {
     expect(log).toEqual([
       'mount Shell into body',
       'addEventListener popstate',
+      'addEventListener click',
       'router-outlet.innerHTML = ""',
       'mount A into router-outlet',
     ]);
@@ -706,6 +1026,7 @@ describe('mount({ router })', () => {
       'router-outlet.innerHTML = ""',
       'router-outlet.innerHTML = ""',
       'removeEventListener popstate',
+      'removeEventListener click',
       'destroy Shell',
       'body.innerHTML = ""',
     ]);

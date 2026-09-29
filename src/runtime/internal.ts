@@ -5,8 +5,10 @@ export {
   __registerComponent,
   __registerComponentLean,
   __enableComponentStyles,
+  __enableKeyframeScoping,
   __dc,
   __T,
   mountComponent,
 } from './component.js';
 export { __bindIf, __bindIfExpr, createKeyedReconciler, __batchRows, __nc } from './dom-binding.js';
+export { __mf } from './fragment.js';

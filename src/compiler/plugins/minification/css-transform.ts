@@ -8,6 +8,7 @@ import ts from 'typescript';
 import { minifyCSS } from './template-minifier.js';
 import type { SelectorMap } from './selector-minifier.js';
 import { logger } from '../../utils/logger.js';
+import { INTERNAL_RUNTIME_SPECIFIER, RUNTIME_HELPER } from '../../../contracts/index.js';
 
 // Private-use characters: never part of an identifier, never CSS syntax, never in real source.
 // A `${…}` substitution of a `css` template is replaced by MASK_OPEN <index> MASK_CLOSE while
@@ -100,7 +101,12 @@ export interface CssTransformOptions {
   selectorMap?: SelectorMap | undefined;
   /** The stylesheet's file, named in warnings */
   file?: string | undefined;
+  /** Called when the stylesheet defines `@keyframes`, which a component's stylesheet then scopes at run time */
+  onKeyframes?: (() => void) | undefined;
 }
+
+/** The import and call that scope component keyframes, added to a module whose stylesheet defines some */
+export const KEYFRAME_SCOPING = `import { ${RUNTIME_HELPER.ENABLE_KEYFRAMES} } from '${INTERNAL_RUNTIME_SPECIFIER}';\n${RUNTIME_HELPER.ENABLE_KEYFRAMES}();\n`;
 
 const HOST_CONTEXT = ':host-context(';
 
@@ -211,6 +217,7 @@ export const transformCss = (css: string, options: CssTransformOptions): string 
     text = renameCssClasses(text, (name) => selectorMap.get(name));
   }
   text = options.minify ? minifyCSS(text) : stripCssComments(text);
+  if (options.onKeyframes && /@(?:-webkit-)?keyframes\s/.test(text)) options.onKeyframes();
   return text;
 };
 

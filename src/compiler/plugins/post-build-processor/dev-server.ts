@@ -6,6 +6,8 @@ import { basename, join, extname, relative, resolve, sep } from 'node:path';
 import type { Server } from 'bun';
 import { consoleColors, ansi, getContentType, logger } from '../../utils/index.js';
 import { compress } from './compression.js';
+import type { HotUpdate } from '../../cli/hot-updates.js';
+import { HOT_MODULE_PREFIX, HOT_PACKAGE_PREFIX } from '../component-precompiler/hot-modules.js';
 
 const promptForPort = async (): Promise<number> => {
   process.stdout.write(`${ansi.yellow}Enter a different port number: ${ansi.reset}`);
@@ -34,7 +36,7 @@ export interface DevServerOptions {
 
 const BROWSER_ERROR_SENTINEL = 'THANE_BROWSER_ERROR';
 
-/** The topic every page's browser-event socket subscribes to; its one message is `reload` */
+/** The topic every page's browser-event socket subscribes to: `reload`, or a rebuild's hot updates as JSON */
 const RELOAD_TOPIC = 'thane-reload';
 
 /**
@@ -90,6 +92,12 @@ export class DevServer {
 
   get isStarted(): boolean {
     return this.serverStarted;
+  }
+
+  /** Sends a rebuild's hot updates to every open page, which swaps the changed components (see runtime/hot.ts) */
+  hotUpdate(updates: HotUpdate[]): void {
+    if (!this.server || this.options.isProd) return;
+    this.server.publish(RELOAD_TOPIC, JSON.stringify({ hot: updates }));
   }
 
   /** Reloads every page open on the development server (after a rebuild, or a changed asset or index.html) */
@@ -268,6 +276,30 @@ export class DevServer {
     const script = `<script>
 (() => {
   if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return;
+  // Components register for hot swapping (runtime/hot.ts); a hot update runs a changed file again, its
+  // imports read from the modules the page has loaded. False: the page reloads instead.
+  window.__thaneHot = {};
+  const applyHotUpdates = (updates) => {
+    const modules = window.__thaneModules;
+    if (!Array.isArray(updates) || !modules || updates.some((update) => !modules.has(update.key))) return false;
+    try {
+      for (const update of updates) {
+        const require = (id) => {
+          const key = id.startsWith('${HOT_PACKAGE_PREFIX}')
+            ? 'pkg:' + id.slice(${HOT_PACKAGE_PREFIX.length})
+            : id.slice(${HOT_MODULE_PREFIX.length});
+          if (!modules.has(key)) throw new Error('not loaded in the page: ' + key);
+          return modules.get(key);
+        };
+        const module = { exports: {} };
+        new Function('require', 'module', 'exports', update.code)(require, module, module.exports);
+      }
+      return true;
+    } catch (error) {
+      console.error('[thane] a hot update failed, so the page reloads:', error);
+      return false;
+    }
+  };
   const queue = [];
   const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/__thane-browser-events';
   let socket;
@@ -303,6 +335,7 @@ export class DevServer {
     });
     socket.addEventListener('message', (event) => {
       if (event.data === 'reload') location.reload();
+      else if (!applyHotUpdates(JSON.parse(event.data).hot)) location.reload();
     });
     socket.addEventListener('close', () => {
       setTimeout(connect, 500);
@@ -358,11 +391,13 @@ export class DevServer {
       cacheControl: string,
     ): Promise<Response> => {
       const acceptEncoding = req.headers.get('accept-encoding') ?? '';
+      // Images, audio, video and woff fonts are compressed formats already
       const canCompress =
         useGzip &&
         !contentType.startsWith('image/') &&
         !contentType.startsWith('video/') &&
-        !contentType.startsWith('audio/');
+        !contentType.startsWith('audio/') &&
+        !contentType.startsWith('font/woff');
 
       const headers: Record<string, string> = {
         'Content-Type': contentType,
@@ -439,13 +474,14 @@ export class DevServer {
         // A static route's own page, which a production build writes with the route's head in it
         if (!hasFileExtension) {
           const routePage = join(requestedPath, 'index.html');
-          if (await Bun.file(routePage).exists()) return compressAndRespond(routePage, req, 'text/html', 'no-cache');
+          if (await Bun.file(routePage).exists())
+            return compressAndRespond(routePage, req, getContentType(routePage), 'no-cache');
         }
 
         // Anything else that is not a file: a missing asset, or a client route served by index.html (if there is one)
         return hasFileExtension || !(await Bun.file(indexPath).exists())
           ? new Response('Not Found', { status: 404 })
-          : compressAndRespond(indexPath, req, 'text/html', 'no-cache');
+          : compressAndRespond(indexPath, req, getContentType(indexPath), 'no-cache');
       },
       websocket: {
         open: (ws) => {

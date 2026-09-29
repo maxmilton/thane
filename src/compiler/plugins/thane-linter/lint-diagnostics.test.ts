@@ -4,7 +4,9 @@
  * lint-rules.test.ts pins codes and counts. These tests pin everything else a user sees, plus the
  * shapes each rule accepts or skips: which return objects THANE401/402 inspect, which calls count as
  * defineComponent, which tags count as html/css, and how THANE411 keys mount targets.
- * THANE406 (no-element-id) is retired: compiled code no longer uses ids.
+ * THANE406 (no-element-id) is retired: compiled code no longer uses ids. THANE407 (single-component-per-file)
+ * is retired: each component of a file is compiled on its own. THANE410 (no-cross-file-html-template) is
+ * retired: a template can use a fragment another module exports.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -19,10 +21,8 @@ import {
   requireConstTaggedTemplates,
   noNestedHtmlTags,
   noConditionalTemplateInit,
-  singleComponentPerFile,
   componentConstDeclaration,
   noAliasedComponentExport,
-  noCrossFileHtmlTemplate,
   duplicateMountTarget,
   singleReturnObject,
   noAliasedThaneImport,
@@ -284,23 +284,25 @@ describe('THANE403 diagnostics', () => {
 describe('THANE404 diagnostics', () => {
   const error = diag('error', ErrorCode.NO_NESTED_HTML_TAGS);
   const MESSAGE =
-    "Nested 'html' tagged templates are not supported. The inner template will not be " +
-    'processed for signal bindings or subscriptions. Extract it into a const variable instead.';
+    "An 'html' template here is not compiled: inside another template, one is compiled where it is the whole " +
+    '${…} or a directive argument. Use whenElse() to choose between templates, and repeat() for a list.';
 
-  test('reports every nested html template at its tag; directive calls reset the nesting', () => {
+  test('reports a nested html template at its tag unless it is the whole ${} or in a directive call', () => {
     const src = [
       'const t = html`<div>${html`<p>${html`<i/>`}</p>`}</div>`;',
       'const u = html`${when(x(), html`<b/>`)}${whenElse(x(), html`<c/>`, html`<d/>`)}`;',
       'const v = html`${fmt(html`<e/>`)}`;',
       'const w = html`${repeat(xs, (i) => html`${html`<s/>`}`)}`;',
       'const m = html`${lib.html`<q/>`}${lib.when(x(), html`<r/>`)}`;',
+      "const y = html`${on() ? html`<y/>` : ''}${xs.map((i) => html`<z/>`)}`;",
+      'const k = html`${fmt(html`${html`<k/>`}`)}`;',
     ];
     expect(run(noNestedHtmlTags, src)).toStrictEqual([
-      error(src, 1, 'html`<p>', MESSAGE),
-      error(src, 1, 'html`<i/>', MESSAGE),
       error(src, 3, 'html`<e/>', MESSAGE),
-      error(src, 4, 'html`<s/>', MESSAGE),
       error(src, 5, 'html`<r/>', MESSAGE),
+      error(src, 6, 'html`<y/>', MESSAGE),
+      error(src, 6, 'html`<z/>', MESSAGE),
+      error(src, 7, 'html`${html', MESSAGE),
     ]);
   });
 });
@@ -337,43 +339,6 @@ describe('THANE405 diagnostics', () => {
       warning(src, 6, 'g =', LOGICAL),
       warning(src, 7, 'h =', TERNARY),
     ]);
-  });
-});
-
-// ============================================================================
-// THANE407: single-component-per-file
-// ============================================================================
-
-describe('THANE407 diagnostics', () => {
-  const error = diag('error', ErrorCode.SINGLE_COMPONENT_PER_FILE);
-  const message = (n: number) =>
-    `Only one defineComponent() is allowed per file. Found ${n} calls — ` +
-    'the compiler processes only one component per file. Split additional components into separate files.';
-
-  test('reports every call after the first, however it is written, with the total count', () => {
-    const src = [
-      'export const A = defineComponent(() => ({ template: html`<a/>` }));',
-      'function make() {',
-      '  let B = defineComponent(() => ({})), C = defineComponent(() => ({}));',
-      '}',
-      '/** Doc. */',
-      'export default defineComponent(() => ({ template: html`<c/>` }));',
-      'const notOne = lib.defineComponent(() => ({}));',
-      'const alsoNot = (defineComponent(() => ({})));',
-      'defineComponent(() => ({}));',
-    ];
-    expect(run(singleComponentPerFile, src)).toStrictEqual([
-      error(src, 3, 'B =', message(6)),
-      error(src, 3, 'C =', message(6)),
-      error(src, 6, 'export default', message(6)),
-      error(src, 8, 'alsoNot', message(6)),
-      error(src, 9, 'defineComponent', message(6)),
-    ]);
-  });
-
-  test('counts a defineComponent declared inside a setup function', () => {
-    const src = ['export const A = defineComponent(() => {', '  const Inner = defineComponent(() => ({}));', '});'];
-    expect(run(singleComponentPerFile, src)).toStrictEqual([error(src, 2, 'Inner', message(2))]);
   });
 });
 
@@ -444,40 +409,6 @@ describe('THANE409 diagnostics', () => {
       error(src, 7, 'Deep', deferred('Deep')),
       error(src, 8, 'Card', reExport('Card')),
       error(src, 9, 'x as', reExport('Button')),
-    ]);
-  });
-});
-
-// ============================================================================
-// THANE410: no-cross-file-html-template
-// ============================================================================
-
-describe('THANE410 diagnostics', () => {
-  const warning = diag('warning', ErrorCode.NO_CROSS_FILE_HTML_TEMPLATE);
-  const message = (name: string) =>
-    `Imported variable '${name}' is used inside an html\`\` template. ` +
-    'The compiler cannot resolve imported template variables at compile time. ' +
-    'Define the template fragment in the same file as a const variable instead.';
-
-  test('reports bare imported identifiers in html interpolations, at the identifier', () => {
-    const src = [
-      "import Header from './header.js';",
-      "import { footer as Footer, nav } from './parts.js';",
-      "import * as parts from './parts.js';",
-      "import './side-effect.js';",
-      'const local = html`<i/>`;',
-      'export const A = defineComponent(() => ({',
-      '  template: html`${Header}<main>${local}${ Footer }${nav()}${parts.x}${parts}</main>`,',
-      '}));',
-      'const t = lib.html`${Header}`;',
-      'const u = css`${Header}`;',
-      'const v = html`<p>${nav}</p>`;',
-    ];
-    expect(run(noCrossFileHtmlTemplate, src)).toStrictEqual([
-      warning(src, 7, 'Header', message('Header')),
-      warning(src, 7, 'Footer', message('Footer')),
-      warning(src, 7, 'parts}', message('parts')),
-      warning(src, 11, 'nav', message('nav')),
     ]);
   });
 });

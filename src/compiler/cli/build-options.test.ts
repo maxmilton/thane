@@ -148,3 +148,51 @@ describe('development checks', () => {
     expect(await buildAndReadJs(APP, { config: { strictTypeCheck: false, ...PROD_BUILD } })).not.toContain(message);
   });
 });
+
+describe('the router guard step', () => {
+  const app = (route: string) => `
+import { defineComponent, html, mount } from 'thane';
+import { defineRoutes } from 'thane/router';
+export const Home = defineComponent('home-page', () => ({ template: html\`<p>home</p>\` }));
+const Routes = defineRoutes({ '/': { component: Home }, ${route} notFound: { component: Home } });
+mount({ router: { routes: Routes } });
+`;
+  // dropConsole: false keeps the loop report, which marks the guard step in the bundle
+  const PROD_WITH_CONSOLE = { strictTypeCheck: false, ...PROD_BUILD, dropConsole: false };
+
+  test('a production build leaves it out when no route has canEnter or redirectTo, and keeps it otherwise', async () => {
+    const mark = 'Redirect loop';
+    expect(await buildAndReadJs(app(''), { config: PROD_WITH_CONSOLE })).not.toContain(mark);
+    expect(await buildAndReadJs(app("'/old': { redirectTo: '/' },"), { config: PROD_WITH_CONSOLE })).toContain(mark);
+    expect(
+      await buildAndReadJs(app("'/me': { component: Home, canEnter: () => '/' },"), { config: PROD_WITH_CONSOLE }),
+    ).toContain(mark);
+    // A development build always keeps it, so a guard added while thane dev runs works at once
+    expect(await buildAndReadJs(app(''), { config: { strictTypeCheck: false } })).toContain(mark);
+  });
+});
+
+describe('the router link handling', () => {
+  const app = (markup: string) => `
+import { defineComponent, html, mount } from 'thane';
+import { defineRoutes } from 'thane/router';
+export const Home = defineComponent('home-page', () => ({ template: html\`${markup}\` }));
+const Routes = defineRoutes({ '/': { component: Home }, '/about': { component: Home }, notFound: { component: Home } });
+mount({ router: { routes: Routes } });
+`;
+  const PROD = { strictTypeCheck: false, ...PROD_BUILD };
+  const mark = 'a[href]';
+
+  test('a production build keeps it for a plain link to a path, and leaves it out otherwise', async () => {
+    expect(await buildAndReadJs(app('<a href="/about">About</a>'), { config: PROD })).toContain(mark);
+    expect(await buildAndReadJs(app('<p>no link</p>'), { config: PROD })).not.toContain(mark);
+    expect(
+      await buildAndReadJs(app('<a href="/about" @click.prevent=${() => 0}>About</a>'), { config: PROD }),
+    ).not.toContain(mark);
+    expect(await buildAndReadJs(app('<a href="https://example.com">Elsewhere</a>'), { config: PROD })).not.toContain(
+      mark,
+    );
+    // A development build always keeps it
+    expect(await buildAndReadJs(app('<p>no link</p>'), { config: { strictTypeCheck: false } })).toContain(mark);
+  });
+});

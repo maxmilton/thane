@@ -15,8 +15,22 @@ const compiledAway = (marker: string): never => {
   );
 };
 
+declare const fragmentBrand: unique symbol;
+
+/**
+ * An html template as a value: a component's template, a fragment of one, a row's or a branch's, a child
+ * component call, a directive in a template. The compiler turns each into DOM code where it is used, so a
+ * fragment has nothing to read or call; it goes where a template goes.
+ */
+export interface Fragment {
+  readonly [fragmentBrand]: true;
+}
+
+/** What a directive takes as a template: an html template, or a plain template literal of markup */
+type DirectiveTemplate = Fragment | string;
+
 /** An HTML template: a component's markup, or a row's or a branch's. */
-export function html(_strings: TemplateStringsArray, ..._values: any[]): any {
+export function html(_strings: TemplateStringsArray, ..._values: any[]): Fragment {
   return compiledAway('html``');
 }
 
@@ -31,7 +45,11 @@ export function when(_condition: boolean | (() => boolean)): string {
 }
 
 /** Shows `thenTemplate` while `condition` is true, `elseTemplate` otherwise. */
-export function whenElse<T, F>(_condition: boolean | (() => boolean), _thenTemplate: T, _elseTemplate: F): T | F {
+export function whenElse(
+  _condition: boolean | (() => boolean),
+  _thenTemplate: DirectiveTemplate,
+  _elseTemplate: DirectiveTemplate,
+): Fragment {
   return compiledAway('whenElse()');
 }
 
@@ -41,9 +59,9 @@ export function whenElse<T, F>(_condition: boolean | (() => boolean), _thenTempl
  */
 export function repeat<T>(
   _items: T[] | (() => T[]),
-  _templateFn: (item: T, index: number) => any,
-  _emptyTemplate?: string | null,
+  _templateFn: (item: T, index: number) => DirectiveTemplate,
+  _emptyTemplate?: DirectiveTemplate | null,
   _trackBy?: (item: T, index: number) => string | number,
-): any[] {
+): Fragment {
   return compiledAway('repeat()');
 }

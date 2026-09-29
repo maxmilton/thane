@@ -51,6 +51,29 @@ describe('recursivelyCopyAssetsIntoDist', () => {
     expect(read(join(dest, 'img', 'icons', 'b.svg'))).toBe('<svg/>');
   });
 
+  test('a skipped path is left out, at any depth, with its folder contents', async () => {
+    const src = join(root, 'skip-src');
+    const dest = join(root, 'skip-dest');
+    mkdirSync(join(src, 'docs', 'drafts'), { recursive: true });
+    writeFileSync(join(src, 'index.html'), 'public');
+    writeFileSync(join(src, 'robots.txt'), 'robots');
+    writeFileSync(join(src, 'docs', 'index.html'), 'docs');
+    writeFileSync(join(src, 'docs', 'drafts', 'a.txt'), 'draft');
+    const seen: string[] = [];
+    const skip = (relativePath: string) => {
+      seen.push(relativePath);
+      return relativePath === 'index.html' || relativePath === 'docs/drafts';
+    };
+
+    await recursivelyCopyAssetsIntoDist(src, dest, skip);
+
+    expect(read(join(dest, 'index.html'))).toBeNull();
+    expect(read(join(dest, 'robots.txt'))).toBe('robots');
+    expect(read(join(dest, 'docs', 'index.html'))).toBe('docs');
+    expect(existsSync(join(dest, 'docs', 'drafts'))).toBe(false);
+    expect(seen.sort()).toEqual(['docs', 'docs/drafts', 'docs/index.html', 'index.html', 'robots.txt']);
+  });
+
   test('a missing source folder creates the destination and does not throw', async () => {
     const dest = join(root, 'missing-dest');
     await recursivelyCopyAssetsIntoDist(join(root, 'no-such-folder'), dest);

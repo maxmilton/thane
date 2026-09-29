@@ -16,6 +16,10 @@ const VALID: Record<string, string> = {
   'a static path, as before': "navigate('/about');",
   "href's result is a path": "const path: RoutePaths = href('/users/:id', { id: 1 });\n  navigate(path);",
   "thane/router's navigate": "routerNavigate('/users/:id/posts/:post', { id: 1, post: 'x' });",
+  'a redirect and a guard to routes':
+    "defineRoutes({ '/old': { redirectTo: '/about' }, '/me': { component: page, canEnter: () => '/about' }, notFound: { component: page } });",
+  'a redirect function and an async guard':
+    "defineRoutes({ '/u/:id': { redirectTo: (r) => `/users/${r.params.id}` }, '/x': { component: page, canEnter: async () => true }, notFound: { component: page } });",
 };
 const INVALID: Record<string, [string, RegExp]> = {
   'a missing parameter': ["navigate('/users/:id', {});", /Property 'id' is missing/],
@@ -26,6 +30,18 @@ const INVALID: Record<string, [string, RegExp]> = {
   "thane/router's navigate, a missing parameter": [
     "routerNavigate('/users/:id/posts/:post', { id: 1 });",
     /'post' is missing/,
+  ],
+  'a redirect to a path that is not a route': [
+    "defineRoutes({ '/old': { redirectTo: '/missing' }, notFound: { component: page } });",
+    /'"\/missing"' is not assignable/,
+  ],
+  'a guard that returns a path that is not a route': [
+    "defineRoutes({ '/me': { component: page, canEnter: () => '/missing' }, notFound: { component: page } });",
+    /not assignable/,
+  ],
+  'a redirect route with a page too': [
+    "defineRoutes({ '/old': { redirectTo: '/about', component: page }, notFound: { component: page } });",
+    /not assignable/,
   ],
 };
 
@@ -43,7 +59,8 @@ const register = [
 const cases = Object.entries({ ...VALID, ...Object.fromEntries(Object.entries(INVALID).map(([k, [c]]) => [k, c])) });
 const usage = [
   `import type { RoutePaths } from '${dir}/index.js';`,
-  `import { href, navigate as routerNavigate } from '${dir}/router-exports.js';`,
+  `import { defineRoutes, href, navigate as routerNavigate } from '${dir}/router-exports.js';`,
+  'const page = () => Promise.resolve({});',
   ...cases.map(([, code], i) => `export function case${i}() {\n  ${code}\n}`),
 ].join('\n');
 

@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createModuleResolver } from '../../utils/module-graph.js';
-import { readRouteTableHeads, routePages, routeTablesOf, withHead } from './route-head.js';
+import { hasPlainLink, readRouteTableHeads, routePages, routeTablesOf, withHead } from './route-head.js';
 
 let root = '';
 let n = 0;
@@ -189,6 +189,98 @@ describe('whether an app needs head support', () => {
         'src/other/routes.ts': table(`'/': { ${PAGE}, meta: { description: 'x' } }, notFound: { ${PAGE} }`),
       }),
     ).toBe(false);
+  });
+});
+
+describe('whether an app needs the guard and redirect step', () => {
+  const guards = async (routesSource: string) => {
+    const { dir } = project({
+      'src/main.ts': "import Routes from './routes.js';\nconsole.log(Routes);\n",
+      'src/routes.ts': routesSource,
+    });
+    return (await routeTablesOf([join(dir, 'src', 'main.ts')], dir)).usesGuards;
+  };
+  const table = (routes: string) =>
+    `import { defineRoutes } from 'thane/router';\nexport default defineRoutes({ ${routes} });\n`;
+
+  test('pages alone, titles and heads included: no', async () => {
+    expect(await guards(table(`'/': { ${PAGE}, meta: { description: 'A' } }, notFound: { ${PAGE} }`))).toBe(false);
+  });
+
+  test('a canEnter or a redirectTo on any route, notFound included, however written: yes', async () => {
+    expect(await guards(table(`'/': { ${PAGE}, canEnter: () => true }, notFound: { ${PAGE} }`))).toBe(true);
+    expect(await guards(table(`'/old': { redirectTo: '/' }, notFound: { ${PAGE} }`))).toBe(true);
+    expect(await guards(table(`'/': { ${PAGE} }, notFound: { redirectTo: '/' }`))).toBe(true);
+    expect(await guards(table(`'/': { ${PAGE}, canEnter() { return true; } }, notFound: { ${PAGE} }`))).toBe(true);
+    expect(
+      await guards(`const canEnter = () => true;\n${table(`'/': { ${PAGE}, canEnter }, notFound: { ${PAGE} }`)}`),
+    ).toBe(true);
+  });
+
+  test('what the compiler cannot read counts as a guard: a spread, a route or a table in a variable', async () => {
+    expect(await guards(`const r = { ${PAGE} };\n${table(`'/': { ...r }, notFound: { ${PAGE} }`)}`)).toBe(true);
+    expect(await guards(`const r = { ${PAGE} };\n${table(`'/': r, notFound: { ${PAGE} }`)}`)).toBe(true);
+    expect(
+      await guards(
+        "import { defineRoutes } from 'thane/router';\nconst t = { '/': {} };\nexport default defineRoutes(t as never);\n",
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('whether an app needs typed search values', () => {
+  const search = async (routes: string) => {
+    const { dir } = project({
+      'src/main.ts': "import Routes from './routes.js';\nconsole.log(Routes);\n",
+      'src/routes.ts': `import { defineRoutes, searchNumber } from 'thane/router';\nexport default defineRoutes({ ${routes} });\n`,
+    });
+    return (await routeTablesOf([join(dir, 'src', 'main.ts')], dir)).usesSearch;
+  };
+
+  test('a route with a search schema: yes; none, or only guards: no; a route it cannot read: yes', async () => {
+    expect(await search(`'/': { ${PAGE}, search: { page: searchNumber(1) } }, notFound: { ${PAGE} }`)).toBe(true);
+    expect(await search(`'/': { ${PAGE}, canEnter: () => true }, notFound: { ${PAGE} }`)).toBe(false);
+    expect(await search(`'/': { ${PAGE} }, notFound: { ${PAGE} }`)).toBe(false);
+    expect(await search(`'/': { ...{ ${PAGE} } }, notFound: { ${PAGE} }`)).toBe(true);
+  });
+});
+
+describe('whether an app needs the link handling', () => {
+  test('a plain link to a path or an expression counts; one with its own click handler, or to elsewhere, does not', () => {
+    const cases: Array<[string, boolean]> = [
+      ['<a href="/about">x</a>', true],
+      ["<a class='x' href='/about'>", true],
+      ['<a href=${href("/u/:id", { id })}>', true],
+      ['<a href="./x">', true],
+      ['<a href="../x">', true],
+      ['<a href="/about" @click.prevent=${go}>', false],
+      ['<a href="https://x.test">', false],
+      ['<a href="//cdn.test/x">', false],
+      ['<a href="mailto:a@b.c">', false],
+      ['<a href="#top">', false],
+      ['<abbr href="/x">', false],
+      ['<area href="/x">', false],
+    ];
+    for (const [markup, expected] of cases)
+      expect({ markup, plain: hasPlainLink(markup) }).toEqual({ markup, plain: expected });
+  });
+
+  test("a plain link in a module the entry reaches, or in index.html, turns it on; another app's does not", async () => {
+    const links = async (files: Record<string, string>, html?: string) => {
+      const { dir } = project({ 'src/main.ts': "import './page.js';\n", 'src/page.ts': 'export {};\n', ...files });
+      if (html !== undefined) writeFileSync(join(dir, 'index.html'), html);
+      return (
+        await routeTablesOf(
+          [join(dir, 'src', 'main.ts')],
+          dir,
+          html === undefined ? undefined : join(dir, 'index.html'),
+        )
+      ).usesLinks;
+    };
+    expect(await links({})).toBe(false);
+    expect(await links({ 'src/page.ts': 'export const t = html`<a href="/about">About</a>`;\n' })).toBe(true);
+    expect(await links({ 'src/other.ts': 'export const t = html`<a href="/about">About</a>`;\n' })).toBe(false);
+    expect(await links({}, '<body><nav><a href="/about">About</a></nav></body>')).toBe(true);
   });
 });
 

@@ -47,6 +47,21 @@ const CASES: Record<string, string> = {
     '<b @click=${onEvent} @input=${() => count(1)} @my-event=${(e: CustomEvent<number>) => e.detail} @focus=${count(2)}>x</b>',
   ),
   'src/wrong-member.ts': component('WrongMember', '', '<b @click=${(e) => e.key}>x</b>'),
+  // Outside a row, currentTarget is the element; in a row it is the list container, so it stays EventTarget
+  'src/current-target.ts': component(
+    'CurrentTarget',
+    '',
+    '<input @input=${(e) => count(e.currentTarget.value.length)} /><select @change=${(e) => e.currentTarget.selectedIndex}></select>',
+  ),
+  'src/row-target.ts': [
+    "import { defineComponent, html, repeat, signal } from 'thane';",
+    '',
+    'export const RowTarget = defineComponent(() => {',
+    '  const rows = signal([1]);',
+    '  return { template: html`<ul>${repeat(rows(), (n) => html`<li @click=${(e) => e.currentTarget.id}>${n}</li>`)}</ul>` };',
+    '});',
+    '',
+  ].join('\n'),
   'src/wrong-event.ts': component('WrongEvent', '', '<b @click=${(e: KeyboardEvent) => e.key}>x</b>'),
   'src/wrong-reference.ts': component(
     'WrongReference',
@@ -96,14 +111,24 @@ describe('template event handlers in the type check', () => {
     const errors = errorsIn('src/wrong-member.ts');
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain(`src/wrong-member.ts:${at('src/wrong-member.ts', 'key}')} - error TS2339`);
-    expect(errors[0]).toContain("Property 'key' does not exist on type 'PointerEvent'");
+    expect(errors[0]).toContain(
+      "Property 'key' does not exist on type 'PointerEvent & { readonly currentTarget: HTMLElement; }'",
+    );
   });
 
   test('a handler for another event is an error, at the handler as written', () => {
     const errors = errorsIn('src/wrong-event.ts');
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain(`src/wrong-event.ts:${at('src/wrong-event.ts', '(e: KeyboardEvent)')} - error TS1360`);
-    expect(errors[0]).toContain(`does not satisfy the expected type 'ThaneEventListener<"click">'`);
+    expect(errors[0]).toContain(`does not satisfy the expected type 'ThaneEventListener<"click", "b">'`);
+  });
+
+  test("outside a row currentTarget is the element; in a row it is not the row's element", () => {
+    expect(errorsIn('src/current-target.ts')).toEqual([]);
+    const errors = errorsIn('src/row-target.ts');
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain("'e.currentTarget' is possibly 'null'");
+    expect(errors[1]).toContain("Property 'id' does not exist on type 'EventTarget'");
   });
 
   test('a reference is checked against each event it is bound to', () => {

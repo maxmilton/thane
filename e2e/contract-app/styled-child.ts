@@ -12,6 +12,7 @@ export const StyledChild = defineComponent('styled-child', () => ({
     <div data-testid="css-child-styled">child-blue</div>
     <div data-testid="css-child-isolated" class="leak-target">child-bg</div>
     <div data-testid="css-child-inherits" class="parent-scoped">cascade-check</div>
+    <div data-testid="css-child-animated" class="pulsing">keyframes-check</div>
   `,
   styles: css`
     [data-testid='css-child-styled'] {
@@ -19,6 +20,17 @@ export const StyledChild = defineComponent('styled-child', () => ({
     }
     .leak-target {
       background-color: rgb(255, 0, 0);
+    }
+    .pulsing {
+      animation: pulse 10s linear infinite paused;
+    }
+    @keyframes pulse {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0.5;
+      }
     }
   `,
 }));

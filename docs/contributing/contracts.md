@@ -20,6 +20,7 @@ What holds the compiler and the runtime together is `RUNTIME_HELPER` and two tes
 
 - The compiler emits and imports every runtime helper through `RUNTIME_HELPER` (`BIND_FN` in `src/compiler/utils/constants.ts` is the same object), from `INTERNAL_RUNTIME_SPECIFIER` (`thane/runtime`).
 - `src/runtime/internal-contract.test.ts` checks that `thane/runtime` exports a helper under every `RUNTIME_HELPER` name.
+- A compiled file with a list imports `_cloneNode` and `_insertBefore` (Node's `cloneNode` and `insertBefore`) from `DOM_RUNTIME_SPECIFIER` (`thane/runtime/dom`), a module of its own: it reads `Node.prototype` when it loads, so only an app with a list includes it, and `thane/runtime` still loads where there is no DOM. Every such file shares the one read. A file that imports `thane` by a path of its own (a test) declares the pair itself instead.
 - `src/compiler/plugins/reactive-binding-compiler/contract-conformance.test.ts` builds components and checks that the compiled output calls the helpers by those names; `helper-imports.test.ts` checks that a component imports exactly the helpers its code calls.
 
 The runtime imports nothing from `src/contracts/`: esbuild does not inline object properties, so an import would cost bytes in every app. The runtime writes the helper names itself, and the tests keep the two sides in step.
@@ -60,7 +61,11 @@ components must be rebuilt with the matching version.
   bundle it.
 - `__T(html) → HTMLTemplateElement`: builds a compiled template (a component's, a row's, a list's empty
   template). `__nc`: the one empty cleanups array shared by rows that have no cleanups.
-- `__dc(instance) → destroy`; `__sig` = `signal`; `__enableComponentStyles()`;
+- An exported fragment (`` export const Badge = html`…` ``) compiles to `{ t, b? }`: `t` its template, `b(ctx,
+  elements) → cleanup` its binding function, which reaches its nodes in the copy (`ctx.root`, `elements` as for
+  `__b`), calls `ctx.place()` to insert the copy, then binds. `__mf(anchor, fragment) → cleanup` mounts a copy
+  before `anchor`, a comment that stays; the nodes are removed with the template around them.
+- `__dc(instance) → destroy`; `__sig` = `signal`; `__enableComponentStyles()`; `__enableKeyframeScoping()` (called by a module whose stylesheet defines `@keyframes`; it enables component styles too);
   `mountComponent(component, target?, props?)`.
 
 ## Policy

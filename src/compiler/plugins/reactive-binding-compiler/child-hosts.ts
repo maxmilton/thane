@@ -87,6 +87,8 @@ export const placeChildHosts = (
     repeat: (rep) => void slots.push({ get: () => rep.itemTemplate, set: (html) => (rep.itemTemplate = html) }),
   });
   for (const cm of mounts) {
+    // A fragment is mounted before its placeholder
+    if (cm.fragment) continue;
     const mark = anchorMark(cm.anchorId, '.');
     const tag = emit.selector(cm.selector);
     const host = `<${tag} ${BOUND_MARK}="${cm.anchorId}"></${tag}>`;

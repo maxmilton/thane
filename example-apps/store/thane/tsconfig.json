@@ -6,7 +6,8 @@
     "paths": {
       "thane": ["../../../src/runtime/index.ts"],
       "thane/runtime": ["../../../src/runtime/internal.ts"],
-      "thane/router": ["../../../src/runtime/router-exports.ts"]
+      "thane/router": ["../../../src/runtime/router-exports.ts"],
+      "thane/runtime/dom": ["../../../src/runtime/dom-prototype.ts"]
     },
     "skipLibCheck": true,
     "strict": true,

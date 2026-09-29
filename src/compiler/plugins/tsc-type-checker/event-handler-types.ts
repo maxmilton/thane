@@ -10,8 +10,10 @@
  *   @click=${(handler) satisfies ThaneEventListener<'click'>}
  *
  * which gives an untyped parameter the event's type (`MouseEvent`) and reports a handler that takes
- * another one. An event that lib.dom does not know, such as a custom event, is typed `any`, as
- * before. Any other expression, such as `navigate('/')`, runs on the event and is checked as
+ * another one. Outside a list row the handler is the element's own listener, so its `currentTarget`
+ * is typed as the element too (`ThaneEventListener<'input', 'input'>`: an `HTMLInputElement`); a
+ * row's handler is delegated to the list container, and keeps `EventTarget | null`. An event that
+ * lib.dom does not know, such as a custom event, is typed `any`, as before. Any other expression, such as `navigate('/')`, runs on the event and is checked as
  * written. The rewritten text is only ever read by the type checker, and its diagnostics are
  * mapped back to the source as written.
  */
@@ -21,9 +23,14 @@ import { FN } from '../../utils/constants.js';
 
 /** The declaration of `ThaneEventListener`, a global type of the checked program only. */
 export const EVENT_TYPES_DECLARATION =
-  '/** The type of an `@event=${handler}` handler: the event lib.dom gives the name, or any. */\n' +
-  'type ThaneEventListener<K extends string> = (\n' +
-  '  event: K extends keyof HTMLElementEventMap ? HTMLElementEventMap[K] : any,\n' +
+  '/** The type of an `@event=${handler}` handler: the event lib.dom gives the name (or any), on the element of the tag `T` */\n' +
+  "type ThaneEventListener<K extends string, T extends string = ''> = (\n" +
+  '  event: (K extends keyof HTMLElementEventMap ? HTMLElementEventMap[K] : any) &\n' +
+  '    (T extends keyof HTMLElementTagNameMap\n' +
+  '      ? { readonly currentTarget: HTMLElementTagNameMap[T] }\n' +
+  '      : T extends keyof SVGElementTagNameMap\n' +
+  '        ? { readonly currentTarget: SVGElementTagNameMap[T] }\n' +
+  '        : unknown),\n' +
   ') => unknown;\n';
 
 /** A source rewritten for the type check, and the way back from its positions to the source's. */
@@ -34,6 +41,10 @@ export interface RewrittenSource {
    * an error reported on the inserted type, is the whole handler's.
    */
   toOriginal: (start: number, length: number) => { start: number; length: number };
+  /** The position in `text` of a position in the source as written (inside a handler: the same code) */
+  toRewritten: (position: number) => number;
+  /** Whether a position in the source as written is inside a typed handler, its ends included */
+  inHandler: (position: number) => boolean;
 }
 
 interface Insertion {
@@ -57,6 +68,27 @@ const isListenerValue = (expression: ts.Expression, sourceFile: ts.SourceFile): 
 /** The text of a template literal part, as written. */
 const rawText = (part: ts.TemplateLiteralLikeNode): string => part.rawText ?? part.text;
 
+/** The name of the tag still open at the end of `markup` (the element an attribute belongs to), or '' */
+const openTagName = (markup: string): string => /<([a-zA-Z][\w-]*)[^<>]*$/.exec(markup)?.[1]?.toLowerCase() ?? '';
+
+/** Whether a template is (inside) a list row: a function that is `repeat()`'s row argument holds it */
+const isInRow = (node: ts.Node): boolean => {
+  for (let at: ts.Node | undefined = node.parent; at; at = at.parent) {
+    const call: ts.Node | undefined = at.parent;
+    if (
+      (ts.isArrowFunction(at) || ts.isFunctionExpression(at)) &&
+      call &&
+      ts.isCallExpression(call) &&
+      ts.isIdentifier(call.expression) &&
+      call.expression.text === FN.REPEAT &&
+      call.arguments[1] === at
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
 /** The insertions that type each event handler of every `html` template in the file. */
 const eventHandlerInsertions = (sourceFile: ts.SourceFile): Insertion[] => {
   const insertions: Insertion[] = [];
@@ -68,7 +100,11 @@ const eventHandlerInsertions = (sourceFile: ts.SourceFile): Insertion[] => {
       ts.isTemplateExpression(node.template)
     ) {
       const { head, templateSpans } = node.template;
+      const inRow = isInRow(node);
+      // The template's text so far, each substitution standing as one character: where the open tag is
+      let markup = rawText(head);
       templateSpans.forEach((span, i) => {
+        if (i > 0) markup += '_' + rawText(templateSpans[i - 1]!.literal);
         const before = rawText(i === 0 ? head : templateSpans[i - 1]!.literal);
         const match = EVENT_ATTRIBUTE.exec(before);
         if (!match) return;
@@ -80,9 +116,11 @@ const eventHandlerInsertions = (sourceFile: ts.SourceFile): Insertion[] => {
         if (!after.startsWith(quote) || !ends) return;
         if (!isListenerValue(span.expression, sourceFile)) return;
         const handler = { start: span.expression.getStart(sourceFile), end: span.expression.end };
+        const tag = inRow ? '' : openTagName(markup);
+        const type = tag ? `ThaneEventListener<'${match[1]!}', '${tag}'>` : `ThaneEventListener<'${match[1]!}'>`;
         insertions.push(
           { at: handler.start, text: '(', handler },
-          { at: handler.end, text: `) satisfies ThaneEventListener<'${match[1]!}'>`, handler },
+          { at: handler.end, text: `) satisfies ${type}`, handler },
         );
       });
     }
@@ -129,5 +167,16 @@ export const rewriteEventHandlers = (fileName: string, text: string): RewrittenS
     }
     return { start: from.position, length: Math.max(0, locate(start + length).position - from.position) };
   };
-  return { text: rewritten, toOriginal };
+  // A handler's opening insertion is before the handler's first character, its closing one after its last
+  const toRewritten = (position: number): number => {
+    let shift = 0;
+    for (const insertion of insertions) {
+      if (insertion.at > position || (insertion.at === position && insertion.text !== '(')) break;
+      shift += insertion.text.length;
+    }
+    return position + shift;
+  };
+  const inHandler = (position: number): boolean =>
+    insertions.some(({ handler }) => position >= handler.start && position <= handler.end);
+  return { text: rewritten, toOriginal, toRewritten, inHandler };
 };

@@ -15,6 +15,8 @@ export interface CLIOptions {
   outDir?: string | undefined;
   /** Assets source directory */
   assetsDir?: string | undefined;
+  /** Folder whose files are copied to the root of the output (default: ./public) */
+  publicDir?: string | undefined;
   /** Root HTML file (default: ./index.html) */
   html?: string | undefined;
   /** Start dev server after build */
@@ -73,6 +75,8 @@ export interface ThaneBuildOptions {
   outDir?: string | undefined;
   /** Assets source directory */
   assetsDir?: string | undefined;
+  /** Folder whose files are copied to the root of the output (default: ./public) */
+  publicDir?: string | undefined;
   /** Root HTML file (default: ./index.html) */
   html?: string | undefined;
   /** Strip console.* calls (default: true in prod, false in dev) */
@@ -144,6 +148,8 @@ export interface BuildConfig {
   assetsInputDir?: string | undefined;
   /** Assets output directory */
   assetsOutputDir?: string | undefined;
+  /** Folder whose files are copied to the root of the output */
+  publicInputDir?: string | undefined;
   /** Input HTML file path */
   inputHTMLFilePath: string;
   /** Output HTML file path */

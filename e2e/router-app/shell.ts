@@ -62,6 +62,8 @@ export const Shell = defineComponent('router-shell', () => {
             @click.prevent=${navigate('/users/:id', { id: 'ada lovelace' })}
             >Ada</a
           >
+          <a data-testid="nav-plain-about" href="/about">About (plain link)</a>
+          <a data-testid="nav-file" href="/robots.txt">A file</a>
         </nav>
         <div data-testid="current-path">${currentPath()}</div>
         <div data-testid="shell-visit-count">${visitCount()}</div>

@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Metafile, Plugin } from 'esbuild';
-import { sourceCache, PLUGIN_NAME, consoleColors, logger } from '../../utils/index.js';
+import { PLUGIN_NAME, consoleColors, logger } from '../../utils/index.js';
 import type { BuildContext } from '../../types.js';
 
 import {
@@ -20,6 +20,7 @@ import { collectFileSizes, printAllFileSizes, printTotalSizes } from './console-
 import { minifySelectorsInHTML } from '../minification/minification.js';
 import { minifyHTML } from '../minification/template-minifier.js';
 import { routePages, routeTablesOf } from '../router-typegen/route-head.js';
+import type { HotUpdate } from '../../cli/hot-updates.js';
 
 const NAME = PLUGIN_NAME.POST_BUILD;
 
@@ -31,6 +32,8 @@ export interface PostBuildOptions {
   entryPoints: string[];
   assetsInputDir?: string | undefined;
   assetsOutputDir?: string | undefined;
+  /** A folder whose files are copied to the root of `distDir`, `index.html` at its root excepted */
+  publicInputDir?: string | undefined;
   serve?: boolean | undefined;
   isProd?: boolean | undefined;
   useGzip?: boolean | undefined;
@@ -39,6 +42,11 @@ export interface PostBuildOptions {
   open?: boolean | undefined;
   host?: string | undefined;
   emptyOutDir?: boolean | undefined;
+  /**
+   * `thane dev`: the hot updates of a rebuild, sent to the open pages instead of a reload (null: reload).
+   * The output folder is emptied before the first build only, so that the pages' chunks stay.
+   */
+  hotUpdates?: (() => Promise<HotUpdate[] | null>) | undefined;
   base?: string | undefined;
 }
 
@@ -58,6 +66,8 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
   });
 
   let watchersStarted = false;
+  let publicIndexWarned = false;
+  const skipPublicIndex = (relativePath: string): boolean => relativePath === 'index.html';
   let cachedHashedFileNames: Record<string, string> = {};
 
   /**
@@ -149,7 +159,9 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     if (serve && !devServer.isStarted) {
       devServer.start();
     } else if (serve && !isProd) {
-      devServer.reloadPages();
+      const updates = await config.hotUpdates?.();
+      if (updates) devServer.hotUpdate(updates);
+      else devServer.reloadPages();
     }
   };
 
@@ -191,11 +203,12 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     name: NAME,
     setup(build) {
       const { distDir } = config;
+      let emptiedOnce = false;
 
       build.onStart(async () => {
-        sourceCache.clear();
-
-        if (config.emptyOutDir !== false && fs.existsSync(distDir)) {
+        const keepChunks = config.hotUpdates !== undefined && emptiedOnce;
+        emptiedOnce = true;
+        if (config.emptyOutDir !== false && fs.existsSync(distDir) && !keepChunks) {
           // Resolve to an absolute path: Bun 1.4.x on Windows fails recursive rm on "./"-prefixed paths.
           await fs.promises.rm(path.resolve(distDir), { recursive: true });
         }
@@ -205,7 +218,26 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
       build.onEnd(async (result) => {
         totalBundleSizeInBytes = 0;
 
-        const { assetsInputDir, assetsOutputDir, serve, inputHTMLFilePath } = config;
+        const { assetsInputDir, assetsOutputDir, publicInputDir, serve, inputHTMLFilePath } = config;
+        // The public folder first: a file the build writes (index.html, a bundle, a route's page) wins
+        if (publicInputDir && fs.existsSync(publicInputDir)) {
+          if (!publicIndexWarned && fs.existsSync(path.join(publicInputDir, 'index.html'))) {
+            logger.warn(NAME, `${publicInputDir}/index.html is not copied: the build writes index.html from --html`);
+            publicIndexWarned = true;
+          }
+          if (serve && !watchersStarted) {
+            cleanupCallbacks.add(
+              watchAndRecursivelyCopyAssetsIntoDist(
+                publicInputDir,
+                distDir,
+                () => devServer.reloadPages(),
+                skipPublicIndex,
+              ),
+            );
+          } else {
+            await recursivelyCopyAssetsIntoDist(publicInputDir, distDir, skipPublicIndex);
+          }
+        }
         if (assetsInputDir && assetsOutputDir) {
           if (serve && !watchersStarted) {
             cleanupCallbacks.add(

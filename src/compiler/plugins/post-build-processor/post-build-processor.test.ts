@@ -41,6 +41,31 @@ describe('Entry script injection', () => {
   });
 });
 
+describe('the public folder', () => {
+  test('its files are copied to the root of the output; its index.html is not, the built one stays', async () => {
+    const project = await createTempProject(APP, {
+      'public/robots.txt': 'User-agent: *',
+      'public/.well-known/security.txt': 'Contact: x',
+      'public/index.html': '<p>not the app</p>',
+    });
+    const warnings: string[] = [];
+    const warn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(args.join(' '));
+    try {
+      await runBuild(
+        createTestBuildConfig(project, { publicInputDir: join(project.root, 'public'), strictTypeCheck: false }),
+      );
+      expect(await readFile(join(project.outDir, 'robots.txt'), 'utf8')).toBe('User-agent: *');
+      expect(await readFile(join(project.outDir, '.well-known', 'security.txt'), 'utf8')).toBe('Contact: x');
+      expect(await readFile(join(project.outDir, 'index.html'), 'utf8')).toMatch(ENTRY_SCRIPT);
+      expect(warnings.join(' ')).toContain('index.html is not copied');
+    } finally {
+      console.warn = warn;
+      await removeTempProject(project);
+    }
+  });
+});
+
 describe('an edited index.html is rendered like the built one', () => {
   const SOURCE_HTML =
     '<!doctype html>\n<html>\n  <head>\n    <!-- a note -->\n    <title>t</title>\n  </head>\n  <body>\n    <div id="app"></div>\n  </body>\n</html>\n';

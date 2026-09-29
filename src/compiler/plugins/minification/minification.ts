@@ -19,7 +19,7 @@ import path from 'node:path';
 import type { Plugin } from 'esbuild';
 import ts from 'typescript';
 import { SelectorMap, normalisePath, planSelectorRenames, renameSelectorsInHtml } from './selector-minifier.js';
-import { collectFilesRecursively, extractComponentDefinitions, logger } from '../../utils/index.js';
+import { collectFilesRecursively, extractComponentDefinitions, logger, sourceCache } from '../../utils/index.js';
 import { collectModuleGraph, createModuleResolver } from '../../utils/module-graph.js';
 import type { BuildContext } from '../../types.js';
 
@@ -38,6 +38,17 @@ export interface MinificationOptions {
 
 const readAll = async (files: string[]): Promise<Array<{ path: string; text: string }>> =>
   Promise.all(files.map(async (file) => ({ path: file, text: await fs.promises.readFile(file, 'utf8') })));
+
+/** The project's TypeScript files, with the parses the build's scan made (the source cache holds them) */
+const readParsed = (files: string[]): Promise<Array<{ path: string; text: string; sourceFile: ts.SourceFile }>> =>
+  Promise.all(
+    files.map(async (file) => {
+      const cached = await sourceCache.get(file);
+      if (cached) return { path: file, text: cached.source, sourceFile: cached.sourceFile };
+      const text = await fs.promises.readFile(file, 'utf8');
+      return { path: file, text, sourceFile: sourceCache.parse(file, text) };
+    }),
+  );
 
 export const MinificationPlugin = (ctx: BuildContext, options: MinificationOptions): Plugin => ({
   name: NAME,
@@ -58,7 +69,7 @@ export const MinificationPlugin = (ctx: BuildContext, options: MinificationOptio
       const isCss = (file: string): boolean => file.endsWith('.css');
       const paths = (await collectFilesRecursively(projectRoot, (name) => isTs(name) || isCss(name))).filter(isSource);
       const [tsFiles, cssFiles, html, modules] = await Promise.all([
-        readAll(paths.filter(isTs)),
+        readParsed(paths.filter(isTs)),
         readAll(paths.filter(isCss)),
         fs.promises.readFile(options.htmlPath, 'utf8').catch(() => ''),
         collectModuleGraph(options.entryPoints, createModuleResolver(projectRoot)),
@@ -70,10 +81,7 @@ export const MinificationPlugin = (ctx: BuildContext, options: MinificationOptio
       const selectors = tsFiles
         .filter((file) => reached.has(normalisePath(file.path)))
         .flatMap((file) =>
-          extractComponentDefinitions(
-            ts.createSourceFile(file.path, file.text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
-            file.path,
-          ).map((definition) => definition.selector),
+          extractComponentDefinitions(file.sourceFile, file.path).map((definition) => definition.selector),
         );
       const reserved = Array.from(ctx.componentsBySelector.keys());
 

@@ -28,12 +28,28 @@ import { signal } from './signal.js';
 import type { ReadonlySignal, Signal } from './types.js';
 import { applyHead, resolveHead } from './router-head.js';
 import type { CustomMetaFields, CustomMetaValues, RouteMeta, SiteMeta } from './router-head.js';
+import type { SearchSchema } from './router-search.js';
 
 /**
  * False in a production build of an app whose routes use no head field but `title` (the build reads
  * them): the head renderer is then left out. Undefined everywhere else, which keeps it.
  */
 declare const __THANE_HEAD__: boolean | undefined;
+/**
+ * False in a production build of an app whose routes have no `canEnter` and no `redirectTo` (the build
+ * reads them): the guard and redirect step is then left out. Undefined everywhere else, which keeps it.
+ */
+declare const __THANE_GUARDS__: boolean | undefined;
+/**
+ * False in a production build of an app with no plain link (an `<a href>` without its own click
+ * handler) in its templates or its index.html: the router's link handling is then left out.
+ */
+declare const __THANE_LINKS__: boolean | undefined;
+/**
+ * False in a production build of an app whose routes have no `search` schema: parsing `route.search` and
+ * writing search values into a path are then left out.
+ */
+declare const __THANE_SEARCH__: boolean | undefined;
 
 // ─────────────────────────────────────────────────────────────
 //  Route type registry — augmented by generated files
@@ -41,12 +57,15 @@ declare const __THANE_HEAD__: boolean | undefined;
 
 /**
  * The hidden files that `thane build`, `dev`, `serve` and `types` generate in
- * `.thane/types` augment these interfaces with the app's route paths (`Register`) and
- * the route pattern of each page component's selector (`RouteComponentRegister`). That
- * makes `navigate()`, `RoutePaths` and a page's `ctx.route` type-safe.
+ * `.thane/types` add one entry per route table to `RouteTables`, keyed by the table's file:
+ * its paths, its custom head fields, and the route pattern of each page component's selector.
+ * That makes `navigate()`, `RoutePaths`, `setMeta()` and a page's `ctx.route` type-safe. Two
+ * tables in one program (two apps that share a tsconfig) add up. `Register` and
+ * `RouteComponentRegister` take the same information written by hand.
  */
 declare global {
   namespace ThaneTypeRegistry {
+    interface RouteTables {}
     interface Register {}
     interface RouteComponentRegister {}
   }
@@ -67,8 +86,8 @@ export type RouteToPath<T extends string> = T extends `${infer Before}:${infer _
     ? `${Before}${string}`
     : T;
 
-/** Exclude the special `notFound` key when computing navigable paths / params. */
-type RouteKeys<T> = Exclude<keyof T & string, 'notFound'>;
+/** Exclude the special `notFound` and `error` keys when computing navigable paths / params. */
+type RouteKeys<T> = Exclude<keyof T & string, 'notFound' | 'error'>;
 
 /** Extracts all parameter names from all route patterns. */
 type ExtractParams<T extends string> = T extends `${string}:${infer Param}/${infer Rest}`
@@ -92,26 +111,57 @@ type RegisteredRoutePaths<T extends Record<string, any>> = T extends { readonly 
 type EffectiveRegister = ThaneTypeRegistry.Register;
 type EffectiveRouteComponentRegister = ThaneTypeRegistry.RouteComponentRegister;
 
+/** Every generated route table's entry, as a union (never when there is none) */
+type RouteTableEntry = ThaneTypeRegistry.RouteTables[keyof ThaneTypeRegistry.RouteTables];
+type TablePaths<T> = T extends { routePaths: infer P extends string } ? P : never;
+
 type ExplicitRegisterRoutePaths = EffectiveRegister extends { routePaths: infer P extends string } ? P : never;
 type ExplicitRegisterRouteParamNames = EffectiveRegister extends { routeParamNames: infer P extends string }
   ? P
   : never;
-type RegisteredRoutePatterns = [ExplicitRegisterRoutePaths] extends [never]
+type HandRegisteredRoutePatterns = [ExplicitRegisterRoutePaths] extends [never]
   ? EffectiveRegister extends { routes: infer R extends Record<string, any> }
     ? RegisteredRoutePaths<R>
     : never
   : ExplicitRegisterRoutePaths;
+type RegisteredRoutePatterns = TablePaths<RouteTableEntry> | HandRegisteredRoutePatterns;
+
+/** A path, and the same path with a query or a hash */
+type WithQuery<T extends string> = T | `${T}?${string}` | `${T}#${string}`;
 
 /** Resolves to the navigable path union when Register is augmented, else `string`. */
-export type RoutePaths = [RegisteredRoutePatterns] extends [never] ? string : RouteToPath<RegisteredRoutePatterns>;
+export type RoutePaths = [RegisteredRoutePatterns] extends [never]
+  ? string
+  : WithQuery<RouteToPath<RegisteredRoutePatterns>>;
 
-/** The registered patterns that have parameters (`/users/:id`), else `string`: what `href()` takes. */
+/** Every table's search types, by pattern */
+type TableSearch<T> = T extends { search: infer S } ? S : never;
+type PatternSearch<S, P extends string> = S extends unknown ? (P extends keyof S ? S[P] : never) : never;
+type SearchPatterns =
+  TableSearch<RouteTableEntry> extends infer S ? (S extends unknown ? keyof S & string : never) : never;
+
+/** What a page of the route reads on `route.search`, from the route's `search` schema; `{}` without one */
+export type RouteSearchValues<P extends string> = [PatternSearch<TableSearch<RouteTableEntry>, P>] extends [never]
+  ? {}
+  : Readonly<PatternSearch<TableSearch<RouteTableEntry>, P>>;
+
+/** The search values `href()` and `navigate()` take for a route: any of its schema's, each optional */
+type RouteSearchInput<P extends string> = [RegisteredRoutePatterns] extends [never]
+  ? { readonly [key: string]: string | number | boolean | undefined }
+  : { readonly [K in keyof RouteSearchValues<P>]?: Exclude<RouteSearchValues<P>[K], undefined> };
+
+/**
+ * The registered patterns that have parameters (`/users/:id`) or a search schema, else `string`: what
+ * `href()` takes.
+ */
 export type RoutePatternWithParams = [RegisteredRoutePatterns] extends [never]
   ? string
-  : Extract<RegisteredRoutePatterns, `${string}:${string}`>;
+  : Extract<RegisteredRoutePatterns, `${string}:${string}`> | Extract<SearchPatterns, RegisteredRoutePatterns>;
 
-/** A value for each of a pattern's parameters: `{ id: 7 }` for `/users/:id`. */
-export type RouteParamValues<P extends string> = { readonly [K in ExtractRouteParams<P>]: string | number };
+/** A value for each of a pattern's parameters, `{ id: 7 }` for `/users/:id`, and any of its search values. */
+export type RouteParamValues<P extends string> = {
+  readonly [K in ExtractRouteParams<P>]: string | number;
+} & RouteSearchInput<P>;
 
 /** Resolves to the route param name union when Register is augmented, else `string`. */
 export type RouteParamNames = [ExplicitRegisterRouteParamNames] extends [never]
@@ -124,17 +174,25 @@ export type RouteParamsObject<T extends string> = [ExtractRouteParams<T>] extend
   ? Record<string, never>
   : { readonly [K in ExtractRouteParams<T>]: string };
 
-type RegisteredRoutePatternForSelector<S extends string> = S extends keyof EffectiveRouteComponentRegister
-  ? EffectiveRouteComponentRegister[S] extends string
-    ? EffectiveRouteComponentRegister[S]
-    : never
-  : never;
+/** The pattern a selector is mounted for in one table's components (never when it is not there) */
+type PatternIn<C, S extends string> = C extends unknown ? (S extends keyof C ? Extract<C[S], string> : never) : never;
+type TableComponents<T> = T extends { components: infer C } ? C : never;
 
-type RouteContextBase<TPattern extends string, TPath extends string, TParams> = Readonly<{
+type RegisteredRoutePatternForSelector<S extends string> =
+  PatternIn<TableComponents<RouteTableEntry>, S> | PatternIn<EffectiveRouteComponentRegister, S>;
+
+type RouteContextBase<
+  TPattern extends string,
+  TPath extends string,
+  TParams,
+  TSearch = Readonly<Record<string, unknown>>,
+> = Readonly<{
   pattern: TPattern;
   path: TPath;
   params: TParams;
   searchParams: URLSearchParams;
+  /** The query parameters the route's `search` schema declares, parsed */
+  search: TSearch;
   hash: string;
   title: string;
   state: unknown;
@@ -142,11 +200,18 @@ type RouteContextBase<TPattern extends string, TPath extends string, TParams> = 
 
 type ResolvedRouteContext<TPattern extends string> = TPattern extends 'notFound'
   ? RouteContextBase<'notFound', string, Record<string, never>>
-  : RouteContextBase<TPattern, RouteToPath<TPattern>, RouteParamsObject<TPattern>>;
+  : TPattern extends 'error'
+    ? RouteContextBase<'error', string, Record<string, never>> & {
+        /** What failed: the page's chunk did not load, or its component threw while mounting */
+        readonly error: unknown;
+      }
+    : RouteContextBase<TPattern, RouteToPath<TPattern>, RouteParamsObject<TPattern>, RouteSearchValues<TPattern>>;
 
 export interface UntypedRouteContext extends RouteContextBase<string, string, Record<string, string>> {
   /** @deprecated Run thane dev, thane build, or thane serve once to generate route-aware component types. */
   readonly params: Record<string, string>;
+  /** On the error route: what failed */
+  readonly error?: unknown;
 }
 
 export type RouteContextForSelector<S extends string> = [RegisteredRoutePatternForSelector<S>] extends [never]
@@ -174,11 +239,38 @@ export type RouteMetaInput<M = RouteMeta> = M | ((route: UntypedRouteContext) =>
  * });
  * ```
  */
-export interface Route {
+export type Route = PageRoute | RedirectRoute;
+
+/** What a guard decides: `true` enters, a path goes there instead, `false` stays on the page on screen */
+export type RouteGuardResult = boolean | RoutePaths;
+
+/** A route that shows a page */
+export interface PageRoute {
   /** Lazy loader or eager page component (return value of defineComponent). */
   component: RouteComponent;
   /** The document head while this route is active: its title, description, preview image and more */
   meta?: RouteMetaInput<RouteMeta & Record<string, unknown>> | undefined;
+  /**
+   * Decides, before the page is fetched, whether it may be entered: `true` enters, a path redirects
+   * there (`'/login'`), `false` keeps the page on screen. It may be async.
+   */
+  canEnter?: ((route: UntypedRouteContext) => RouteGuardResult | Promise<RouteGuardResult>) | undefined;
+  /**
+   * The query parameters its page reads on `route.search`, each with its parser:
+   * `{ page: searchNumber(1), sort: searchOneOf(['price', 'name'], 'name') }`.
+   */
+  search?: SearchSchema | undefined;
+  redirectTo?: undefined;
+}
+
+/** A route that sends its path elsewhere, replacing the history entry: `'/old': { redirectTo: '/new' }` */
+export interface RedirectRoute {
+  /** The path to go to, or a function of the route that returns it (for a route with parameters) */
+  redirectTo: RoutePaths | ((route: UntypedRouteContext) => RoutePaths);
+  component?: undefined;
+  meta?: undefined;
+  canEnter?: undefined;
+  search?: undefined;
 }
 
 /**
@@ -208,8 +300,15 @@ export type RoutesMap<T extends string = string> = Record<T, Route>;
 /**
  * The return type of `defineRoutes()` — a routes map with a mandatory `notFound` route.
  */
-export type RoutesConfig = Record<string, Route> & { notFound: Route };
-type RouteRecordFromKeys<K extends string> = Record<Exclude<K, 'notFound'>, Route> & { notFound: Route };
+export type RoutesConfig = Record<string, Route> & {
+  notFound: Route;
+  /** Shown when a page's chunk fails to load or its component throws while mounting, given the error */
+  error?: Route;
+};
+type RouteRecordFromKeys<K extends string> = Record<Exclude<K, 'notFound' | 'error'>, Route> & {
+  notFound: Route;
+  error?: Route;
+};
 export type RegisteredRoutes<K extends string = string> = RouteRecordFromKeys<K> &
   RouteMetadata<RouteRecordFromKeys<K>>;
 
@@ -259,7 +358,11 @@ export interface RouterConfig {
  * The special `notFound` key is exempt from path validation.
  */
 type ValidateRoutes<T extends Record<string, Route>, C extends CustomMetaFields> = {
-  [K in keyof T]: K extends 'notFound' ? CheckRoute<T[K], C> : K extends `/:${string}` ? never : CheckRoute<T[K], C>;
+  [K in keyof T]: K extends 'notFound' | 'error'
+    ? CheckRoute<T[K], C>
+    : K extends `/:${string}`
+      ? never
+      : CheckRoute<T[K], C>;
 };
 
 /** Each head field a route sets, typed as the field is: a field that does not exist is `never` */
@@ -312,7 +415,7 @@ export function defineRoutes<const T extends RoutesConfig, const C extends Custo
   // mount() won't find a router and the entire router module is tree-shaken away.
   __setRouterMount((options: MountOptions, target: HTMLElement): MountHandle => {
     const routerConfig = options.router!;
-    const { notFound, ...routeMap } = routerConfig.routes;
+    const { notFound, error, ...routeMap } = routerConfig.routes;
 
     // ── Mode B: shell component + router ──
     if (options.component) {
@@ -330,7 +433,7 @@ export function defineRoutes<const T extends RoutesConfig, const C extends Custo
         );
       }
 
-      startRouter({ routes: routeMap, notFound }, outlet, routerConfig);
+      startRouter({ routes: routeMap, notFound, error }, outlet, routerConfig);
 
       return {
         root: shellHandle.root,
@@ -342,7 +445,7 @@ export function defineRoutes<const T extends RoutesConfig, const C extends Custo
     }
 
     // ── Mode C: router only (no shell) ──
-    startRouter({ routes: routeMap, notFound }, target, routerConfig);
+    startRouter({ routes: routeMap, notFound, error }, target, routerConfig);
     return {
       root: target as any,
       destroy: stopRouter,
@@ -365,13 +468,17 @@ export function defineRoutes<const T extends RoutesConfig, const C extends Custo
 //  Internal state (single-instance)
 // ─────────────────────────────────────────────────────────────
 
-let _config: { routes: RoutesMap; notFound: Route } | null = null;
+let _config: { routes: RoutesMap; notFound: Route; error?: Route | undefined } | null = null;
 let _target: HTMLElement | null = null;
 const _currentPath: Signal<string> = signal<string>(typeof window !== 'undefined' ? window.location.pathname : '');
 let _currentHandle: MountHandle | null = null;
 let _currentRoutePattern = typeof window !== 'undefined' ? window.location.pathname : '';
 let _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
 let _routeParams: Record<string, string> = {};
+/** On the error route, what failed */
+let _routeError: unknown;
+/** The current route's search values, parsed by its schema */
+let _routeSearch: Record<string, unknown> = {};
 /** The site's head and the app's own fields, from the last defineRoutes() call */
 let _siteMeta: SiteMeta & Record<string, unknown> = {};
 let _customMeta: CustomMetaFields | undefined;
@@ -427,9 +534,11 @@ const createCurrentRouteContext = (): UntypedRouteContext => ({
   path: typeof window !== 'undefined' ? window.location.pathname : _currentPath(),
   pattern: _currentRoutePattern,
   searchParams: new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''),
+  search: _routeSearch,
   hash: typeof window !== 'undefined' ? window.location.hash : '',
   title: _currentRouteTitle,
   state: typeof window !== 'undefined' ? window.history.state : undefined,
+  error: _routeError,
 });
 
 __setRouteContextProvider(createCurrentRouteContext);
@@ -519,7 +628,7 @@ const normalizeLoadedRouteComponent = (value: unknown): ComponentHTMLSelector<an
   return undefined;
 };
 
-const resolveRouteComponent = async (route: Route): Promise<ComponentHTMLSelector<any> | undefined> => {
+const resolveRouteComponent = async (route: PageRoute): Promise<ComponentHTMLSelector<any> | undefined> => {
   if (isEagerRouteComponent(route.component)) {
     return route.component;
   }
@@ -527,6 +636,29 @@ const resolveRouteComponent = async (route: Route): Promise<ComponentHTMLSelecto
   const mod = await route.component();
   return normalizeLoadedRouteComponent(mod);
 };
+
+/** The context of a route that is about to load, for its guard or its redirect function */
+const routeContextFor = (match: MatchResult): UntypedRouteContext => ({
+  ...createCurrentRouteContext(),
+  pattern: match.pattern,
+  params: { ...match.params },
+  search: parseSearch(match.route),
+});
+
+/** A route's search values, parsed from the query string by its schema (none without one) */
+const parseSearch = (route: Route): Record<string, unknown> => {
+  const values: Record<string, unknown> = {};
+  const schema = route.search;
+  if (schema) {
+    const params = new URLSearchParams(window.location.search);
+    for (const key in schema) values[key] = schema[key]!(params.get(key) ?? undefined);
+  }
+  return values;
+};
+
+/** Redirects in a row, reset once a load gets past them: a loop of redirects stops at the limit */
+let _redirects = 0;
+const MAX_REDIRECTS = 10;
 
 // ─────────────────────────────────────────────────────────────
 //  Route matching
@@ -629,72 +761,128 @@ const loadRoute = async (): Promise<void> => {
     return;
   }
 
-  const match = matchRoute(pathname, _config.routes, _config.notFound);
+  let match = matchRoute(pathname, _config.routes, _config.notFound);
+  _routeError = undefined;
 
-  // Fetch the next page while the current one stays on screen. Tearing the current page down
-  // before this await left the outlet empty for as long as the chunk took to arrive, and for
-  // one painted frame even when it was already cached: the document collapsed to the shell,
-  // the footer jumped to the top and the page flashed.
-  let component: ComponentHTMLSelector<any> | undefined;
-  if (match) {
-    _routePending = true;
-    try {
-      component = await resolveRouteComponent(match.route);
-    } catch (error) {
-      console.error('[thane-router] Failed to load route:', error);
+  // Once for the route, and once more for the error route when the route's page failed to load or mount
+  for (;;) {
+    // Fetch the next page while the current one stays on screen. Tearing the current page down
+    // before this await left the outlet empty for as long as the chunk took to arrive, and for
+    // one painted frame even when it was already cached: the document collapsed to the shell,
+    // the footer jumped to the top and the page flashed.
+    let component: ComponentHTMLSelector<any> | undefined;
+    let failure: unknown;
+    let failed = false;
+    if (match) {
+      const route = match.route;
+      _routePending = true;
+      // A redirect, or the route's guard, decides before the page is fetched. A redirect is a guard
+      // whose answer is always a path. The build leaves this out when no route has either.
+      if (typeof __THANE_GUARDS__ === 'undefined' || __THANE_GUARDS__) {
+        const decide = route.redirectTo ?? route.canEnter;
+        if (decide) {
+          const verdict = typeof decide === 'function' ? await decide(routeContextFor(match)) : decide;
+          if (navigationId !== _navigationId || _target !== target) return;
+          if (verdict === false) {
+            _routePending = false;
+            if (_currentHandle) {
+              // The page on screen stays, and the address bar shows its URL again
+              window.history.replaceState(window.history.state, '', _loadedUrl);
+              _currentPath(window.location.pathname);
+              return;
+            }
+            // Nothing is on screen yet (the first load): the notFound route
+            if (route === _config.notFound) return;
+            match = { pattern: 'notFound', route: _config.notFound, params: {} };
+            continue;
+          }
+          if (typeof verdict === 'string') {
+            // The redirected path leaves no history entry; the load keeps how it was triggered. A loop
+            // of redirects stops at the limit.
+            if (++_redirects > MAX_REDIRECTS) {
+              _redirects = 0;
+              return console.error('[thane-router] Redirect loop at', verdict);
+            }
+            window.history.replaceState(null, '', verdict);
+            _pendingScrollAction = scrollAction;
+            _pendingPopScrollPosition = popScrollPosition;
+            return loadRoute();
+          }
+        }
+        _redirects = 0;
+      }
+
+      try {
+        component = await resolveRouteComponent(route as PageRoute);
+      } catch (error) {
+        failure = error;
+        failed = true;
+      }
+      // Superseded by a newer navigation, or the router was stopped (or restarted) meanwhile:
+      // the outlet and the pending flag are no longer this load's to touch.
+      if (navigationId !== _navigationId || _target !== target) return;
+      _routePending = false;
     }
-    // Superseded by a newer navigation, or the router was stopped (or restarted) meanwhile:
-    // the outlet and the pending flag are no longer this load's to touch.
-    if (navigationId !== _navigationId || _target !== target) return;
-    _routePending = false;
-  }
 
-  // From here to the scroll write everything happens in one task, so the browser paints the
-  // previous page and then the next one, never the gap between them.
-  if (_currentHandle) {
-    const previous = _currentHandle;
-    _currentHandle = null;
-    unmount(previous);
-  }
-  target.innerHTML = '';
-  _loadedUrl = url;
+    // From here to the scroll write everything happens in one task, so the browser paints the
+    // previous page and then the next one, never the gap between them.
+    if (_currentHandle) {
+      const previous = _currentHandle;
+      _currentHandle = null;
+      unmount(previous);
+    }
+    target.innerHTML = '';
+    _loadedUrl = url;
 
-  if (!match) {
-    _currentRoutePattern = pathname;
-    _currentRouteTitle = document.title;
-    _routeParams = {};
+    if (!match) {
+      _currentRoutePattern = pathname;
+      _currentRouteTitle = document.title;
+      _routeParams = {};
+      return;
+    }
+
+    _currentRoutePattern = match.pattern;
+    _routeParams = match.params;
+    if (typeof __THANE_SEARCH__ === 'undefined' || __THANE_SEARCH__) _routeSearch = parseSearch(match.route);
+
+    // The route's head goes on before the page mounts, so the page reads its title and may add to it
+    if (typeof __THANE_HEAD__ === 'undefined' || __THANE_HEAD__) {
+      const meta = match.route.meta;
+      _routeMeta = (typeof meta === 'function' ? meta(createCurrentRouteContext()) : meta) ?? {};
+      _metaOverrides = {};
+      applyRouteMeta();
+    } else {
+      // Without head support (the build found no field but titles), a route's head is its title
+      const title = (match.route.meta as RouteMeta | undefined)?.title;
+      if (title) document.title = title;
+      _currentRouteTitle = document.title;
+    }
+
+    if (component) {
+      try {
+        _currentHandle = mountComponent(component, target, undefined, { route: createCurrentRouteContext() });
+      } catch (error) {
+        failure = error;
+        failed = true;
+      }
+    }
+
+    if (failed) {
+      console.error('[thane-router] Failed to load route:', failure);
+      // The error route, given what failed. Browsers cache a failed module import, so recovery is
+      // a reload, which the error page can offer. Without an error route the outlet stays empty.
+      const errorRoute = _config.error;
+      if (!errorRoute || match.route === errorRoute) return;
+      match = { pattern: 'error', route: errorRoute, params: {} };
+      _routeError = failure;
+      continue;
+    }
+
+    // A page that navigates while it mounts (a redirect) has started a newer load, which owns the scroll
+    if (component && navigationId === _navigationId) {
+      applyScrollPosition(pathname, scrollAction, popScrollPosition);
+    }
     return;
-  }
-
-  _currentRoutePattern = match.pattern;
-  _routeParams = match.params;
-
-  // The route's head goes on before the page mounts, so the page reads its title and may add to it
-  if (typeof __THANE_HEAD__ === 'undefined' || __THANE_HEAD__) {
-    const meta = match.route.meta;
-    _routeMeta = (typeof meta === 'function' ? meta(createCurrentRouteContext()) : meta) ?? {};
-    _metaOverrides = {};
-    applyRouteMeta();
-  } else {
-    // Without head support (the build found no field but titles), a route's head is its title
-    const title = (match.route.meta as RouteMeta | undefined)?.title;
-    if (title) document.title = title;
-    _currentRouteTitle = document.title;
-  }
-
-  // The component failed to load (reported above): the outlet stays empty
-  if (!component) return;
-
-  try {
-    _currentHandle = mountComponent(component, target, undefined, { route: createCurrentRouteContext() });
-  } catch (error) {
-    console.error('[thane-router] Failed to load route:', error);
-    return;
-  }
-
-  // A page that navigates while it mounts (a redirect) has started a newer load, which owns the scroll
-  if (navigationId === _navigationId) {
-    applyScrollPosition(pathname, scrollAction, popScrollPosition);
   }
 };
 
@@ -702,17 +890,33 @@ const loadRoute = async (): Promise<void> => {
 //  Navigation API — generic, zero knowledge of user routes
 // ─────────────────────────────────────────────────────────────
 
-const fillParams = (pattern: string, params: Record<string, string | number>): string =>
-  pattern.replace(/\/:([^/]+)/g, (_, name: string) => '/' + encodeURIComponent(params[name]!));
+const fillParams = (pattern: string, params: Record<string, string | number | boolean>): string => {
+  let path = pattern.replace(/\/:([^/]+)/g, (_, name: string) => '/' + encodeURIComponent(params[name]!));
+  // The other values are search values, in the query: a flag that is on as the bare name, one that is off left out
+  if (typeof __THANE_SEARCH__ === 'undefined' || __THANE_SEARCH__) {
+    const query = new URLSearchParams();
+    for (const key in params) {
+      const value = params[key];
+      if (!pattern.split('/').includes(':' + key) && value !== undefined && value !== null && value !== false) {
+        query.append(key, value === true ? '' : String(value));
+      }
+    }
+    const text = query.toString();
+    if (text) path += '?' + text;
+  }
+  return path;
+};
 
 /**
  * A route's path with its parameters filled in, each one URL-encoded: `href('/users/:id', { id: 7 })`
- * is `'/users/7'`. The pattern and the parameters are typed from the app's routes.
+ * is `'/users/7'`. Values its `search` schema declares go into the query:
+ * `href('/users/:id', { id: 7, tab: 'posts' })` is `'/users/7?tab=posts'`. The pattern, the parameters
+ * and the search values are typed from the app's routes.
  */
 export const href = fillParams as <P extends RoutePatternWithParams>(
   pattern: P,
   params: RouteParamValues<P>,
-) => RouteToPath<P>;
+) => WithQuery<RouteToPath<P>>;
 
 /**
  * Navigate to the given path using HTML5 History pushState: `navigate('/about')`, or a pattern and its
@@ -722,7 +926,7 @@ export const href = fillParams as <P extends RoutePatternWithParams>(
  */
 export function navigate(path: RoutePaths): void;
 export function navigate<P extends RoutePatternWithParams>(pattern: P, params: RouteParamValues<P>): void;
-export function navigate(path: string, params?: Record<string, string | number>): void {
+export function navigate(path: string, params?: Record<string, string | number | boolean>): void {
   if (params) path = fillParams(path, params);
   // Nothing to do when the whole URL, query and hash included, is already the current one
   const target = new URL(path, window.location.href);
@@ -745,8 +949,11 @@ export function navigateBack(): void {
   window.history.back();
 }
 
-/** The app's own head fields, as the generated route types give them (from `customMeta`) */
-type RegisteredCustomMeta = EffectiveRegister extends { customMeta: infer C extends object } ? C : {};
+/** The app's own head fields, as the generated route types give them (from `customMeta`), every table's together */
+type TableCustomMeta<T> = T extends { customMeta: infer C extends object } ? C : never;
+type IntersectionOf<U> = (U extends unknown ? (u: U) => void : never) extends (i: infer I) => void ? I : never;
+type AllCustomMeta = TableCustomMeta<RouteTableEntry> | TableCustomMeta<EffectiveRegister>;
+type RegisteredCustomMeta = [AllCustomMeta] extends [never] ? {} : IntersectionOf<AllCustomMeta>;
 
 /** The head fields a page may set: the built-in ones and the app's own */
 export type AppRouteMeta = RouteMeta & RegisteredCustomMeta;
@@ -777,8 +984,38 @@ export function setMeta(meta: AppRouteMeta): void {
  * @param config - Router configuration with routes map and notFound.
  * @param target - The element to render pages into (outlet in Mode B, body/target in Mode C).
  */
+/**
+ * A plain click on a link to one of the app's routes navigates in the app instead of loading the page
+ * again, so `<a href="/about">` is a router link. The browser keeps a click that is already handled
+ * (`@click.prevent`), a modified one (a new tab, a download), a link with a `target`, a `download` or
+ * `rel="external"`, one to another origin or to a hash on this page, and one to a path that no route
+ * has (a file such as `/sitemap.xml`).
+ */
+const followLink = (event: MouseEvent): void => {
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+  const link = (event.target as Element | null)?.closest?.('a[href]');
+  if (!link || link.hasAttribute('download') || /\bexternal\b/.test(link.getAttribute('rel') ?? '')) return;
+  const target = link.getAttribute('target');
+  if (target && target !== '_self') return;
+  // An SVG link has no href property, so the attribute is read, resolved against the page
+  const url = new URL(link.getAttribute('href')!, window.location.href);
+  if (url.origin !== window.location.origin || (url.hash && url.pathname + url.search === locationUrl())) return;
+  if (!_config || !matchRoute(url.pathname, _config.routes)) return;
+  event.preventDefault();
+  navigate((url.pathname + url.search + url.hash) as RoutePaths);
+};
+
 export function startRouter(
-  config: { routes: RoutesMap; notFound: Route },
+  config: { routes: RoutesMap; notFound: Route; error?: Route | undefined },
   target: HTMLElement,
   routerConfig?: Pick<RouterConfig, 'scrollRestoration'>,
 ): void {
@@ -823,6 +1060,7 @@ export function startRouter(
     void loadRoute();
   };
   window.addEventListener('popstate', _popstateHandler);
+  if (typeof __THANE_LINKS__ === 'undefined' || __THANE_LINKS__) window.addEventListener('click', followLink);
 
   // Load the initial route
   void loadRoute();
@@ -852,6 +1090,7 @@ export function stopRouter(): void {
     window.removeEventListener('popstate', _popstateHandler);
     _popstateHandler = null;
   }
+  if (typeof __THANE_LINKS__ === 'undefined' || __THANE_LINKS__) window.removeEventListener('click', followLink);
 
   if (_scrollHandler) {
     window.removeEventListener('scroll', _scrollHandler);

@@ -45,11 +45,41 @@ const KEPT: Record<string, EntrySurface> = {
       'when',
       'whenElse',
     ],
-    types: ['Signal', 'ReadonlySignal', 'ComponentContext', 'ComponentHTMLSelector', 'MountHandle', 'RoutePaths'],
+    types: [
+      'Signal',
+      'ReadonlySignal',
+      'ComponentContext',
+      'ComponentHTMLSelector',
+      'Fragment',
+      'MountHandle',
+      'RoutePaths',
+    ],
   },
   'thane/router': {
-    values: ['defineRoutes', 'href', 'linkTag', 'metaName', 'metaProperty', 'navigate', 'navigateBack', 'setMeta'],
-    types: ['AppRouteMeta', 'CustomMetaField', 'HeadTag', 'RouteImage', 'RouteMeta', 'SiteMeta'],
+    values: [
+      'defineRoutes',
+      'href',
+      'linkTag',
+      'metaName',
+      'metaProperty',
+      'navigate',
+      'navigateBack',
+      'searchFlag',
+      'searchNumber',
+      'searchOneOf',
+      'searchString',
+      'setMeta',
+    ],
+    types: [
+      'AppRouteMeta',
+      'CustomMetaField',
+      'HeadTag',
+      'RouteImage',
+      'RouteMeta',
+      'SearchParser',
+      'SearchSchema',
+      'SiteMeta',
+    ],
   },
   'thane/runtime': {
     values: [
@@ -59,6 +89,8 @@ const KEPT: Record<string, EntrySurface> = {
       '__bindIfExpr',
       '__dc',
       '__enableComponentStyles',
+      '__enableKeyframeScoping',
+      '__mf',
       '__nc',
       '__registerComponent',
       '__registerComponentLean',
@@ -68,6 +100,8 @@ const KEPT: Record<string, EntrySurface> = {
     ],
     types: [],
   },
+  // Node's cloneNode and insertBefore, for compiled lists (it reads Node.prototype when it loads)
+  'thane/runtime/dom': { values: ['_cloneNode', '_insertBefore'], types: [] },
 };
 
 /** Names that an entry exported before the round and no longer does. */
@@ -160,10 +194,12 @@ try {
 
   // Runtime: the value exports of each entry, exactly
   const probe = join(project, 'probe-values.ts');
+  // thane/runtime/dom reads Node.prototype, which Bun does not have: a stub, loaded before it
+  writeFileSync(join(project, 'node-stub.ts'), '(globalThis as { Node?: unknown }).Node ??= class {};\n');
   writeFileSync(
     probe,
-    Object.keys(KEPT)
-      .map((entry, i) => `import * as m${i} from '${entry}';`)
+    [`import './node-stub.ts';`]
+      .concat(Object.keys(KEPT).map((entry, i) => `import * as m${i} from '${entry}';`))
       .concat(
         `console.log(JSON.stringify({ ${Object.keys(KEPT)
           .map((entry, i) => `'${entry}': Object.keys(m${i}).sort()`)

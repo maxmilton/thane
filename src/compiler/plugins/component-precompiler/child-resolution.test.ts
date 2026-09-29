@@ -2,10 +2,16 @@
  * A child component call in a template, `${Kid(…)}`, resolves to the component the file declares or
  * imports under that name, whatever other components the project holds: two components with one
  * export name in different folders stay apart, an import alias works, re-exports and tsconfig `paths`
- * are followed, and a plain function that shares a component's name is not a component call.
+ * are followed, and a plain function that shares a component's name is not a component call. A component
+ * the file does not export is callable in that file, and not through an import.
  */
 import { describe, expect, test } from 'bun:test';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildAndReadJs } from '../../testing/build-project.js';
+import { createComponentResolver } from '../../utils/component-resolver.js';
+import { sourceCache } from '../../utils/index.js';
 
 const DEV = { strictTypeCheck: false };
 
@@ -84,6 +90,17 @@ describe('child components resolve through the file', () => {
     expect(js).toContain('<paths-kid');
   });
 
+  test('a component the file does not export is mounted in that file, by the name it is declared under', async () => {
+    const js = await build({
+      'src/app.ts':
+        "import { defineComponent } from 'thane';\n" +
+        'const Pill = defineComponent(() => ({ template: html`<i>p</i>` }));\n' +
+        'export const App = defineComponent(() => ({ template: html`<main>${Pill({})}</main>` }));\n',
+    });
+    expect(js).toContain('<pill');
+    expect(js).toMatch(/__registerComponentLean\("pill", /);
+  });
+
   test('a local function that shares a component name is a plain call', async () => {
     const js = await build({
       'src/app.ts': app('const Label = (s: string): string => s.toUpperCase();', "${Label('x')}"),
@@ -92,4 +109,26 @@ describe('child components resolve through the file', () => {
     expect(js).not.toContain('x-label');
     expect(js).toContain('toUpperCase');
   });
+});
+
+test('an import resolves only to a component the other file exports', async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'thane-resolver-')));
+  try {
+    const kid = join(root, 'kid.ts');
+    writeFileSync(
+      kid,
+      "const Kid = defineComponent('hidden-kid', () => ({}));\n" +
+        "export const Shown = defineComponent('shown-kid', () => ({}));\n",
+    );
+    const appPath = join(root, 'app.ts');
+    const appText = "import { Kid, Shown } from './kid.js';\nconst Own = defineComponent(() => ({}));\n";
+    writeFileSync(appPath, appText);
+    const scope = await createComponentResolver(root, []).componentsInScope(sourceCache.parse(appPath, appText));
+    expect([...scope].map(([name, def]) => [name, def.selector, def.exported])).toEqual([
+      ['Own', 'own', false],
+      ['Shown', 'shown-kid', true],
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

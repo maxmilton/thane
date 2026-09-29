@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { runBuild } from '../../cli/build.js';
 import {
+  buildAndReadJs,
   createTempProject,
   createTestBuildConfig,
   listBuiltJsFiles,
@@ -32,12 +33,27 @@ mount({ component: FixtureApp });
   }
 });
 
-test('directly nested html`` inside another html`` interpolation fails compile (THANE404)', async () => {
+test('an html`` template written as a whole ${} is inlined', async () => {
+  const js = await buildAndReadJs(`
+import { defineComponent, mount, signal } from 'thane';
+
+export const FixtureApp = defineComponent('fixture-app', () => {
+  const n = signal(1);
+  return { template: html\`<main>\${html\`<div data-testid="nested">\${n()}</div>\`}</main>\` };
+});
+
+mount({ component: FixtureApp });
+`);
+  expect(js).toContain('<main><div data-testid="nested"><!---->1<!----></div></main>');
+  expect(js).toMatch(/n\.subscribe\(/);
+});
+
+test('an html`` template in a ternary inside another fails compile (THANE404)', async () => {
   const source = `
 import { defineComponent, mount } from 'thane';
 
 export const FixtureApp = defineComponent('fixture-app', () => ({
-  template: html\`<main>\${html\`<div data-testid="bad-nested">nested</div>\`}</main>\`,
+  template: html\`<main>\${Math.random() > 1 ? html\`<div data-testid="bad-nested">nested</div>\` : ''}</main>\`,
 }));
 
 mount({ component: FixtureApp });

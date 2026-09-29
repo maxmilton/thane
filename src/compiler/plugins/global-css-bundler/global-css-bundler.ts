@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import type { Plugin } from 'esbuild';
 import { PLUGIN_NAME } from '../../utils/index.js';
-import { transformCss } from '../minification/css-transform.js';
+import { KEYFRAME_SCOPING, transformCss } from '../minification/css-transform.js';
 import type { SelectorMap } from '../minification/selector-minifier.js';
+import { trackHotInput, type HotState } from '../component-precompiler/hot-modules.js';
 
 const NAME = PLUGIN_NAME.GLOBAL_CSS_BUNDLER;
 
@@ -15,6 +16,8 @@ export interface GlobalCSSBundlerOptions {
    * stylesheet imported from a package is never renamed in.
    */
   selectorMap?: () => SelectorMap | undefined;
+  /** `thane dev`: a changed stylesheet is recorded, and the page reloads (see hot-modules.ts) */
+  hot?: HotState | undefined;
 }
 
 export const GlobalCSSBundlerPlugin = (options: GlobalCSSBundlerOptions = {}): Plugin => ({
@@ -25,13 +28,17 @@ export const GlobalCSSBundlerPlugin = (options: GlobalCSSBundlerOptions = {}): P
     build.onLoad({ filter: /\.css$/ }, async (args) => {
       try {
         const selectorMap = options.selectorMap?.();
-        const cssContent = transformCss(await fs.promises.readFile(args.path, 'utf8'), {
+        let keyframes = false;
+        const text = await fs.promises.readFile(args.path, 'utf8');
+        if (options.hot) trackHotInput(options.hot, args.path, text, () => false);
+        const cssContent = transformCss(text, {
           minify: shouldMinify,
           selectorMap: selectorMap?.hasStylesheet(args.path) ? selectorMap : undefined,
           file: args.path,
+          onKeyframes: () => (keyframes = true),
         });
         return {
-          contents: `export default ${JSON.stringify(cssContent)};`,
+          contents: `${keyframes ? KEYFRAME_SCOPING : ''}export default ${JSON.stringify(cssContent)};`,
           loader: 'ts',
         };
       } catch (error) {

@@ -4,7 +4,7 @@ Thane's compiler is an esbuild-based plugin pipeline that transforms your TypeSc
 
 ## Build Pipeline
 
-Before esbuild starts, the build finds the project (the nearest folder above the entry file with a `tsconfig.json` or `package.json`) and scans the working directory, and the project folder when it lies outside it, for every exported `defineComponent()`. That list is how the compiler recognises a child component call such as `${Card({ … })}` in a template. The scan runs once per `thane` command, so a component file added while `thane dev` runs is only recognised after a restart.
+Before esbuild starts, the build finds the project (the nearest folder above the entry file with a `tsconfig.json` or `package.json`) and scans the working directory, and the project folder when it lies outside it, for every exported `defineComponent()`. That list is how the compiler recognises a child component call such as `${Card({ … })}` in a template. Under `thane dev` every rebuild scans again, so a component file added while it runs is recognised on the next rebuild; files that did not change are not parsed again.
 
 A folder without its own `tsconfig.json` or `package.json` therefore builds as part of the enclosing project, whose type check and generated types then cover it; the build warns when that project lies above the folder `thane` runs in (a scratch app inside a repository, for example). Add a `package.json` to build such a folder on its own.
 
@@ -129,7 +129,11 @@ Compiled components import these helpers from `thane/runtime`, the compiler's ow
 
 A call to a known component inside a template, `${Card({ title })}`, is replaced at build time by the child's host element (`<card>`), and the parent's binding function mounts the child into it. Where the browser's parser would not keep an element in that place (directly in a table row, inside `<svg>`), a comment stands there instead and the child's host replaces it at mount.
 
-Components are matched to calls by export name, across the scanned folders: give every component a unique export name.
+A call is matched to the component the file declares under that name, or imports under it (following re-exports and the tsconfig's `paths`). A file can declare several components; each is compiled on its own.
+
+## Fragments
+
+An `html` const used in a template of the same file is inlined where it is used. A fragment another module exports (`` export const Badge = html`…` ``) is resolved through the imports like a component: one without `${…}` is written out in place, and one with expressions is compiled in its own module into `{ t, b }`, its static template and a binding function closed over that module, which the importing template mounts before a comment placeholder (`__mf`). Its static templates are marked pure, so esbuild drops a fragment no template uses.
 
 ## CSS Processing
 

@@ -11,4 +11,6 @@ export interface GeneratedInitBindingsArtifact {
    * passes as `__b`'s second argument (`__b(ctx, _ns)`, `_ns[i]` the template's i-th element).
    */
   elementList: boolean;
+  /** Whether the code calls `_cloneNode` and `_insertBefore` (it has a list): the file imports them */
+  domPrototype: boolean;
 }

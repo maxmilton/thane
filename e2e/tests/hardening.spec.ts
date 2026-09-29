@@ -1393,6 +1393,102 @@ test.describe('@namespace in a component stylesheet', () => {
   });
 });
 
+test.describe('calls to the component’s own functions in a template', () => {
+  test('T1 a function follows the signals it reads, a plain one renders once, a helper follows its body', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 't1');
+    await expect(page.locator('.t1-label')).toHaveText('Total');
+    await expect(page.locator('.t1-total')).toHaveText('6');
+    await expect(page.locator('.t1-formatted')).toHaveText('2 EUR');
+    await setProbe(page, 't1', 'qty', 4);
+    await expect(page.locator('.t1-total')).toHaveText('8');
+    await expect(page.locator('.t1-total')).toHaveAttribute('title', '8');
+    await setProbe(page, 't1', 'price', 5);
+    await expect(page.locator('.t1-total')).toHaveText('20');
+    await expect(page.locator('.t1-formatted')).toHaveText('5 EUR');
+    await setProbe(page, 't1', 'currency', 'USD');
+    await expect(page.locator('.t1-formatted')).toHaveText('5 USD');
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
+test.describe('several components in one file', () => {
+  test("C1 the file's components mount one another, each with its own signals and styles", async ({ page }) => {
+    const probe = await mountProbe(page, 'c1');
+    const green = 'rgb(0, 128, 0)';
+    await expect(page.locator('.c1-own')).toHaveText('1');
+    await expect(page.locator('.c1-count-value')).toHaveText('3');
+    await expect(page.locator('.c1-pill-text')).toHaveText(['top 2', 'a 2', 'b 2']);
+    await expect(page.locator('.c1-pill-text').first()).toHaveCSS('color', green);
+    await expect(page.locator('.c1-plain')).not.toHaveCSS('color', green);
+
+    await setProbe(page, 'c1', 'items', [
+      { id: 2, label: 'b' },
+      { id: 3, label: 'c' },
+    ]);
+    await expect(page.locator('.c1-rows .c1-pill-text')).toHaveText(['b 2', 'c 2']);
+    await setProbe(page, 'c1count', 'count', 4);
+    await expect(page.locator('.c1-count-value')).toHaveText('4');
+    await setProbe(page, 'c1', 'count', 5);
+    await expect(page.locator('.c1-own')).toHaveText('5');
+    await expect(page.locator('.c1-count-value')).toHaveText('4');
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
+test.describe('fragments', () => {
+  test('F1 fragments go wherever a template goes: branches, twice with a child, an empty template', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 'f1');
+    await expect(page.locator('.f1-busy')).toHaveText('busy');
+    await expect(page.locator('.f1-done')).toHaveCount(0);
+    await expect(page.locator('.f1-count')).toHaveText(['1', '1']);
+    await expect(page.locator('.f1-kid-n')).toHaveText(['7', '7']);
+    await expect(page.locator('.f1-empty')).toHaveText('none');
+
+    await setProbe(page, 'f1', 'loading', false);
+    await expect(page.locator('.f1-busy')).toHaveCount(0);
+    await expect(page.locator('.f1-done')).toHaveText('done');
+    await setProbe(page, 'f1', 'count', 2);
+    await expect(page.locator('.f1-count')).toHaveText(['2', '2']);
+    await setProbe(page, 'f1', 'rows', [1, 2]);
+    await expect(page.locator('.f1-row')).toHaveText(['1', '2']);
+    await expect(page.locator('.f1-empty')).toHaveCount(0);
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
+test.describe('fragments another module exports', () => {
+  test('F2 a static one is written out; one with bindings is mounted at the top, in a branch and in rows', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 'f2');
+    await expect(page.locator('.f2-static')).toHaveText('static');
+    await expect(page.locator('.f2-badge')).toHaveText(['calm', 'calm', 'calm']);
+    await expect(page.locator('.f2-kid-n')).toHaveText(['3', '3', '3']);
+    await expect(page.locator('.f2-tag')).toHaveText(['a', 'b']);
+
+    await setProbe(page, 'f2', 'tone', 'loud');
+    await expect(page.locator('.f2-badge')).toHaveText(['loud', 'loud', 'loud']);
+    await expect(page.locator('.f2-top .f2-badge')).toHaveAttribute('data-tone', 'loud');
+    await setProbe(page, 'f2', 'tags', ['c']);
+    await expect(page.locator('.f2-tag')).toHaveText(['c']);
+
+    await setProbe(page, 'f2', 'open', false);
+    await expect(page.locator('.f2-tags')).toHaveCount(0);
+    await setProbe(page, 'f2', 'open', true);
+    await expect(page.locator('.f2-tag')).toHaveText(['c']);
+
+    await setProbe(page, 'f2', 'rows', [2]);
+    await expect(page.locator('.f2-row .f2-badge')).toHaveCount(1);
+    await setProbe(page, 'f2', 'tone', 'calm');
+    await expect(page.locator('.f2-badge')).toHaveText(['calm', 'calm']);
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
 test.describe('a keyed list reordered while a row goes', () => {
   test('R1 the rows stay before the list anchor, so a later append goes last', async ({ page }) => {
     const probe = await mountProbe(page, 'r1');

@@ -236,7 +236,8 @@ export const collectWhenElseBlocks = (
 
   for (const binding of parsed.bindings) {
     if (binding.type !== 'whenElse') continue;
-    if (!binding.jsExpression || !binding.thenTemplate || !binding.elseTemplate) continue;
+    // A branch may be empty (html``): it shows nothing
+    if (!binding.jsExpression || binding.thenTemplate === undefined || binding.elseTemplate === undefined) continue;
 
     const rewritten = rewriteExpression?.(binding.jsExpression);
     const jsExpression = rewritten ? rewritten.expression : binding.jsExpression;

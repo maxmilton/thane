@@ -71,6 +71,22 @@ function extractHtmlTemplateContent(arg: string): string {
   return arg;
 }
 
+/** What the signal detector knows of the names a component's templates see (see template-scope.ts) */
+export interface TemplateScope {
+  /** Whether the name is a function the component declares (not a signal) */
+  isFunction(name: string): boolean;
+  /** The signals such a function reads, its helpers' included */
+  readsOf(name: string): string[];
+}
+
+/** The scope of the component being compiled; the component compiler sets it around its compile */
+let templateScope: TemplateScope | undefined;
+
+/** Set the scope the signal detector resolves names in, for the component being compiled (undefined after it) */
+export const setTemplateScope = (scope: TemplateScope | undefined): void => {
+  templateScope = scope;
+};
+
 export function extractSignalsFromExpression(expression: string): string[] {
   const signals: string[] = [];
   const sourceFile = ts.createSourceFile(
@@ -82,7 +98,16 @@ export function extractSignalsFromExpression(expression: string): string[] {
   );
 
   const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && node.arguments.length === 0) {
+    // A function of the component is not a signal: the binding follows the signals it reads
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      templateScope?.isFunction(node.expression.text)
+    ) {
+      for (const signal of templateScope.readsOf(node.expression.text)) {
+        if (!signals.includes(signal)) signals.push(signal);
+      }
+    } else if (ts.isCallExpression(node) && node.arguments.length === 0) {
       // `count()` reads a signal in scope; `props.count()` reads a signal passed as a prop
       const callee = node.expression;
       const signalName = ts.isIdentifier(callee)
@@ -438,7 +463,8 @@ export function findBindingsInText(
     if (insideComplex || isEscaped(text, pos)) continue;
 
     const signalName = match[1];
-    if (!signalName) continue;
+    // A function of the component is an expression: the loop below follows the signals it reads
+    if (!signalName || templateScope?.isFunction(signalName)) continue;
 
     bareSignalPositions.push({ start: pos, end: pos + match[0].length });
 
@@ -502,7 +528,8 @@ export function findBindingsInAttributes(
   ): void => {
     const signals = extractSignalsFromExpression(expr.expression);
     if (signals.length === 0 && !options?.detectNonSignalBindings) return;
-    const bareSignal = signals.length > 0 ? expr.expression.match(/^\s*(\w+)\(\)\s*$/) : null;
+    const bareMatch = signals.length > 0 ? expr.expression.match(/^\s*(\w+)\(\)\s*$/) : null;
+    const bareSignal = bareMatch && !templateScope?.isFunction(bareMatch[1]!) ? bareMatch : null;
     bindings.push({
       element,
       type,

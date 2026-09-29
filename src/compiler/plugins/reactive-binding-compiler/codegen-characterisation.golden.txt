@@ -127,7 +127,6 @@
     const _ws_b0 = _r.lastChild.previousSibling;
     const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, outer, `<section><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></section>`, (_c) => {
-      const _a_b8 = _c.lastChild.lastChild;
       const _ws_b1 = _c.firstChild;
       const _we_b1 = _ws_b1.nextSibling;
       const _ws_b3 = _we_b1.nextSibling;
@@ -135,6 +134,7 @@
       const _ws_b5 = _we_b3.nextSibling;
       const _wm_b5 = _ws_b5.nextSibling;
       const _we_b5 = _wm_b5.nextSibling;
+      const _a_b8 = _c.lastChild.lastChild;
       const _rsubs_b8 = [];
       { const _subs = _rsubs_b8;
       const _tc_b8 = __tpl_b8.content.firstElementChild;
@@ -187,7 +187,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b8 = __T(`<li></li>`);
 === nested: expression bindings inside a when and a whenElse branch ===
 --- template
@@ -240,7 +239,6 @@
     const _wm_b0 = _ws_b0.nextSibling;
     const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [mode], () => mode(), `<div><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
-      const _a_b8 = _c.lastChild.lastChild;
       const _ws_b2 = _c.firstChild;
       const _we_b2 = _ws_b2.nextSibling;
       const _ws_b4 = _we_b2.nextSibling;
@@ -248,6 +246,7 @@
       const _ws_b5 = _we_b4.nextSibling;
       const _wm_b5 = _ws_b5.nextSibling;
       const _we_b5 = _wm_b5.nextSibling;
+      const _a_b8 = _c.lastChild.lastChild;
       const _rsubs_b8 = [];
       { const _subs = _rsubs_b8;
       const _tc_b8 = __tpl_b8.content.firstElementChild;
@@ -328,7 +327,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<!----><!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b8 = __T(`<li></li>`);
   const __tpl_b11 = __T(`<li></li>`);
 === nested: whenElse inside a whenElse branch inside a when ===
@@ -442,7 +440,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b1 = __T(`<li><!----><!----></li>`);
 === walkers: text only inside a whenElse branch list (no comment factory) ===
 --- template
@@ -489,7 +486,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<!----><!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b2 = __T(`<li><!----> <!----> <!----> <!----></li>`);
 === walkers: events in a when, in a whenElse inside a when, and in rows ===
 --- template
@@ -505,11 +501,10 @@
     const _a_b12 = _ns[0].lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><button>1</button><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
       const b8 = _c.firstElementChild;
-      const _a_b5 = _c.lastChild.lastChild;
       const _ws_b1 = b8.nextSibling;
       const _wm_b1 = _ws_b1.nextSibling;
       const _we_b1 = _wm_b1.nextSibling;
-      b8.addEventListener('click', one);
+      const _a_b5 = _c.lastChild.lastChild;
       const _rsubs_b5 = [];
       { const _subs = _rsubs_b5;
       const _tc_b5 = __tpl_b5.content.firstElementChild;
@@ -538,6 +533,7 @@
       _subs.push(typeof _rsrc_b5_0?.subscribe === 'function' ? _rsrc_b5_0.subscribe(() => { _rc_b5.reconcile(_items_b5()); }, true) : () => {});
       _subs.push(() => _rc_b5.clearAll());
       }
+      b8.addEventListener('click', one);
       return [
         __bindIfExpr(_ws_b1, _wm_b1, [b], () => b(), `<b>2</b>`, (_c) => {
       const b3 = _c;
@@ -589,7 +585,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<!----><!----><ul><!----></ul><!----><!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b5 = __T(`<li><!----><!----></li>`);
   const __tpl_b12 = __T(`<li><!----><!----></li>`);
 === walkers: a list only inside a whenElse inside a when (prototype caches) ===
@@ -640,7 +635,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b3 = __T(`<li></li>`);
 === walkers: a list only inside a when inside a whenElse (prototype caches) ===
 --- template
@@ -690,7 +684,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<!----><!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b3 = __T(`<li></li>`);
 === walkers: no list anywhere (no prototype caches) ===
 --- template
@@ -740,7 +733,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
 === rows: direct child component with index, empty template and key function ===
 --- template
 <ul><!--b0.--></ul>
@@ -766,7 +758,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
 === rows: direct child component over a derived source ===
 --- template
 <ul><!--b0.--></ul>
@@ -791,7 +782,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
 === rows: template rows, no key, empty template ===
 --- template
 <ul><!--b0.--></ul>
@@ -824,7 +814,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li></li>`);
 === rows: template rows over a derived source with an empty template and key property ===
 --- template
@@ -860,7 +849,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li></li>`);
 === rows: template rows over a member source ===
 --- template
@@ -891,7 +879,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li title=""></li>`);
 === rows: no bindings, no key, no empty template ===
 --- template
@@ -916,7 +903,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li>static</li>`);
 === rows: no bindings, empty template and key property ===
 --- template
@@ -944,7 +930,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li>static</li>`);
 === rows: no bindings over a derived source, key function ===
 --- template
@@ -971,7 +956,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li>static</li>`);
 === rows: no bindings with a child mount and a named index ===
 --- template
@@ -997,7 +981,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><x-kid></x-kid></li>`);
 === rows: no bindings with a child mount, empty template ===
 --- template
@@ -1026,7 +1009,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><x-kid></x-kid></li>`);
 === rows: bindings with two child mounts ===
 --- template
@@ -1060,7 +1042,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><span></span><x-kid></x-kid><x-other></x-other></li>`);
 === mounts: child mount inside a when ===
 --- template
@@ -1071,8 +1052,8 @@
     const _ws_b0 = _r.lastChild.previousSibling;
     const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><x-kid></x-kid><b><!----> <!----></b></div>`, (_c) => {
-      const _cm0 = _c.firstElementChild;
       const b1 = _c.lastChild.firstChild.nextSibling;
+      const _cm0 = _c.firstElementChild;
       b1.data = t() ?? '';
       return [
         t.subscribe(v => { b1.data = v ?? ''; }, true),
@@ -1152,7 +1133,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li class="" data-id=""><a></a><span></span></li>`);
 === rows: comment-marker item bindings ===
 --- template
@@ -1186,7 +1166,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><!----> <!----> and <!----> <!----><b></b> tail</li>`);
 === rows: delegated and non-delegatable events ===
 --- template
@@ -1221,7 +1200,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><a></a><button>x</button><input></li>`);
 === rows: non-delegatable events on elements without bindings ===
 --- template
@@ -1253,7 +1231,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><em>e</em><i>k</i></li>`);
 === rows: index bindings ===
 --- template
@@ -1287,7 +1264,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li data-i=""><!----> <!---->: <!----> <!----></li>`);
 === rows: selection binding and mixed signal-item bindings ===
 --- template
@@ -1326,7 +1302,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li class=""><span></span><b title=""></b></li>`);
 === rows: signal attr, style and text bindings next to item comment bindings ===
 --- template
@@ -1365,7 +1340,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li title="" style="color: "><b></b> and <!----> <!----> <!----> <!----></li>`);
 === rows: signal text binding without item comment bindings ===
 --- template
@@ -1400,7 +1374,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><b></b><i><!----> <!----></i> <!----> <!----></li>`);
 === rows: expression signal bindings over several signals ===
 --- template
@@ -1441,7 +1414,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li title="-" style="height: px"><b></b><i><!----> <!----> <!----> <!----></i></li>`);
 === rows: signal bindings on the row element itself ===
 --- template
@@ -1476,7 +1448,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li class="" style="top: "></li>`);
 === rows: when simple and expression, whenElse, with row signals ===
 --- template
@@ -1552,7 +1523,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><!----><!----><!----><!----><!----><!----><!----></li>`);
 === rows: delegated events and a selection binding after row directives ===
 --- template
@@ -1597,7 +1567,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><!----><!----><!----><!----><!----><a>go</a><i class="">i</i></li>`);
 === rows: row-level when with several bindings on one signal ===
 --- template
@@ -1641,7 +1610,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><!----><!----></li>`);
 === nested rows: element, comment and signal bindings ===
 --- template
@@ -1702,7 +1670,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><span></span><ol><!----></ol></li>`);
   const __tpl_b1 = __T(`<li class=""><b></b> x <!----> <!----> <i title="" style="color: "><!----> <!----></i></li>`);
 === nested rows: signal text without item comment bindings, key property ===
@@ -1757,7 +1724,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><ol><!----></ol></li>`);
   const __tpl_b1 = __T(`<li><b></b><i><!----> <!----></i> <!----> <!----></li>`);
 === nested rows: expression signal bindings and bindings on the inner row element ===
@@ -1813,7 +1779,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><ol><!----></ol></li>`);
   const __tpl_b1 = __T(`<li title="-" style="left: "><i><!----> <!----></i></li>`);
 === nested rows: no bindings, driven by a component signal ===
@@ -1859,7 +1824,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><span></span><ol><!----></ol></li>`);
   const __tpl_b1 = __T(`<li>static</li>`);
 === nested rows: only comment-marker item bindings ===
@@ -1913,7 +1877,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li><ol><!----></ol></li>`);
   const __tpl_b1 = __T(`<li><!----> <!----> and <!----> <!----></li>`);
 === escaping: backslash, backtick and newline in row, branch and main templates (dev) ===
@@ -1971,7 +1934,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<p title="a\b">\`q\` <!----> <!----></p><ul><!----></ul><ol><!----></ol><!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b1 = __T(`<li title="c\d"><!----> <!----> e\f</li>`);
   const __tpl_b3 = __T(`<li>s\t</li>`);
 === escaping: the same templates, production ===
@@ -2029,7 +1991,6 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<p title="a\b">\`q\` <!----> <!----></p><ul><!----></ul><ol><!----></ol><!----><!---->`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b1 = __T(`<li title="c\d"><!----> <!----> e\f</li>`);
   const __tpl_b3 = __T(`<li>s\t</li>`);
 === production: nested rows, row directives and a child mount ===
@@ -2092,6 +2053,5 @@
     return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };
 --- static templates
   const __tpl = __T(`<ul><!----></ul>`);
-  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;
   const __tpl_b0 = __T(`<li class="row"><!----><!----><ol><!----></ol><m-5></m-5></li>`);
   const __tpl_b3 = __T(`<li></li>`);

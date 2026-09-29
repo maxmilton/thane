@@ -12,10 +12,11 @@ export type { HtmlElement, BindingInfo, ParsedTemplate } from './types.js';
 export { parseHtmlTemplate } from './parser-core.js';
 
 // Binding detection
-export type { BindingDetectionOptions } from './binding-detection.js';
+export type { BindingDetectionOptions, TemplateScope } from './binding-detection.js';
 export {
   findTemplateExpressions,
   extractSignalsFromExpression,
+  setTemplateScope,
   stripTemplateExpressions,
 } from './binding-detection.js';
 

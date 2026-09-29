@@ -11,7 +11,7 @@
  */
 import path from 'node:path';
 import ts from 'typescript';
-import { sourceCache } from '../../utils/index.js';
+import { safeReadFile, sourceCache } from '../../utils/index.js';
 import { collectModuleGraph, createModuleResolver, type ModuleResolver } from '../../utils/module-graph.js';
 import {
   headTagHtml,
@@ -40,10 +40,14 @@ export interface RouteTableHead {
   /** The site's meta, as far as it is static */
   site: Record<string, unknown>;
   custom: Record<string, CustomFieldSource>;
-  /** Every route but notFound; `meta` is null when the route computes it (a function) */
+  /** Every route but notFound and error; `meta` is null when the route computes it (a function) */
   routes: Array<{ path: string; meta: Record<string, unknown> | null }>;
   /** True when anything beyond a route title is used, or cannot be told */
   usesHead: boolean;
+  /** True when a route has `canEnter` or `redirectTo`, or when that cannot be told */
+  usesGuards: boolean;
+  /** True when a route has a `search` schema, or when that cannot be told */
+  usesSearch: boolean;
   /** What could not be read, for a verbose note */
   notes: string[];
 }
@@ -357,6 +361,8 @@ export const readRouteTableHeads = async (
     const notes: string[] = [];
     const [routesArg, optionsArg] = call.arguments;
     let usesHead = optionsArg !== undefined;
+    let usesGuards = false;
+    let usesSearch = false;
     let site: Record<string, unknown> = {};
     let custom: Record<string, CustomFieldSource> = {};
     const options = optionsArg && unwrap(optionsArg);
@@ -389,12 +395,14 @@ export const readRouteTableHeads = async (
     const table = routesArg && unwrap(routesArg);
     if (!table || !ts.isObjectLiteralExpression(table)) {
       usesHead = true; // cannot tell
-      tables.push({ file, site, custom, routes, usesHead, notes });
+      tables.push({ file, site, custom, routes, usesHead, usesGuards: true, usesSearch: true, notes });
       continue;
     }
     for (const property of table.properties) {
       if (!ts.isPropertyAssignment(property)) {
         usesHead = true;
+        usesGuards = true;
+        usesSearch = true;
         continue;
       }
       const routePath = propertyName(property.name);
@@ -402,12 +410,18 @@ export const readRouteTableHeads = async (
       const route = unwrap(property.initializer);
       if (!ts.isObjectLiteralExpression(route)) {
         usesHead = true;
-        if (routePath !== 'notFound') routes.push({ path: routePath, meta: null });
+        usesGuards = true;
+        usesSearch = true;
+        if (routePath !== 'notFound' && routePath !== 'error') routes.push({ path: routePath, meta: null });
         continue;
       }
       let meta: Record<string, unknown> | null = {};
       for (const routeProperty of route.properties) {
-        if (!ts.isPropertyAssignment(routeProperty) || propertyName(routeProperty.name) !== 'meta') continue;
+        // A guard or a redirect, or a property that cannot be read (a spread): the router keeps its guard step
+        const name = ts.isSpreadAssignment(routeProperty) ? null : propertyName(routeProperty.name);
+        if (name === null || name === 'canEnter' || name === 'redirectTo') usesGuards = true;
+        if (name === null || name === 'search') usesSearch = true;
+        if (!ts.isPropertyAssignment(routeProperty) || name !== 'meta') continue;
         const init = unwrap(routeProperty.initializer);
         if (ts.isObjectLiteralExpression(init)) {
           const unknownKeys: string[] = [];
@@ -424,9 +438,9 @@ export const readRouteTableHeads = async (
           if (meta === null) notes.push(`${routePath}: its meta is computed, applied in the browser only`);
         }
       }
-      if (routePath !== 'notFound') routes.push({ path: routePath, meta });
+      if (routePath !== 'notFound' && routePath !== 'error') routes.push({ path: routePath, meta });
     }
-    tables.push({ file, site, custom, routes, usesHead, notes });
+    tables.push({ file, site, custom, routes, usesHead, usesGuards, usesSearch, notes });
   }
   return tables;
 };
@@ -516,16 +530,44 @@ export const routePages = (html: string, table: RouteTableHead): Array<{ file: s
  * The route tables the entry points reach, and whether the app needs head support: another app's
  * routes elsewhere in the project change nothing in this one.
  */
+/**
+ * Whether markup holds a plain link to what may be a route: an `<a>` without a click handler of its own
+ * whose `href` is a path (`/about`, `./x`) or an expression, which the router's link handling follows in
+ * the app. An `href` to another site, `mailto:` or `#` never is. A tag that the scan cuts short (a `>`
+ * inside an expression) may be missed; such a link then loads the page, as without the link handling.
+ */
+export const hasPlainLink = (markup: string): boolean => {
+  for (const [tag] of markup.matchAll(/<a\s[^>]*>/gi)) {
+    if (/\shref\s*=\s*["']?(\/(?!\/)|\.{1,2}\/|\$\{)/i.test(tag) && !/\s@click\b/.test(tag)) return true;
+  }
+  return false;
+};
+
 export const routeTablesOf = async (
   entryPoints: string[],
   projectRoot: string,
-): Promise<{ tables: RouteTableHead[]; usesHead: boolean }> => {
+  htmlFile?: string,
+): Promise<{
+  tables: RouteTableHead[];
+  usesHead: boolean;
+  usesGuards: boolean;
+  usesLinks: boolean;
+  usesSearch: boolean;
+}> => {
   const resolve = createModuleResolver(projectRoot);
   const tables: RouteTableHead[] = [];
   let usesSetMeta = false;
+  let usesLinks = htmlFile !== undefined && hasPlainLink((await safeReadFile(htmlFile)) ?? '');
   for (const file of await collectModuleGraph(entryPoints, resolve)) {
     tables.push(...(await readRouteTableHeads(file, resolve)));
     if (await importsSetMeta(file)) usesSetMeta = true;
+    if (!usesLinks) usesLinks = hasPlainLink((await sourceCache.get(file))?.source ?? '');
   }
-  return { tables, usesHead: usesSetMeta || tables.some((table) => table.usesHead) };
+  return {
+    tables,
+    usesHead: usesSetMeta || tables.some((table) => table.usesHead),
+    usesGuards: tables.some((table) => table.usesGuards),
+    usesLinks,
+    usesSearch: tables.some((table) => table.usesSearch),
+  };
 };

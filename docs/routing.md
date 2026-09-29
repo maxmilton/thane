@@ -26,7 +26,7 @@ Each route consists of:
 | `component` | `() => Promise<any>` \| `ComponentHTMLSelector` | Lazy loader or eager component                                               |
 | `meta`      | fields \| `(route) => fields` _(optional)_      | The document head while the route is active: see [Route Heads](#route-heads) |
 
-The `notFound` route is **required** — it renders when no other route matches. Route patterns starting with `/:param` (root-level parameters) are rejected at runtime.
+The `notFound` route is **required** — it renders when no other route matches. An `error` route is optional: it renders when a page cannot be shown (see [The Error Route](#the-error-route)). Route patterns starting with `/:param` (root-level parameters) are rejected at runtime.
 
 ## Bootstrap Modes
 
@@ -84,6 +84,30 @@ No shell component. Page components render directly into `document.body` (or a `
 
 ## Navigation
 
+### Links
+
+A plain link to one of the app's routes navigates in the app: the router takes the click, so the page is not
+loaded again, and the link keeps everything a link does (open in a new tab, copy the address, a crawler
+follows it).
+
+```typescript
+template: html`
+  <a href="/">Home</a>
+  <a href=${href('/users/:id', { id: user.id })}>${user.name}</a>
+`;
+```
+
+The browser keeps these clicks:
+- a click that a handler of the link has already taken (`@click.prevent=${…}`);
+- a click with a modifier key or another mouse button (a new tab or window);
+- a link with a `target` other than `_self`, a `download`, or `rel="external"`;
+- a link to another site, or to a `#hash` on this page;
+- a link to a path that no route has, such as a file (`/sitemap.xml`, `/report.pdf`): it loads as usual.
+
+A production build leaves the link handling out when no template, and no `index.html`, has a plain link
+to a path (an `<a href>` without its own click handler); an app that has one pays about 565 B raw, 220 B
+gzipped.
+
 ### `navigate(path)`
 
 Navigate programmatically using HTML5 History pushState:
@@ -93,7 +117,7 @@ navigate('/about');
 navigate('/users/42');
 ```
 
-In templates, bind directly to click handlers:
+In templates, a [link](#links) is usually the better choice; to navigate from a click on something else, bind it directly:
 
 ```typescript
 template: html`
@@ -137,6 +161,37 @@ A read-only signal containing the current pathname. Use it for active link styli
 template: html` <a class=${currentPath() === '/' ? 'active' : ''} @click=${navigate('/')}>Home</a> `;
 ```
 
+## Redirects and Guards
+
+A route can send its path elsewhere with `redirectTo`, or decide with `canEnter` whether it may be entered.
+Both run before the page's chunk is fetched.
+
+```typescript
+const Routes = defineRoutes({
+  '/old-about': { redirectTo: '/about' },
+  '/members/:id': { redirectTo: (route) => `/users/${route.params.id}` },
+  '/account': { component: () => import('./pages/account.js'), canEnter: () => signedIn() || '/login' },
+  '/admin': { component: () => import('./pages/admin.js'), canEnter: async () => (await session()).isAdmin },
+  // …
+});
+```
+
+- **`redirectTo`** is a path, or a function of the route that returns one. The redirect replaces the history
+  entry, so the redirected path is not in the history and back goes past it. A redirect route has no page, head or
+  guard of its own.
+- **`canEnter(route)`** gets the route about to load (its `pattern`, `params`, `searchParams`) and returns:
+  - `true` to enter;
+  - a path to go there instead, as a redirect;
+  - `false` to stay on the page on screen: the address bar shows its URL again. On the first load there is no
+    page on screen, so the `notFound` route is shown.
+
+  It may be async; a navigation started while it runs wins, as for a slow chunk.
+- Both paths are typed as `RoutePaths`: a path that is no route is a type error.
+- A loop of redirects stops after 10 in a row, with an error in the console.
+
+A production build leaves this step out of the router when no route has `canEnter` or `redirectTo` (the build
+reads the route table); an app that uses them pays about 530 B raw, 185 B gzipped.
+
 ## Route Parameters
 
 Define parameters with `:param` syntax:
@@ -160,6 +215,50 @@ export const UserPage = defineComponent('user-page', ({ route }) => {
 
 Parameters are decoded: `/users/ada%20lovelace` gives `id` the value `ada lovelace`. A segment that is not valid percent-encoding (`/users/100%`) is kept as written.
 
+## Search Parameters
+
+A route declares the query parameters its page reads in a `search` schema: each name with a parser. The page
+reads the parsed values on `route.search`, typed from the schema.
+
+```typescript
+import { defineRoutes, searchFlag, searchNumber, searchOneOf, searchString } from 'thane/router';
+
+'/products': {
+  component: () => import('./pages/products.js'),
+  search: {
+    page: searchNumber(1), // number: 1 when missing or not a number
+    q: searchString(), // string | undefined
+    sale: searchFlag(), // boolean: true for ?sale or ?sale=1
+    sort: searchOneOf(['price', 'name'], 'name'), // 'price' | 'name'
+    tags: (raw): string[] => raw?.split(',') ?? [], // any parser: typed from its return type annotation
+  },
+},
+
+// pages/products.ts: /products?page=2&sort=price
+const { page, sort } = route!.search; // 2, 'price'
+```
+
+| Helper                        | Value                                                                |
+| :---------------------------- | :------------------------------------------------------------------- |
+| `searchString(fallback?)`     | the value, or `fallback` when the URL has none                       |
+| `searchNumber(fallback?)`     | the value as a number, or `fallback` when missing or not a number    |
+| `searchFlag()`                | `true` when present, `false` when missing, `0` or `false`            |
+| `searchOneOf(values, fallback?)` | one of `values`, or `fallback` for anything else                  |
+
+A parser gets the raw value, or `undefined` when the URL has none; any function of that shape works. Without a
+fallback, a helper's value may be `undefined`. `route.searchParams` still holds every query parameter, raw.
+
+`href()` and `navigate()` take the declared values next to the path parameters and write them into the query:
+
+```typescript
+href('/products', { page: 2, sale: true }); // '/products?page=2&sale='
+navigate('/users/:id', { id: user.id, tab: 'posts' }); // if /users/:id declares tab
+```
+
+A flag that is on is written as its bare name, and one that is off, or a value that is `undefined`, is left
+out. A value the schema does not declare is a type error. A production build leaves the parsing and the writing
+out when no route has a `search` schema.
+
 ## Route Context
 
 Every component has access to route context via `ctx.route`:
@@ -170,9 +269,11 @@ Every component has access to route context via `ctx.route`:
 | `pattern`      | `string`                 | Matched route pattern (e.g., `/users/:id`) |
 | `params`       | `Record<string, string>` | Extracted route parameters                 |
 | `searchParams` | `URLSearchParams`        | URL query parameters                       |
+| `search`       | typed from the schema    | The route's [search parameters](#search-parameters), parsed |
 | `hash`         | `string`                 | URL hash fragment                          |
 | `title`        | `string`                 | The document title the route's head set    |
 | `state`        | `unknown`                | History state object                       |
+| `error`        | `unknown`                | On the error route: what failed            |
 
 The context is captured when the route mounts. A navigation that changes the pathname or the query mounts the route again, so a fresh instance reads the new `params` and `searchParams`; a navigation that changes only the hash keeps the current instance, and `hash` is not updated on it.
 
@@ -324,7 +425,26 @@ The URL and `currentPath()` change as soon as a navigation starts, so an active 
 
 - **A newer navigation cancels an older one.** If the user clicks another link while a chunk is still loading, only the latest page mounts; the overtaken one never appears.
 - **Going back to the page on screen keeps it.** If the user returns (back button, or the same link) before the next page has arrived, the load is cancelled and the current page is not re-created, so its state survives.
-- **A chunk that fails to load** is reported with `console.error` and the outlet is left empty; the router stays usable and other pages still load. Browsers remember a failed module import for the life of the document, so that one page needs a reload to recover.
+- **A chunk that fails to load**, or a page component that throws while it mounts, is reported with `console.error`, and the error route is shown in its place (the outlet is left empty without one). The router stays usable and other pages still load. Browsers remember a failed module import for the life of the document, so that one page needs a reload to recover.
+
+### The Error Route
+
+An `error` route next to `notFound` is shown when a page's chunk fails to load (the network dropped, a deploy replaced the chunk) or its component throws while mounting. The URL stays the failed page's; the error route's head applies, and its page receives what failed as `route.error`:
+
+```typescript
+// routes.ts
+error: { component: () => import('./pages/error.js'), meta: { title: 'Something went wrong' } },
+
+// pages/error.ts
+export const ErrorPage = defineComponent('error-page', ({ route }) => {
+  const message = route!.error instanceof Error ? route!.error.message : String(route!.error);
+  return {
+    template: html`<p>${message}</p><button @click=${() => location.reload()}>Reload</button>`,
+  };
+});
+```
+
+A reload is the way back from a failed chunk, because the browser keeps the failed import. `error` is not a path: `navigate('error')` is a type error, and a build writes no page for it.
 
 ## Scroll Restoration
 
@@ -388,7 +508,7 @@ Thane generates type definitions for your routes automatically. After running `t
 3. Reject invalid paths at compile time
 4. Type the patterns and parameters of `href()` and `navigate(pattern, params)`
 
-The types are generated at the start of every build, and by `thane types`, from your `defineRoutes()` call. Include `.thane/types` in your `tsconfig.json` so your editor sees them (see [Getting Started](getting-started.md#installation)).
+The types are generated at the start of every build, and by `thane types`, from your `defineRoutes()` call. A project with several route tables, such as two apps that share one `tsconfig.json`, gets one entry per table, keyed by its file: `navigate()` accepts the paths of all of them. Include `.thane/types` in your `tsconfig.json` so your editor sees them (see [Getting Started](getting-started.md#installation)).
 
 To type a variable or prop that holds a navigation target, use `RoutePaths`:
 

@@ -4,38 +4,24 @@ This page documents current constraints, browser requirements, and by-design dec
 
 ## Compiler Constraints
 
-### One Component Per File
+### `html` Templates Inside Others
 
-Only one `defineComponent()` call is allowed per file (THANE407). The compiler processes the entire file as a single component unit — multiple calls cause silent skipping.
+An `html` template inside another is compiled where it is the whole `${…}` or a directive argument. In a ternary or a `map()` it would be a plain value (THANE404): use `whenElse()` and `repeat()`.
 
-### No Nested `html` Tags
+### Unique Selectors
 
-`html` tagged templates cannot be nested inside other `html` templates (THANE404). Inner templates must be extracted to `const` variables:
+A component's selector is the class of its host element, which scopes its styles. Two components of an app with one selector (two components declared under one name, each with a derived selector) share it: the styles of the one registered first apply to both. The build reports them (THANE013). Give one of them another name or an explicit selector. A child component call, `${Card({ … })}`, is resolved through the file's own declarations and imports, so two components with one name in different files are never confused for each other.
 
-```typescript
-// ❌ Not allowed
-template: html`<div>${html`<span>nested</span>`}</div>`;
-
-// ✅ Allowed
-const inner = html`<span>nested</span>`;
-template: html`<div>${inner}</div>`;
-```
-
-Templates inside directive callbacks (`repeat`, `whenElse`) are the exception — these are processed independently.
-
-### Template Variables Must Be Local
-
-`html` template variables used inside `defineComponent()` must be defined in the same file (THANE410). The compiler resolves templates via AST analysis and cannot process imported variables. CSS imports are unaffected.
-
-### Unique Component Names
-
-The compiler recognises a child component call, `${Card({ … })}`, by the component's export name, over every component in the working directory and the project. Two components exported under the same name collide: the last one found wins, and its selector names the host element of both. A function called in a template with the name of a component defined elsewhere is taken for that component too. Give every component a unique export name.
-
-A component file added while `thane dev` is running is recognised as a child component only after `thane dev` is restarted.
 
 ### One Return Object per Setup
 
 A setup function returns one object (THANE412). The compiler builds one static template per component, so an early `return { template: … }` in a branch cannot work. Use `when()` or `whenElse()` in the template instead.
+
+### Hot Updates Swap Whole Components
+
+`thane dev` swaps a changed component file in the open page, but a swapped component starts again: its own signals
+start from their initial values (its stores, and the rest of the page, keep theirs). A change to any other module
+reloads the page.
 
 ### `const` Required for Components and Templates
 
@@ -149,7 +135,6 @@ These features are **not currently supported**:
 | Context / Provide / Inject        | Not available — use module-level signals for shared state   |
 | Async component setup             | Not supported — use `onMount` for async work                |
 | Multiple router instances         | Not supported — single-instance only                        |
-| Route guards / middleware         | Not built-in                                                |
 | Animated route transitions        | Not built-in                                                |
 
 ## Production Build Behavior

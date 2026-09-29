@@ -17,6 +17,7 @@ Options:
   --entry <path>      Custom entry point (default: ./src/main.ts)
   --out <dir>         Output directory (default: ./dist)
   --assets <dir>      Assets directory (default: ./src/assets)
+  --public <dir>      Folder copied to the root of the output (default: ./public)
   --html <path>       Root HTML file (default: ./index.html)
   --config <path>     Path to thane config file (default: ./thane.config.json or .jsonc)
   --drop-console      Strip console.* calls from the bundle (default: on in prod)

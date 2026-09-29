@@ -1,7 +1,7 @@
 /**
  * Lint rule unit tests
  *
- * Tests all 12 Thane lint rules (THANE400–THANE411) by parsing
+ * Tests the Thane lint rules THANE400–THANE411 (THANE406, THANE407 and THANE410 are retired) by parsing
  * source strings into TS ASTs and running each rule's check function.
  */
 
@@ -20,10 +20,8 @@ import {
   requireConstTaggedTemplates,
   noNestedHtmlTags,
   noConditionalTemplateInit,
-  singleComponentPerFile,
   componentConstDeclaration,
   noAliasedComponentExport,
-  noCrossFileHtmlTemplate,
   duplicateMountTarget,
 } from './rules/index.js';
 
@@ -199,9 +197,16 @@ describe('THANE404 — no-nested-html-tags', () => {
     expect(noNestedHtmlTags.check(parse(src), 'test.ts')).toEqual([]);
   });
 
-  test('fails with directly nested html template', () => {
+  test('passes with an html template that is the whole ${}', () => {
     const src = `export const A = defineComponent(() => ({
       template: html\`<div>\${html\`<span>nested</span>\`}</div>\`,
+    }));`;
+    expect(noNestedHtmlTags.check(parse(src), 'test.ts')).toEqual([]);
+  });
+
+  test('fails with an html template in a ternary', () => {
+    const src = `export const A = defineComponent(() => ({
+      template: html\`<div>\${show() ? html\`<span>nested</span>\` : ''}</div>\`,
     }));`;
     const d = noNestedHtmlTags.check(parse(src), 'test.ts');
     expect(d).toHaveLength(1);
@@ -234,37 +239,6 @@ describe('THANE405 — no-conditional-template-init', () => {
     const d = noConditionalTemplateInit.check(parse(src), 'test.ts');
     expect(d).toHaveLength(1);
     expect(codes(d)).toEqual([ErrorCode.NO_CONDITIONAL_TEMPLATE_INIT]);
-  });
-});
-
-// ============================================================================
-// THANE407 — single-component-per-file
-// ============================================================================
-
-describe('THANE407 — single-component-per-file', () => {
-  test('passes with one component per file', () => {
-    const src = `export const MyApp = defineComponent(() => ({ template: html\`<div/>\` }));`;
-    expect(singleComponentPerFile.check(parse(src), 'test.ts')).toEqual([]);
-  });
-
-  test('fails with two components in one file', () => {
-    const src = `
-      export const Foo = defineComponent(() => ({ template: html\`<div/>\` }));
-      export const Bar = defineComponent(() => ({ template: html\`<span/>\` }));
-    `;
-    const d = singleComponentPerFile.check(parse(src), 'test.ts');
-    expect(d).toHaveLength(1);
-    expect(codes(d)).toEqual([ErrorCode.SINGLE_COMPONENT_PER_FILE]);
-  });
-
-  test('fails with three components — reports on each after the first', () => {
-    const src = `
-      export const A = defineComponent(() => ({ template: html\`<div/>\` }));
-      export const B = defineComponent(() => ({ template: html\`<div/>\` }));
-      export const C = defineComponent(() => ({ template: html\`<div/>\` }));
-    `;
-    const d = singleComponentPerFile.check(parse(src), 'test.ts');
-    expect(d).toHaveLength(2);
   });
 });
 
@@ -341,41 +315,6 @@ describe('THANE409 — no-aliased-component-export', () => {
   test('passes with type-only re-export of PascalCase names', () => {
     const src = `export type { ComponentRoot } from './types.js';`;
     expect(noAliasedComponentExport.check(parse(src), 'test.ts')).toEqual([]);
-  });
-});
-
-// ============================================================================
-// THANE410 — no-cross-file-html-template
-// ============================================================================
-
-describe('THANE410 — no-cross-file-html-template', () => {
-  test('passes when template variables are local', () => {
-    const src = `
-      const header = html\`<header>Title</header>\`;
-      export const A = defineComponent(() => ({
-        template: html\`\${header}<main>Content</main>\`,
-      }));
-    `;
-    expect(noCrossFileHtmlTemplate.check(parse(src), 'test.ts')).toEqual([]);
-  });
-
-  test('fails when imported variable is used in html template', () => {
-    const src = `
-      import { header } from './shared-templates.js';
-      export const A = defineComponent(() => ({
-        template: html\`\${header}<main>Content</main>\`,
-      }));
-    `;
-    const d = noCrossFileHtmlTemplate.check(parse(src), 'test.ts');
-    expect(d).toHaveLength(1);
-    expect(codes(d)).toEqual([ErrorCode.NO_CROSS_FILE_HTML_TEMPLATE]);
-  });
-
-  test('passes with no imports', () => {
-    const src = `export const A = defineComponent(() => ({
-      template: html\`<div>\${count()}</div>\`,
-    }));`;
-    expect(noCrossFileHtmlTemplate.check(parse(src), 'test.ts')).toEqual([]);
   });
 });
 

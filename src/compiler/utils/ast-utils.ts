@@ -1,7 +1,7 @@
 /** Helpers for working with the TypeScript AST. */
 
 import ts from 'typescript';
-import type { ComponentDefinition } from '../types.js';
+import type { ComponentDefinition, FragmentDefinition } from '../types.js';
 import { FN } from './constants.js';
 
 // ============================================================================
@@ -65,34 +65,17 @@ export const extractStaticValue = (arg: ts.Expression): string | number | boolea
 };
 
 /**
- * Find all signal property declarations and their initial values.
- * Supports both class property pattern (this._count = signal(0))
- * and variable pattern (const count = signal(0)).
+ * The signals declared under `root` (`const count = signal(0)`), except inside the nodes in `skip`,
+ * with their initial values where they are literals. A template's static text holds them.
  */
-export const findSignalInitializers = (sourceFile: ts.SourceFile): Map<string, string | number | boolean> => {
+export const findSignalInitializers = (
+  root: ts.Node,
+  skip?: ReadonlySet<ts.Node>,
+): Map<string, string | number | boolean> => {
   const initializers = new Map<string, string | number | boolean>();
 
   const visit = (node: ts.Node) => {
-    // Class property pattern: private _count = signal(0)
-    if (
-      ts.isPropertyDeclaration(node) &&
-      node.name &&
-      ts.isIdentifier(node.name) &&
-      node.initializer &&
-      ts.isCallExpression(node.initializer) &&
-      isSignalCall(node.initializer)
-    ) {
-      const args = node.initializer.arguments;
-      const firstArg = args[0];
-      if (args.length > 0 && firstArg) {
-        const value = extractStaticValue(firstArg);
-        if (value !== null) {
-          initializers.set(node.name.text, value);
-        }
-      }
-    }
-
-    // Variable pattern: const count = signal(0)
+    if (skip?.has(node)) return;
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
@@ -112,7 +95,7 @@ export const findSignalInitializers = (sourceFile: ts.SourceFile): Map<string, s
     ts.forEachChild(node, visit);
   };
 
-  visit(sourceFile);
+  visit(root);
   return initializers;
 };
 
@@ -132,54 +115,88 @@ export const hasHtmlTemplates = (source: string): boolean => {
 // Component Registration
 // ============================================================================
 
+/** A component declaration: `const Name = defineComponent(…)`, exported or not. */
+export interface ComponentDeclaration {
+  /** The name the component is declared under */
+  name: string;
+  exported: boolean;
+  call: ts.CallExpression;
+  statement: ts.VariableStatement;
+  /** The selector passed to `defineComponent`, or the one derived from the name */
+  selector: string;
+  /** The selector is passed to `defineComponent` */
+  explicitSelector: boolean;
+}
+
 /**
- * Extract all component definitions from a source file.
- * Supports defineComponent() pattern.
+ * Every component declaration in a file, in source order: each `const Name = defineComponent(…)` at any
+ * depth, one declared inside another's setup function too. Its selector is the string passed as the first
+ * argument, or else derived from the name it is declared under: `TodoItem` is `todo-item`.
  */
-export const extractComponentDefinitions = (sourceFile: ts.SourceFile, filePath: string): ComponentDefinition[] => {
-  const definitions: ComponentDefinition[] = [];
+export const findComponentDeclarations = (sourceFile: ts.SourceFile): ComponentDeclaration[] => {
+  const declarations: ComponentDeclaration[] = [];
 
   const visit = (node: ts.Node) => {
     if (ts.isVariableStatement(node)) {
-      const hasExport = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-      if (hasExport) {
-        for (const decl of node.declarationList.declarations) {
-          if (ts.isIdentifier(decl.name) && decl.initializer && ts.isCallExpression(decl.initializer)) {
-            const exportName = decl.name.text;
-            const call = decl.initializer;
-
-            // defineComponent pattern
-            if (isDefineComponentCall(call)) {
-              let selector: string | null = null;
-
-              // Check if first arg is a string literal (explicit selector)
-              const firstArg = call.arguments[0];
-              if (firstArg && ts.isStringLiteral(firstArg)) {
-                selector = firstArg.text;
-              } else {
-                // Auto-derive from export name
-                selector = pascalToKebab(exportName);
-              }
-
-              if (selector) {
-                definitions.push({
-                  name: exportName,
-                  selector,
-                  filePath,
-                });
-              }
-            }
-          }
-        }
+      const exported = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+      for (const decl of node.declarationList.declarations) {
+        const call = decl.initializer;
+        if (!ts.isIdentifier(decl.name) || !call || !ts.isCallExpression(call) || !isDefineComponentCall(call))
+          continue;
+        const firstArg = call.arguments[0];
+        const explicitSelector = !!firstArg && ts.isStringLiteral(firstArg);
+        declarations.push({
+          name: decl.name.text,
+          exported,
+          call,
+          statement: node,
+          selector: explicitSelector ? (firstArg as ts.StringLiteral).text : pascalToKebab(decl.name.text),
+          explicitSelector,
+        });
       }
     }
-
     ts.forEachChild(node, visit);
   };
 
   visit(sourceFile);
-  return definitions;
+  return declarations;
 };
+
+/** The components a file declares: the ones it exports, and the ones only its own templates can call. */
+export const extractComponentDefinitions = (sourceFile: ts.SourceFile, filePath: string): ComponentDefinition[] =>
+  findComponentDeclarations(sourceFile).map(({ name, selector, exported }) => ({ name, selector, filePath, exported }));
+
+/** An exported fragment: `export const Name = html\`…\`` at the top level of a module. */
+export interface FragmentDeclaration {
+  name: string;
+  template: ts.TaggedTemplateExpression;
+  statement: ts.VariableStatement;
+}
+
+/** The fragments a module exports, in source order: other files' templates can use them. */
+export const findExportedFragments = (sourceFile: ts.SourceFile): FragmentDeclaration[] => {
+  const fragments: FragmentDeclaration[] = [];
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    if (!statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      const init = decl.initializer;
+      if (ts.isIdentifier(decl.name) && init && ts.isTaggedTemplateExpression(init) && isHtmlTemplate(init)) {
+        fragments.push({ name: decl.name.text, template: init, statement });
+      }
+    }
+  }
+  return fragments;
+};
+
+/** The fragments a file exports, for the files that import them */
+export const extractFragmentDefinitions = (sourceFile: ts.SourceFile, filePath: string): FragmentDefinition[] =>
+  findExportedFragments(sourceFile).map(({ name, template }) => ({
+    name,
+    filePath,
+    exported: true,
+    staticText: ts.isNoSubstitutionTemplateLiteral(template.template) ? template.template.rawText! : null,
+  }));
 
 // ============================================================================
 // Utility Functions

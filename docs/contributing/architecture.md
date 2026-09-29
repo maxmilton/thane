@@ -17,7 +17,7 @@ src/
       tsc-type-checker/        # Type sync and TypeScript type checking at build start
     testing/                   # Shared helpers for build-through tests (not published)
     utils/                     # Shared compiler utilities (HTML parser, AST helpers, file scan, logger)
-    errors.ts                  # Diagnostic codes (THANE006–THANE012, THANE200, THANE202, THANE400–THANE413)
+    errors.ts                  # Diagnostic codes (THANE006–THANE013, THANE200, THANE202, THANE400–THANE413)
   contracts/                   # Names shared by the compiler and the runtime's compiled-output contract
     compiler/                  # Binding kinds, parser states, the code generator's result type
     runtime/                   # Runtime helper names, package entry specifiers
@@ -60,7 +60,7 @@ Unit tests sit next to the code they cover (`*.test.ts`); they are excluded from
 
 ## Compiler Pipeline
 
-`runBuild()` (`cli/build.ts`) first resolves the project root (the nearest folder above the entry with a `tsconfig.json` or `package.json`) and scans the working directory, and the project root when it lies outside it, for exported `defineComponent()` calls (`createBuildContext`, `utils/file-utils.ts`). That map of components by name is how child component calls are recognised. It is built once per `runBuild`; watch rebuilds reuse it.
+`runBuild()` (`cli/build.ts`) first resolves the project root (the nearest folder above the entry with a `tsconfig.json` or `package.json`) and scans the working directory, and the project root when it lies outside it, for exported `defineComponent()` calls (`createBuildContext`, `utils/file-utils.ts`). That map of components by name is how child component calls are recognised. A watch rebuild scans again in the component compiler's `onStart` (`refreshBuildContext`), updating the context every plugin holds; the source cache checks modification times, so only changed files are parsed again.
 
 The build is then an **esbuild plugin pipeline**, registered in this order. esbuild runs the `onStart` callbacks concurrently and waits for all of them before it loads a file, and for each file the first `onLoad` callback that returns contents wins.
 
@@ -69,18 +69,22 @@ The build is then an **esbuild plugin pipeline**, registered in this order. esbu
 3. **Component Precompiler** (`onLoad` `.ts`, label `component-compiler`) — the mount-call optimiser for files without templates; `css`-only modules; for files with `html` templates: replaces `${Child(…)}` calls with anchor comments, calls the reactive binding compiler (`transformDefineComponentSource`), compiles `css` templates and strips the `html` tags. An exception becomes the file's build error
 4. **Global CSS Bundler** (`onLoad` `.css`) — `transformCss` on the file (`:host-context`, statement at-rules, planned renames, minify in prod or strip comments in dev), exported as a string
 5. **Minification** (`onStart`, prod only) — reads the project's sources and plans selector renames into `buildContext.selectorMap`. Templates and stylesheets are minified by the compiler where it emits them; emitted JavaScript is minified by esbuild and never edited
-6. **Post-Build Processor** (`onStart`, `onEnd`, `onDispose`) — `onStart` clears the source cache and empties the output directory (unless `emptyOutDir` is off); `onEnd` copies assets, writes `index.html` with the entry `<script>` tags from the metafile, compresses, prints the size report and starts the dev server
+6. **Post-Build Processor** (`onStart`, `onEnd`, `onDispose`) — `onStart` empties the output directory (unless `emptyOutDir` is off; `thane dev` empties it before its first build only); `onEnd` copies assets, writes `index.html` with the entry `<script>` tags from the metafile, compresses, prints the size report and starts the dev server, or, on a rebuild, sends the open pages a hot update or a reload
+
+### Hot Updates
+
+`thane dev` swaps a changed component file in the open pages (`plugins/component-precompiler/hot-modules.ts`, `cli/hot-updates.ts`, `runtime/hot.ts`). In a `thane dev` build, the precompiler appends to every project module the lines that register its namespace (a self-import) and the namespaces of the packages it imports in `globalThis.__thaneModules`, and records which inputs changed. When every changed file is a component file that exports only components, each is bundled on its own as CommonJS, with every other import left to the page (`require('__thane_module__:src/store.ts')`), and sent over the page's socket; the page runs it, and each component registers again: the runtime (only while the page script's `__thaneHot` flag is set) mounts every live instance again with the new factory and replaces its stylesheet. Anything else reloads the page.
 
 ### One Component File
 
-Inside the precompiler's `onLoad`, `transformDefineComponentSource` (`reactive-binding-compiler/index.ts`) compiles a component file from one parse of it:
+Inside the precompiler's `onLoad`, `transformDefineComponentSource` (`reactive-binding-compiler/index.ts`) compiles a component file from one parse of it. Each `const X = defineComponent(…)` in it is compiled on its own (steps 1 to 5), and so is each exported fragment (`` export const X = html`…` ``, into its `{ t, b }` value), with ids counted across the file; step 6 is the file's:
 
-1. Find the `defineComponent` call and its selector (explicit, or derived from the export name), and the initial values of `const x = signal(literal)` declarations.
+1. Find the component's selector (explicit, or derived from the name it is declared under), and the initial values of the `const x = signal(literal)` declarations of its setup and of the module.
 2. Collect the templates of the setup's return objects (local `html` fragments inlined). A setup has one return object; THANE412 reports more.
 3. Process each template (`template-processing.ts`, `repeat-analysis.ts`): parse it, find text, attribute, style and event bindings, and compile `when()`, `whenElse()` and `repeat()` content as sub-templates, at any depth, including directives inside list rows.
 4. Build the DOM model of each template as emitted (`dom-model.ts`, the browser's tree construction) and compute, for every bound node, the shortest path of DOM properties from its scope's starting nodes: the component template's elements, a branch's first node, a row element.
 5. Generate the code (`codegen.ts`): the `__b` binding function, branch initializers and row factories. Lists at every level are emitted by one generator, `emitRepeat`.
-6. Apply every change to the source as one list of edits: the registration call, the static templates, `__b`, and an import of exactly the runtime helpers the code uses, from `thane/runtime`.
+6. Apply every change to the source as one list of edits: each component's registration call, static templates (`__tpl`, `__tpl1`…) and `__b`, and one import of exactly the runtime helpers the file's code uses, from `thane/runtime`.
 
 ## Runtime Architecture
 

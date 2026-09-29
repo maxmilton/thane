@@ -24,6 +24,8 @@ import { GlobalCSSBundlerPlugin } from '../plugins/global-css-bundler/global-css
 import { MinificationPlugin } from '../plugins/minification/minification.js';
 import { PostBuildPlugin } from '../plugins/post-build-processor/post-build-processor.js';
 import { routeTablesOf } from '../plugins/router-typegen/route-head.js';
+import { createHotState } from '../plugins/component-precompiler/hot-modules.js';
+import { buildHotUpdates } from './hot-updates.js';
 
 /** `--analyze`: esbuild's metafile, written to the output folder after every build and rebuild */
 export const AnalyzePlugin = (outDir: string): Plugin => ({
@@ -68,21 +70,39 @@ export async function runBuild(config: BuildConfig): Promise<void> {
   // Templates, stylesheets and selectors are minified by the compiler as it emits them (see
   // plugins/minification); esbuild minifies the JavaScript. Nothing edits the emitted files.
   buildContext.minify = config.isProd;
+  // `thane dev` swaps a changed component file in the open page instead of reloading it
+  if (config.serve && !config.isProd) buildContext.hot = createHotState();
 
   // The runtime's build constants. A production build leaves out the development checks (a cycle of
   // signals), and the router's head renderer when the routes use no head field but `title`. A
   // development build keeps both, so a head field added while `thane dev` runs works at once.
+  const routeTables = config.isProd
+    ? await routeTablesOf(config.entryPoints, projectRoot, config.inputHTMLFilePath)
+    : undefined;
   const define: Record<string, string> = {
     ...config.define,
     __THANE_DEV__: String(!config.isProd),
-    __THANE_HEAD__: String(!config.isProd || (await routeTablesOf(config.entryPoints, projectRoot)).usesHead),
+    __THANE_HEAD__: String(routeTables?.usesHead ?? true),
+    // The router's guard and redirect step, left out when no route has canEnter or redirectTo
+    __THANE_GUARDS__: String(routeTables?.usesGuards ?? true),
+    // The router's link handling, left out when no template (nor index.html) has a plain <a href>
+    __THANE_LINKS__: String(routeTables?.usesLinks ?? true),
+    // Typed search values (route.search, and search values in href() and navigate()), left out without a schema
+    __THANE_SEARCH__: String(routeTables?.usesSearch ?? true),
   };
+
+  // Resolve esbuild targets: user-specified or built-in defaults
+  const targets = config.target.length > 0 ? config.target : [...BROWSER_TARGETS];
 
   const plugins = [
     TSCTypeCheckerPlugin({ strict: config.strictTypeCheck, projectRoot }),
     ThaneLinterPlugin(),
     ComponentPrecompilerPlugin(buildContext),
-    GlobalCSSBundlerPlugin({ minify: config.isProd, selectorMap: () => buildContext.selectorMap }),
+    GlobalCSSBundlerPlugin({
+      minify: config.isProd,
+      selectorMap: () => buildContext.selectorMap,
+      hot: buildContext.hot,
+    }),
     ...(config.isProd
       ? [
           MinificationPlugin(buildContext, {
@@ -100,6 +120,7 @@ export async function runBuild(config: BuildConfig): Promise<void> {
       entryPoints: config.entryPoints,
       assetsInputDir: config.assetsInputDir,
       assetsOutputDir: config.assetsOutputDir,
+      publicInputDir: config.publicInputDir,
       serve: config.serve,
       isProd: config.isProd,
       useGzip: config.useGzip,
@@ -109,12 +130,10 @@ export async function runBuild(config: BuildConfig): Promise<void> {
       host: config.host,
       emptyOutDir: config.emptyOutDir,
       base: config.base,
+      hotUpdates: buildContext.hot ? () => buildHotUpdates({ buildContext, define, target: targets }) : undefined,
     }),
     ...(config.analyze ? [AnalyzePlugin(config.outDir)] : []),
   ];
-
-  // Resolve esbuild targets: user-specified or built-in defaults
-  const targets = config.target.length > 0 ? config.target : [...BROWSER_TARGETS];
 
   // Resolve entry/chunk naming pattern based on hashFileNames
   const names = config.hashFileNames ? '[name]-[hash]' : '[name]';

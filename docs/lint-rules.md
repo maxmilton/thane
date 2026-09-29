@@ -1,6 +1,6 @@
 # Lint Rules
 
-Thane includes 13 compile-time lint rules (THANE400–THANE413; THANE406 is retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
+Thane includes 11 compile-time lint rules (THANE400–THANE413; THANE406, THANE407 and THANE410 are retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
 
 The compiler reports a few more problems itself, while it compiles a template: see [Template Errors](#template-errors).
 
@@ -14,10 +14,8 @@ The compiler reports a few more problems itself, while it compiles a template: s
 | THANE403 | [require-const-tagged-templates](#thane403--require-const-tagged-templates) | Error    |
 | THANE404 | [no-nested-html-tags](#thane404--no-nested-html-tags)                       | Error    |
 | THANE405 | [no-conditional-template-init](#thane405--no-conditional-template-init)     | Warning  |
-| THANE407 | [single-component-per-file](#thane407--single-component-per-file)           | Error    |
 | THANE408 | [component-const-declaration](#thane408--component-const-declaration)       | Error    |
 | THANE409 | [no-aliased-component-export](#thane409--no-aliased-component-export)       | Error    |
-| THANE410 | [no-cross-file-html-template](#thane410--no-cross-file-html-template)       | Warning  |
 | THANE411 | [duplicate-mount-target](#thane411--duplicate-mount-target)                 | Warning  |
 | THANE412 | [single-return-object](#thane412--single-return-object)                     | Error    |
 | THANE413 | [no-aliased-thane-import](#thane413--no-aliased-thane-import)               | Error    |
@@ -139,23 +137,20 @@ const styles = css`
 
 **Severity:** Error
 
-`html` tagged templates must not be nested directly inside other `html` tagged templates. The compiler skips inner templates, so signal bindings inside them won't be processed.
+An `html` template inside another is compiled where it is the whole `${…}` (it is inlined) or an argument of a directive (a `whenElse()` branch, a `repeat()` row or empty template). Anywhere else, such as in a ternary or a `map()`, it would be a plain value, and it is reported.
 
 ```typescript
-// ❌ BAD — nested html tag
+// ❌ BAD — an html template in a ternary, and in map()
+template: html`<div>${open() ? html`<p>Open</p>` : ''}</div>`;
+template: html`<ul>${items().map((i) => html`<li>${i}</li>`)}</ul>`;
+
+// ✅ GOOD — a directive chooses, or repeats
+template: html`<div>${whenElse(open(), html`<p>Open</p>`, html``)}</div>`;
+template: html`<ul>${repeat(items(), (i) => html`<li>${i}</li>`)}</ul>`;
+
+// ✅ GOOD — a whole ${…} is inlined, like a const fragment
 template: html`<div>${html`<span>nested</span>`}</div>`;
-
-// ✅ GOOD — extract to const variable
-const span = html`<span>nested</span>`;
-template: html`<div>${span}</div>`;
-
-// ✅ GOOD — inside directives (allowed exception)
-template: html`<ul
-  >${repeat(items(), (i) => html`<li>${i}</li>`)}</ul
->`;
 ```
-
-Templates inside directive callbacks (`repeat`, `whenElse`) are allowed because the compiler processes each callback's template independently.
 
 ---
 
@@ -186,22 +181,11 @@ the developer's own. The code is not reused.
 
 ---
 
-## THANE407 — single-component-per-file
+## THANE407 — retired
 
-**Severity:** Error
-
-Only one `defineComponent()` call is allowed per file. Multiple calls cause the compiler to process only one and silently skip the rest.
-
-```typescript
-// ❌ BAD — two components in one file
-export const Foo = defineComponent(() => ({ template: html`<div />` }));
-export const Bar = defineComponent(() => ({ template: html`<span />` }));
-
-// ✅ GOOD — one component per file
-export const MyCounter = defineComponent(() => ({
-  template: html`<div />`,
-}));
-```
+THANE407 (single-component-per-file) allowed one `defineComponent()` call per file, because the compiler
+compiled only the first. Each component of a file is now compiled on its own (see
+[Components](components.md#several-components-in-one-file)). The code is not reused.
 
 ---
 
@@ -242,27 +226,11 @@ export const MyCounter = defineComponent(() => { ... });
 
 ---
 
-## THANE410 — no-cross-file-html-template
+## THANE410 — retired
 
-**Severity:** Warning
-
-`html` template variables used inside `defineComponent()` must be defined in the **same file**. The compiler resolves templates via AST analysis and cannot process imported variables.
-
-```typescript
-// ❌ BAD — imported html template
-import { header } from './shared-templates.js';
-export const App = defineComponent(() => ({
-  template: html`${header}<main>Content</main>`,
-}));
-
-// ✅ GOOD — template defined locally
-const header = html`<header>Title</header>`;
-export const App = defineComponent(() => ({
-  template: html`${header}<main>Content</main>`,
-}));
-```
-
-> Note: CSS imports _are_ allowed (`import styles from './Component.module.css'`). This rule only applies to `html` tagged templates.
+THANE410 (no-cross-file-html-template) warned about an imported variable used in an `html` template, because
+the compiler could not see an imported template. A template can now use a fragment another module exports
+(see [Templates](templates.md#fragments)). The code is not reused.
 
 ---
 
@@ -337,7 +305,7 @@ export const App = defineComponent(() => ({ template: html`<p>Hi</p>` }));
 
 ## Template Errors
 
-These are reported by the compiler while it compiles a template, as build errors.
+These are reported by the compiler while it compiles a template, as build errors. THANE013 is a warning.
 
 | Code     | What it reports                                                                                                |
 | :------- | :------------------------------------------------------------------------------------------------------------- |
@@ -348,6 +316,7 @@ These are reported by the compiler while it compiles a template, as build errors
 | THANE010 | A function as `repeat()`'s third argument, which is the empty template. Pass the key function fourth: `repeat(items, row, null, (it) => it.id)` |
 | THANE011 | A `repeat()` empty template that is not one static element: two roots, text outside an element, or a `${…}` in it. It is inserted as one element while the list is empty |
 | THANE012 | A template reads a name that the compiled bindings declare for themselves (a name starting with `_`, an element name such as `b3`, or `e` and `item` in a row), so it would read the compiler's value. Rename the variable |
+| THANE013 | Two components of the build with one selector (declared under one name, each with a derived selector). They share their host class, and the styles of the one registered first apply to both. Rename one, or give it an explicit selector |
 
 ### THANE007 — one root element per row
 

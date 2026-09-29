@@ -93,7 +93,7 @@ const file = (isProd: boolean, contentType: string, body: string, extra: Record<
 });
 const index = (extra: Record<string, string> = {}): Served => ({
   status: 200,
-  headers: { 'cache-control': 'no-cache', 'content-type': 'text/html', ...extra },
+  headers: { 'cache-control': 'no-cache', 'content-type': 'text/html; charset=utf-8', ...extra },
   body: INDEX,
 });
 const status = (code: number, body: string): Served => ({ status: code, headers: {}, body });
@@ -101,8 +101,8 @@ const status = (code: number, body: string): Served => ({ status: code, headers:
 /** Routes whose outcome does not depend on the server options, apart from compression headers. */
 const routes = (isProd: boolean, vary: Record<string, string>): Array<[string, Served]> => [
   ['/', index(vary)],
-  ['/main.js', file(isProd, 'text/javascript', MAIN_JS, vary)],
-  ['/main.js?v=1', file(isProd, 'text/javascript', MAIN_JS, vary)],
+  ['/main.js', file(isProd, 'text/javascript; charset=utf-8', MAIN_JS, vary)],
+  ['/main.js?v=1', file(isProd, 'text/javascript; charset=utf-8', MAIN_JS, vary)],
   // A directory without an extension falls back to index.html; with an extension it is a 404
   ['/assets', index(vary)],
   ['/assets/', index(vary)],
@@ -115,7 +115,7 @@ const routes = (isProd: boolean, vary: Record<string, string>): Array<[string, S
   ['/missing.css', status(404, 'Not Found')],
   // Percent-encoded names are decoded before the lookup
   ['/assets/My%20Logo.png', file(isProd, 'image/png', 'PNGDATA')],
-  ['/caf%C3%A9.txt', file(isProd, 'text/plain', 'cafe', vary)],
+  ['/caf%C3%A9.txt', file(isProd, 'text/plain; charset=utf-8', 'cafe', vary)],
   // Traversal and malformed escapes are refused
   ['/..%2F..%2Fsecret.txt', status(403, 'Forbidden')],
   ['/..%2Fsecret.txt', status(403, 'Forbidden')],
@@ -131,7 +131,7 @@ describe('dev server routing without compression', () => {
       // The browser-event socket path refuses a plain request in development
       expect(await get('/__thane-browser-events')).toEqual(status(400, 'WebSocket upgrade failed'));
       // Compression is off: accept-encoding is ignored
-      expect(await get('/main.js', 'br, gzip')).toEqual(file(false, 'text/javascript', MAIN_JS));
+      expect(await get('/main.js', 'br, gzip')).toEqual(file(false, 'text/javascript; charset=utf-8', MAIN_JS));
     });
   });
 
@@ -174,15 +174,15 @@ describe('dev server routing with useGzip', () => {
       await withServer({ isProd, useGzip: true }, async (get) => {
         const vary = { vary: 'Accept-Encoding' };
         expect(await get('/main.js', 'br')).toEqual(
-          file(isProd, 'text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
+          file(isProd, 'text/javascript; charset=utf-8', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
         );
         expect(await get('/main.js', 'gzip')).toEqual(
-          file(isProd, 'text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'gzip' }),
+          file(isProd, 'text/javascript; charset=utf-8', MAIN_JS, { ...vary, 'content-encoding': 'gzip' }),
         );
         expect(await get('/main.js', 'gzip, deflate, br')).toEqual(
-          file(isProd, 'text/javascript', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
+          file(isProd, 'text/javascript; charset=utf-8', MAIN_JS, { ...vary, 'content-encoding': 'br' }),
         );
-        expect(await get('/main.js', 'deflate')).toEqual(file(isProd, 'text/javascript', MAIN_JS, vary));
+        expect(await get('/main.js', 'deflate')).toEqual(file(isProd, 'text/javascript; charset=utf-8', MAIN_JS, vary));
         // The index.html fallback is compressed too
         expect(await get('/about', 'gzip')).toEqual(index({ ...vary, 'content-encoding': 'gzip' }));
         // Images are never compressed and carry no Vary
@@ -231,9 +231,23 @@ describe('page reloads', () => {
     });
   });
 
-  test('the page script reloads when told to', () => {
+  test('development: a hot update goes to every open page', async () => {
+    await withSocket(async (server, messages) => {
+      server.hotUpdate([{ key: 'src/card.ts', code: 'module.exports = 1;' }]);
+      await waitFor(() => messages.length > 0);
+      expect(messages.map((message) => JSON.parse(message))).toEqual([
+        { hot: [{ key: 'src/card.ts', code: 'module.exports = 1;' }] },
+      ]);
+    });
+  });
+
+  test('the page script reloads when told to, and when a hot update does not apply', () => {
     const html = DevServer.injectBrowserRelayScript('<head></head>');
     expect(html).toContain("if (event.data === 'reload') location.reload();");
+    expect(html).toContain('else if (!applyHotUpdates(JSON.parse(event.data).hot)) location.reload();');
+    // Components register for swapping before the app's module runs
+    expect(html.indexOf('window.__thaneHot = {};')).toBeGreaterThan(-1);
+    expect(html).toContain("id.startsWith('__thane_package__:')");
   });
 });
 

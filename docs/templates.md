@@ -42,6 +42,26 @@ template: html`<p>Name: ${first()} ${last()}</p>`;
 
 Each binding gets its own text node — updating `first` doesn't touch the `last` text node.
 
+### Functions and Helpers
+
+A call to a function the component declares is not a signal read: the binding follows the signals the
+function reads.
+
+```typescript
+const price = signal(2);
+const qty = signal(3);
+const currency = signal('EUR');
+const total = () => price() * qty(); // follows price and qty
+const format = (n: number) => `${n} ${currency()}`; // follows its argument's signals, and currency
+const label = () => 'Total'; // reads no signal: rendered once
+
+template: html`<p>${label()}: ${total()}, ${format(price())}</p>`;
+```
+
+This covers the functions declared in the component's setup and at the top of its file, and the helpers they
+call. A name the compiler does not see declared as a function, such as an imported one, is read as a signal
+when it is called without arguments (an imported store signal, `${visitCount()}`, works that way).
+
 ## Attribute Bindings
 
 Bind a dynamic value to an attribute by writing the expression as its value:
@@ -154,19 +174,58 @@ The compiler manages the child's lifecycle and binding initialization.
 
 ## Rules and Constraints
 
-### No Nested `html` Tags
+### Fragments
 
-You cannot nest an `html` template inside another `html` template (lint rule THANE404). Instead, assign inner templates to `const` variables:
+An `html` template can be a fragment of another: a `const` of the component or the module, used as `${name}`
+wherever markup goes, as a `whenElse()` branch, or as a `repeat()` empty template. An `html` template can also
+be written as a whole `${…}`. The compiler inlines each fragment where it is used, so a fragment costs nothing
+at run time, and it can be used any number of times:
 
 ```typescript
-// ❌ BAD — nested html tag
-template: html` <div> ${html`<span>Nested</span>`} </div> `;
+const spinner = html`<span class="spinner"></span>`;
 
-// ✅ GOOD — const variable
-const inner = html`<span>Nested</span>`;
-
-template: html` <div> ${inner} </div> `;
+export const Orders = defineComponent(() => {
+  const loading = signal(true);
+  const empty = html`<li>No orders</li>`;
+  return {
+    template: html`
+      ${whenElse(loading(), spinner, html`<p>Ready</p>`)}
+      <ul>${repeat(orders(), (o) => html`<li>${o.name}</li>`, empty)}</ul>
+    `,
+  };
+});
 ```
+
+Anywhere else in a `${…}`, such as a ternary or a `map()`, an `html` template would be a plain value, and the
+build reports it (lint rule THANE404): use `whenElse()` to choose between templates, and `repeat()` for a list.
+
+#### Fragments Shared Across Files
+
+A module can export a fragment, `` export const Name = html`…` ``, for other modules' templates, which use it
+wherever a fragment of their own goes. Its expressions belong to its own module: they read that module's
+signals and functions, and it can mount that module's components.
+
+```typescript
+// pieces.ts
+import { html, signal } from 'thane';
+
+export const theme = signal('light');
+export const Spinner = html`<span class="spinner"></span>`;
+export const Badge = html`<b class=${theme()}>New</b>`;
+
+// orders.ts
+import { Spinner, Badge } from './pieces.js';
+
+template: html`<h2>Orders ${Badge}</h2>${whenElse(loading(), Spinner, html`<ul>…</ul>`)}`;
+```
+
+A fragment without `${…}` (`Spinner`) is written out where it is used, like a fragment of the same file. One
+with expressions (`Badge`) is compiled, in its module, into a template and the code that binds a copy of it;
+each use mounts a copy, bound to the fragment's own signals, and releases it with the template around it. A
+fragment no template uses is left out of a production bundle.
+
+A fragment's type is `Fragment` (`import type { Fragment } from 'thane'`), and so is a child component call:
+each goes where a template goes, and has nothing to read or call.
 
 ### `const` Required for Tagged Templates
 
@@ -179,10 +238,6 @@ let tpl = html`<div>...</div>`;
 // ✅ GOOD
 const tpl = html`<div>...</div>`;
 ```
-
-### Template Variables Must Be Local
-
-Template variables must be declared in the same file — you cannot import an `html` template from another module and use it in a template. The compiler needs to see the full template at build time.
 
 ### Expression Order
 
