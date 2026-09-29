@@ -51,6 +51,7 @@ import { RW2 } from './probes/rw2-row-directives.js';
 import { RW2Sig } from './probes/rw2-signal-rows.js';
 import { RW3 } from './probes/rw3-nested-lists.js';
 import { R1 } from './probes/r1-reorder-before-anchor.js';
+import { T1 } from './probes/t1-helper-calls.js';
 import { X1 } from './probes/x1-row-when-attribute.js';
 
 const probes: Record<string, ComponentHTMLSelector<any>> = {
@@ -99,6 +100,7 @@ const probes: Record<string, ComponentHTMLSelector<any>> = {
   quotes: Quotes,
   cssnamespace: CssNamespace,
   r1: R1,
+  t1: T1,
 };
 
 const win = window as any;

@@ -1393,6 +1393,26 @@ test.describe('@namespace in a component stylesheet', () => {
   });
 });
 
+test.describe('calls to the component’s own functions in a template', () => {
+  test('T1 a function follows the signals it reads, a plain one renders once, a helper follows its body', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 't1');
+    await expect(page.locator('.t1-label')).toHaveText('Total');
+    await expect(page.locator('.t1-total')).toHaveText('6');
+    await expect(page.locator('.t1-formatted')).toHaveText('2 EUR');
+    await setProbe(page, 't1', 'qty', 4);
+    await expect(page.locator('.t1-total')).toHaveText('8');
+    await expect(page.locator('.t1-total')).toHaveAttribute('title', '8');
+    await setProbe(page, 't1', 'price', 5);
+    await expect(page.locator('.t1-total')).toHaveText('20');
+    await expect(page.locator('.t1-formatted')).toHaveText('5 EUR');
+    await setProbe(page, 't1', 'currency', 'USD');
+    await expect(page.locator('.t1-formatted')).toHaveText('5 USD');
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
 test.describe('a keyed list reordered while a row goes', () => {
   test('R1 the rows stay before the list anchor, so a later append goes last', async ({ page }) => {
     const probe = await mountProbe(page, 'r1');

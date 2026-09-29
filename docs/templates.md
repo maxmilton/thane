@@ -42,6 +42,26 @@ template: html`<p>Name: ${first()} ${last()}</p>`;
 
 Each binding gets its own text node — updating `first` doesn't touch the `last` text node.
 
+### Functions and Helpers
+
+A call to a function the component declares is not a signal read: the binding follows the signals the
+function reads.
+
+```typescript
+const price = signal(2);
+const qty = signal(3);
+const currency = signal('EUR');
+const total = () => price() * qty(); // follows price and qty
+const format = (n: number) => `${n} ${currency()}`; // follows its argument's signals, and currency
+const label = () => 'Total'; // reads no signal: rendered once
+
+template: html`<p>${label()}: ${total()}, ${format(price())}</p>`;
+```
+
+This covers the functions declared in the component's setup and at the top of its file, and the helpers they
+call. A name the compiler does not see declared as a function, such as an imported one, is read as a signal
+when it is called without arguments (an imported store signal, `${visitCount()}`, works that way).
+
 ## Attribute Bindings
 
 Bind a dynamic value to an attribute by writing the expression as its value:

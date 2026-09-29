@@ -23,6 +23,8 @@ import { anchorMark } from './template-utils.js';
 import { placeChildHosts } from './child-hosts.js';
 import { walkDirectives } from './directive-tree.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
+import { setTemplateScope } from '../../utils/html-parser/index.js';
+import { templateScopeOf } from './template-scope.js';
 
 // ============================================================================
 // Lifecycle hook stripping
@@ -339,6 +341,20 @@ export const transformDefineComponentSource = (
   childMounts?: ChildMountInfo[],
   options: CompileOptions = {},
 ): string | null => {
+  try {
+    return transformComponent(source, filePath, childMounts, options);
+  } finally {
+    // The scope is this component's alone
+    setTemplateScope(undefined);
+  }
+};
+
+const transformComponent = (
+  source: string,
+  filePath: string,
+  childMounts: ChildMountInfo[] | undefined,
+  options: CompileOptions,
+): string | null => {
   const sourceFile = sourceCache.parse(filePath, source);
 
   // Find the defineComponent call and the statement that declares it
@@ -395,6 +411,8 @@ export const transformDefineComponentSource = (
   // The regex pipeline natively matches bare signal() calls.
   const servicesImport = findServicesImport(sourceFile);
   const setupArg = getSetupFunction(dcCall);
+  // The signal detector resolves a template's calls in the component's scope
+  setTemplateScope(setupArg ? templateScopeOf(sourceFile, setupArg) : undefined);
   // Every return object's template is compiled; the last object is the component's: it
   // decides the features, loses its dead properties and receives the binding function.
   const returnObjects = setupArg ? findReturnObjects(setupArg) : [];
