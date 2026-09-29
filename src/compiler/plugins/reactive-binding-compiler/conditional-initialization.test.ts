@@ -37,6 +37,17 @@ describe('conditional initialization', () => {
     expect(processedContent).toMatch(/^<!--(b\d+)\(--><p data-testid="then-branch">then<\/p><!--\1\|--><!--\1\)-->$/);
   });
 
+  test('an empty whenElse() branch is a branch that shows nothing', () => {
+    const { processedContent, whenElseBlocks } = process('${whenElse(1 + 1 === 2, html`<p>then</p>`, html``)}');
+    expect(whenElseBlocks).toHaveLength(1);
+    expect(whenElseBlocks[0]!.elseTemplate).toBe('');
+    expect(processedContent).toMatch(/^<!--(b\d+)\(--><p>then<\/p><!--\1\|--><!--\1\)-->$/);
+
+    const emptyThen = process('${whenElse(1 + 1 === 2, html``, html`<p>else</p>`)}');
+    expect(emptyThen.whenElseBlocks).toHaveLength(1);
+    expect(emptyThen.processedContent).toMatch(/^<!--(b\d+)\(--><!--\1\|--><!--\1\)-->$/);
+  });
+
   test('template literal expressions with nested object literals are parsed intact', () => {
     const { bindings } = process('<p>${`x${{ value: 1 }.value}`}</p>');
     const exprBindings = bindings.filter((binding) => 'expression' in binding);

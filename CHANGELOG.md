@@ -73,6 +73,7 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 
 ### Fixed
 
+- **A `whenElse()` branch may be empty.** A `whenElse()` with an empty `html` template as a branch was not compiled: the page showed the directive's source as text. An empty branch now shows nothing.
 - **A fragment passed to `whenElse()` or as a `repeat()` empty template is its markup.** `whenElse(loading(), spinner, done)`, with `spinner` and `done` html`` consts, rendered the words "spinner" and "done". A fragment named where a directive takes a template is now inlined like one used as `${spinner}`.
 - **A fragment used twice in a template is inlined twice.** The second `${spinner}` was left as an expression and rendered its markup as text. A child component in a fragment used twice is mounted in each place.
 - **An inlined fragment's markup is no longer shipped twice.** A fragment whose every use is inlined is emptied, so esbuild drops it (the contract e2e app: -118 B raw).
