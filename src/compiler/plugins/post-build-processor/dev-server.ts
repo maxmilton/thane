@@ -358,11 +358,13 @@ export class DevServer {
       cacheControl: string,
     ): Promise<Response> => {
       const acceptEncoding = req.headers.get('accept-encoding') ?? '';
+      // Images, audio, video and woff fonts are compressed formats already
       const canCompress =
         useGzip &&
         !contentType.startsWith('image/') &&
         !contentType.startsWith('video/') &&
-        !contentType.startsWith('audio/');
+        !contentType.startsWith('audio/') &&
+        !contentType.startsWith('font/woff');
 
       const headers: Record<string, string> = {
         'Content-Type': contentType,
@@ -439,13 +441,14 @@ export class DevServer {
         // A static route's own page, which a production build writes with the route's head in it
         if (!hasFileExtension) {
           const routePage = join(requestedPath, 'index.html');
-          if (await Bun.file(routePage).exists()) return compressAndRespond(routePage, req, 'text/html', 'no-cache');
+          if (await Bun.file(routePage).exists())
+            return compressAndRespond(routePage, req, getContentType(routePage), 'no-cache');
         }
 
         // Anything else that is not a file: a missing asset, or a client route served by index.html (if there is one)
         return hasFileExtension || !(await Bun.file(indexPath).exists())
           ? new Response('Not Found', { status: 404 })
-          : compressAndRespond(indexPath, req, 'text/html', 'no-cache');
+          : compressAndRespond(indexPath, req, getContentType(indexPath), 'no-cache');
       },
       websocket: {
         open: (ws) => {

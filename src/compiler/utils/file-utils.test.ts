@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
-import { createBuildContext, projectRootWarning } from './file-utils.js';
+import { createBuildContext, getContentType, projectRootWarning } from './file-utils.js';
 
 const FILES: Record<string, string> = {
   'src/main.ts': `import { AppShell } from './app-shell';\nconsole.log(AppShell);\n`,
@@ -120,5 +120,24 @@ describe('projectRootWarning', () => {
     expect(projectRootWarning(root, root)).toBeNull();
     expect(projectRootWarning(join(root, 'apps', 'site'), root)).toBeNull();
     expect(projectRootWarning(join(root, 'other'), join(root, 'scratch'))).toBeNull();
+  });
+});
+
+describe('getContentType', () => {
+  test('the files a web app serves get their type, text with its charset', () => {
+    expect(getContentType('/main-ABC.js')).toBe('text/javascript; charset=utf-8');
+    expect(getContentType('/index.html')).toBe('text/html; charset=utf-8');
+    expect(getContentType('/assets/fonts/inter.woff2')).toBe('font/woff2');
+    expect(getContentType('/assets/hero.WEBP')).toBe('image/webp');
+    expect(getContentType('/manifest.webmanifest')).toBe('application/manifest+json');
+    expect(getContentType('/sitemap.xml')).toBe('application/xml');
+    expect(getContentType('/lib.wasm')).toBe('application/wasm');
+    expect(getContentType('/favicon.ico')).toBe('image/x-icon');
+  });
+
+  test('an unknown extension, or none, is application/octet-stream; a dot in a folder name is not an extension', () => {
+    expect(getContentType('/data.bin')).toBe('application/octet-stream');
+    expect(getContentType('/LICENSE')).toBe('application/octet-stream');
+    expect(getContentType('/v1.2/LICENSE')).toBe('application/octet-stream');
   });
 });
