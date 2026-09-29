@@ -40,7 +40,7 @@ export interface RouteTableHead {
   /** The site's meta, as far as it is static */
   site: Record<string, unknown>;
   custom: Record<string, CustomFieldSource>;
-  /** Every route but notFound; `meta` is null when the route computes it (a function) */
+  /** Every route but notFound and error; `meta` is null when the route computes it (a function) */
   routes: Array<{ path: string; meta: Record<string, unknown> | null }>;
   /** True when anything beyond a route title is used, or cannot be told */
   usesHead: boolean;
@@ -402,7 +402,7 @@ export const readRouteTableHeads = async (
       const route = unwrap(property.initializer);
       if (!ts.isObjectLiteralExpression(route)) {
         usesHead = true;
-        if (routePath !== 'notFound') routes.push({ path: routePath, meta: null });
+        if (routePath !== 'notFound' && routePath !== 'error') routes.push({ path: routePath, meta: null });
         continue;
       }
       let meta: Record<string, unknown> | null = {};
@@ -424,7 +424,7 @@ export const readRouteTableHeads = async (
           if (meta === null) notes.push(`${routePath}: its meta is computed, applied in the browser only`);
         }
       }
-      if (routePath !== 'notFound') routes.push({ path: routePath, meta });
+      if (routePath !== 'notFound' && routePath !== 'error') routes.push({ path: routePath, meta });
     }
     tables.push({ file, site, custom, routes, usesHead, notes });
   }

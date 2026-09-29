@@ -517,7 +517,8 @@ describe('route context', () => {
     );
     await settle();
     const r = seen.route;
-    expect(Object.keys(r)).toEqual(['params', 'path', 'pattern', 'searchParams', 'hash', 'title', 'state']);
+    expect(Object.keys(r)).toEqual(['params', 'path', 'pattern', 'searchParams', 'hash', 'title', 'state', 'error']);
+    expect(r.error).toBeUndefined();
     expect(r.params).toEqual({ id: '42' });
     expect(r.path).toBe('/users/42');
     expect(r.pattern).toBe('/users/:id');
@@ -573,6 +574,90 @@ describe('route context', () => {
     expect(seen.route.pattern).toBe('notFound');
     expect(seen.route.title).toBe('404');
     expect(seen.route.params).toEqual({});
+  });
+
+  describe('the error route', () => {
+    const errors: unknown[][] = [];
+    const consoleError = console.error;
+    const capture = () => {
+      errors.length = 0;
+      console.error = (...args: unknown[]) => errors.push(args);
+    };
+    afterEach(() => {
+      console.error = consoleError;
+    });
+
+    const mounts = () => log.filter((line) => line.startsWith('mount') || line.startsWith('destroy'));
+
+    const throwing = (name: string) =>
+      ({
+        __f: () => {
+          log.push(`mount ${name}`);
+          throw new Error(`${name} failed`);
+        },
+      }) as any;
+
+    test('a chunk that fails to load shows the error route, given the error, with its head', async () => {
+      capture();
+      const seen: { route?: any } = {};
+      const failure = new Error('chunk failed');
+      install('http://app.test/a');
+      startRouter(
+        {
+          routes: { '/a': { component: () => Promise.reject(failure), meta: { title: 'A' } } },
+          notFound: { component: page('NF') },
+          error: { component: page('ERR', seen), meta: { title: 'Something went wrong' } },
+        },
+        new FakeElement('outlet') as any,
+        { scrollRestoration: false },
+      );
+      await settle();
+      await settle();
+      expect(log).toContain('mount ERR into outlet');
+      expect(seen.route.pattern).toBe('error');
+      expect(seen.route.error).toBe(failure);
+      expect(seen.route.path).toBe('/a');
+      expect(g.document.title).toBe('Something went wrong');
+      expect(errors[0]).toEqual(['[thane-router] Failed to load route:', failure]);
+    });
+
+    test('a component that throws while mounting shows the error route too, and the next route is normal again', async () => {
+      capture();
+      const seen: { route?: any } = {};
+      install('http://app.test/a');
+      startRouter(
+        {
+          routes: { '/a': { component: throwing('A') }, '/b': { component: page('B', seen) } },
+          notFound: { component: page('NF') },
+          error: { component: () => Promise.resolve({ default: page('ERR') }) },
+        },
+        new FakeElement('outlet') as any,
+        { scrollRestoration: false },
+      );
+      await settle();
+      await settle();
+      expect(mounts()).toEqual(['mount A', 'mount ERR into outlet']);
+      navigate('/b');
+      await settle();
+      expect(log).toContain('destroy ERR');
+      expect(log).toContain('mount B into outlet');
+      expect(seen.route.pattern).toBe('/b');
+      expect(seen.route.error).toBeUndefined();
+    });
+
+    test('without an error route the outlet stays empty, and the failure is reported', async () => {
+      capture();
+      install('http://app.test/a');
+      const outlet = new FakeElement('outlet');
+      startRouter(
+        { routes: { '/a': { component: throwing('A') } }, notFound: { component: page('NF') } },
+        outlet as any,
+        { scrollRestoration: false },
+      );
+      await settle();
+      expect(mounts()).toEqual(['mount A']);
+      expect(errors.map((e) => e[0])).toEqual(['[thane-router] Failed to load route:']);
+    });
   });
 
   test('a lazy route: the default export is mounted', async () => {

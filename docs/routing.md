@@ -26,7 +26,7 @@ Each route consists of:
 | `component` | `() => Promise<any>` \| `ComponentHTMLSelector` | Lazy loader or eager component                                               |
 | `meta`      | fields \| `(route) => fields` _(optional)_      | The document head while the route is active: see [Route Heads](#route-heads) |
 
-The `notFound` route is **required** — it renders when no other route matches. Route patterns starting with `/:param` (root-level parameters) are rejected at runtime.
+The `notFound` route is **required** — it renders when no other route matches. An `error` route is optional: it renders when a page cannot be shown (see [The Error Route](#the-error-route)). Route patterns starting with `/:param` (root-level parameters) are rejected at runtime.
 
 ## Bootstrap Modes
 
@@ -173,6 +173,7 @@ Every component has access to route context via `ctx.route`:
 | `hash`         | `string`                 | URL hash fragment                          |
 | `title`        | `string`                 | The document title the route's head set    |
 | `state`        | `unknown`                | History state object                       |
+| `error`        | `unknown`                | On the error route: what failed            |
 
 The context is captured when the route mounts. A navigation that changes the pathname or the query mounts the route again, so a fresh instance reads the new `params` and `searchParams`; a navigation that changes only the hash keeps the current instance, and `hash` is not updated on it.
 
@@ -324,7 +325,26 @@ The URL and `currentPath()` change as soon as a navigation starts, so an active 
 
 - **A newer navigation cancels an older one.** If the user clicks another link while a chunk is still loading, only the latest page mounts; the overtaken one never appears.
 - **Going back to the page on screen keeps it.** If the user returns (back button, or the same link) before the next page has arrived, the load is cancelled and the current page is not re-created, so its state survives.
-- **A chunk that fails to load** is reported with `console.error` and the outlet is left empty; the router stays usable and other pages still load. Browsers remember a failed module import for the life of the document, so that one page needs a reload to recover.
+- **A chunk that fails to load**, or a page component that throws while it mounts, is reported with `console.error`, and the error route is shown in its place (the outlet is left empty without one). The router stays usable and other pages still load. Browsers remember a failed module import for the life of the document, so that one page needs a reload to recover.
+
+### The Error Route
+
+An `error` route next to `notFound` is shown when a page's chunk fails to load (the network dropped, a deploy replaced the chunk) or its component throws while mounting. The URL stays the failed page's; the error route's head applies, and its page receives what failed as `route.error`:
+
+```typescript
+// routes.ts
+error: { component: () => import('./pages/error.js'), meta: { title: 'Something went wrong' } },
+
+// pages/error.ts
+export const ErrorPage = defineComponent('error-page', ({ route }) => {
+  const message = route!.error instanceof Error ? route!.error.message : String(route!.error);
+  return {
+    template: html`<p>${message}</p><button @click=${() => location.reload()}>Reload</button>`,
+  };
+});
+```
+
+A reload is the way back from a failed chunk, because the browser keeps the failed import. `error` is not a path: `navigate('error')` is a type error, and a build writes no page for it.
 
 ## Scroll Restoration
 

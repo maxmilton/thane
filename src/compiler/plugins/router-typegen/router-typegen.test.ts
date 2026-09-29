@@ -190,3 +190,42 @@ describe('Two route tables in one project', () => {
     await expect(buildTwoApps('/c')).rejects.toThrow();
   });
 });
+
+describe('The error route', () => {
+  test("is not a path to navigate to, and its page's route has the error, typed", async () => {
+    const project = await createTempProject(MAIN, {
+      'tsconfig.json': TSCONFIG,
+      'src/routes.ts': [
+        "import { defineRoutes } from 'thane/router';",
+        "import { HomePage } from './pages/home.js';",
+        "import { ErrorPage } from './pages/error.js';",
+        '',
+        "const Routes = defineRoutes({ '/': { component: HomePage }, notFound: { component: HomePage }, error: { component: ErrorPage } });",
+        'export default Routes;',
+        '',
+      ].join('\n'),
+      'src/pages/home.ts': page('HomePage', '/'),
+      'src/pages/error.ts': [
+        "import { defineComponent, html } from 'thane';",
+        '',
+        "export const ErrorPage = defineComponent('error-page', ({ route }) => {",
+        '  const message = route!.error instanceof Error ? route!.error.message : String(route!.error);',
+        "  const pattern: 'error' = route!.pattern;",
+        '  return { template: html`<p>${pattern}: ${message}</p>` };',
+        '});',
+        '',
+      ].join('\n'),
+    });
+    try {
+      await runBuild(createTestBuildConfig(project));
+      const generated = await readFile(
+        join(project.root, '.thane', 'types', 'router', 'src', 'routes.generated.d.ts'),
+        'utf8',
+      );
+      expect(generated).toContain("routePaths: '/';");
+      expect(generated).toContain("'error-page': 'error';");
+    } finally {
+      await removeTempProject(project);
+    }
+  });
+});

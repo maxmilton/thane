@@ -70,8 +70,8 @@ export type RouteToPath<T extends string> = T extends `${infer Before}:${infer _
     ? `${Before}${string}`
     : T;
 
-/** Exclude the special `notFound` key when computing navigable paths / params. */
-type RouteKeys<T> = Exclude<keyof T & string, 'notFound'>;
+/** Exclude the special `notFound` and `error` keys when computing navigable paths / params. */
+type RouteKeys<T> = Exclude<keyof T & string, 'notFound' | 'error'>;
 
 /** Extracts all parameter names from all route patterns. */
 type ExtractParams<T extends string> = T extends `${string}:${infer Param}/${infer Rest}`
@@ -151,11 +151,18 @@ type RouteContextBase<TPattern extends string, TPath extends string, TParams> = 
 
 type ResolvedRouteContext<TPattern extends string> = TPattern extends 'notFound'
   ? RouteContextBase<'notFound', string, Record<string, never>>
-  : RouteContextBase<TPattern, RouteToPath<TPattern>, RouteParamsObject<TPattern>>;
+  : TPattern extends 'error'
+    ? RouteContextBase<'error', string, Record<string, never>> & {
+        /** What failed: the page's chunk did not load, or its component threw while mounting */
+        readonly error: unknown;
+      }
+    : RouteContextBase<TPattern, RouteToPath<TPattern>, RouteParamsObject<TPattern>>;
 
 export interface UntypedRouteContext extends RouteContextBase<string, string, Record<string, string>> {
   /** @deprecated Run thane dev, thane build, or thane serve once to generate route-aware component types. */
   readonly params: Record<string, string>;
+  /** On the error route: what failed */
+  readonly error?: unknown;
 }
 
 export type RouteContextForSelector<S extends string> = [RegisteredRoutePatternForSelector<S>] extends [never]
@@ -217,8 +224,15 @@ export type RoutesMap<T extends string = string> = Record<T, Route>;
 /**
  * The return type of `defineRoutes()` — a routes map with a mandatory `notFound` route.
  */
-export type RoutesConfig = Record<string, Route> & { notFound: Route };
-type RouteRecordFromKeys<K extends string> = Record<Exclude<K, 'notFound'>, Route> & { notFound: Route };
+export type RoutesConfig = Record<string, Route> & {
+  notFound: Route;
+  /** Shown when a page's chunk fails to load or its component throws while mounting, given the error */
+  error?: Route;
+};
+type RouteRecordFromKeys<K extends string> = Record<Exclude<K, 'notFound' | 'error'>, Route> & {
+  notFound: Route;
+  error?: Route;
+};
 export type RegisteredRoutes<K extends string = string> = RouteRecordFromKeys<K> &
   RouteMetadata<RouteRecordFromKeys<K>>;
 
@@ -268,7 +282,11 @@ export interface RouterConfig {
  * The special `notFound` key is exempt from path validation.
  */
 type ValidateRoutes<T extends Record<string, Route>, C extends CustomMetaFields> = {
-  [K in keyof T]: K extends 'notFound' ? CheckRoute<T[K], C> : K extends `/:${string}` ? never : CheckRoute<T[K], C>;
+  [K in keyof T]: K extends 'notFound' | 'error'
+    ? CheckRoute<T[K], C>
+    : K extends `/:${string}`
+      ? never
+      : CheckRoute<T[K], C>;
 };
 
 /** Each head field a route sets, typed as the field is: a field that does not exist is `never` */
@@ -321,7 +339,7 @@ export function defineRoutes<const T extends RoutesConfig, const C extends Custo
   // mount() won't find a router and the entire router module is tree-shaken away.
   __setRouterMount((options: MountOptions, target: HTMLElement): MountHandle => {
     const routerConfig = options.router!;
-    const { notFound, ...routeMap } = routerConfig.routes;
+    const { notFound, error, ...routeMap } = routerConfig.routes;
 
     // ── Mode B: shell component + router ──
     if (options.component) {
@@ -339,7 +357,7 @@ export function defineRoutes<const T extends RoutesConfig, const C extends Custo
         );
       }
 
-      startRouter({ routes: routeMap, notFound }, outlet, routerConfig);
+      startRouter({ routes: routeMap, notFound, error }, outlet, routerConfig);
 
       return {
         root: shellHandle.root,
@@ -351,7 +369,7 @@ export function defineRoutes<const T extends RoutesConfig, const C extends Custo
     }
 
     // ── Mode C: router only (no shell) ──
-    startRouter({ routes: routeMap, notFound }, target, routerConfig);
+    startRouter({ routes: routeMap, notFound, error }, target, routerConfig);
     return {
       root: target as any,
       destroy: stopRouter,
@@ -374,13 +392,15 @@ export function defineRoutes<const T extends RoutesConfig, const C extends Custo
 //  Internal state (single-instance)
 // ─────────────────────────────────────────────────────────────
 
-let _config: { routes: RoutesMap; notFound: Route } | null = null;
+let _config: { routes: RoutesMap; notFound: Route; error?: Route | undefined } | null = null;
 let _target: HTMLElement | null = null;
 const _currentPath: Signal<string> = signal<string>(typeof window !== 'undefined' ? window.location.pathname : '');
 let _currentHandle: MountHandle | null = null;
 let _currentRoutePattern = typeof window !== 'undefined' ? window.location.pathname : '';
 let _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
 let _routeParams: Record<string, string> = {};
+/** On the error route, what failed */
+let _routeError: unknown;
 /** The site's head and the app's own fields, from the last defineRoutes() call */
 let _siteMeta: SiteMeta & Record<string, unknown> = {};
 let _customMeta: CustomMetaFields | undefined;
@@ -439,6 +459,7 @@ const createCurrentRouteContext = (): UntypedRouteContext => ({
   hash: typeof window !== 'undefined' ? window.location.hash : '',
   title: _currentRouteTitle,
   state: typeof window !== 'undefined' ? window.history.state : undefined,
+  error: _routeError,
 });
 
 __setRouteContextProvider(createCurrentRouteContext);
@@ -638,72 +659,90 @@ const loadRoute = async (): Promise<void> => {
     return;
   }
 
-  const match = matchRoute(pathname, _config.routes, _config.notFound);
+  let match = matchRoute(pathname, _config.routes, _config.notFound);
+  _routeError = undefined;
 
-  // Fetch the next page while the current one stays on screen. Tearing the current page down
-  // before this await left the outlet empty for as long as the chunk took to arrive, and for
-  // one painted frame even when it was already cached: the document collapsed to the shell,
-  // the footer jumped to the top and the page flashed.
-  let component: ComponentHTMLSelector<any> | undefined;
-  if (match) {
-    _routePending = true;
-    try {
-      component = await resolveRouteComponent(match.route);
-    } catch (error) {
-      console.error('[thane-router] Failed to load route:', error);
+  // Once for the route, and once more for the error route when the route's page failed to load or mount
+  for (;;) {
+    // Fetch the next page while the current one stays on screen. Tearing the current page down
+    // before this await left the outlet empty for as long as the chunk took to arrive, and for
+    // one painted frame even when it was already cached: the document collapsed to the shell,
+    // the footer jumped to the top and the page flashed.
+    let component: ComponentHTMLSelector<any> | undefined;
+    let failure: unknown;
+    let failed = false;
+    if (match) {
+      _routePending = true;
+      try {
+        component = await resolveRouteComponent(match.route);
+      } catch (error) {
+        failure = error;
+        failed = true;
+      }
+      // Superseded by a newer navigation, or the router was stopped (or restarted) meanwhile:
+      // the outlet and the pending flag are no longer this load's to touch.
+      if (navigationId !== _navigationId || _target !== target) return;
+      _routePending = false;
     }
-    // Superseded by a newer navigation, or the router was stopped (or restarted) meanwhile:
-    // the outlet and the pending flag are no longer this load's to touch.
-    if (navigationId !== _navigationId || _target !== target) return;
-    _routePending = false;
-  }
 
-  // From here to the scroll write everything happens in one task, so the browser paints the
-  // previous page and then the next one, never the gap between them.
-  if (_currentHandle) {
-    const previous = _currentHandle;
-    _currentHandle = null;
-    unmount(previous);
-  }
-  target.innerHTML = '';
-  _loadedUrl = url;
+    // From here to the scroll write everything happens in one task, so the browser paints the
+    // previous page and then the next one, never the gap between them.
+    if (_currentHandle) {
+      const previous = _currentHandle;
+      _currentHandle = null;
+      unmount(previous);
+    }
+    target.innerHTML = '';
+    _loadedUrl = url;
 
-  if (!match) {
-    _currentRoutePattern = pathname;
-    _currentRouteTitle = document.title;
-    _routeParams = {};
+    if (!match) {
+      _currentRoutePattern = pathname;
+      _currentRouteTitle = document.title;
+      _routeParams = {};
+      return;
+    }
+
+    _currentRoutePattern = match.pattern;
+    _routeParams = match.params;
+
+    // The route's head goes on before the page mounts, so the page reads its title and may add to it
+    if (typeof __THANE_HEAD__ === 'undefined' || __THANE_HEAD__) {
+      const meta = match.route.meta;
+      _routeMeta = (typeof meta === 'function' ? meta(createCurrentRouteContext()) : meta) ?? {};
+      _metaOverrides = {};
+      applyRouteMeta();
+    } else {
+      // Without head support (the build found no field but titles), a route's head is its title
+      const title = (match.route.meta as RouteMeta | undefined)?.title;
+      if (title) document.title = title;
+      _currentRouteTitle = document.title;
+    }
+
+    if (component) {
+      try {
+        _currentHandle = mountComponent(component, target, undefined, { route: createCurrentRouteContext() });
+      } catch (error) {
+        failure = error;
+        failed = true;
+      }
+    }
+
+    if (failed) {
+      console.error('[thane-router] Failed to load route:', failure);
+      // The error route, given what failed. Browsers cache a failed module import, so recovery is
+      // a reload, which the error page can offer. Without an error route the outlet stays empty.
+      const errorRoute = _config.error;
+      if (!errorRoute || match.route === errorRoute) return;
+      match = { pattern: 'error', route: errorRoute, params: {} };
+      _routeError = failure;
+      continue;
+    }
+
+    // A page that navigates while it mounts (a redirect) has started a newer load, which owns the scroll
+    if (component && navigationId === _navigationId) {
+      applyScrollPosition(pathname, scrollAction, popScrollPosition);
+    }
     return;
-  }
-
-  _currentRoutePattern = match.pattern;
-  _routeParams = match.params;
-
-  // The route's head goes on before the page mounts, so the page reads its title and may add to it
-  if (typeof __THANE_HEAD__ === 'undefined' || __THANE_HEAD__) {
-    const meta = match.route.meta;
-    _routeMeta = (typeof meta === 'function' ? meta(createCurrentRouteContext()) : meta) ?? {};
-    _metaOverrides = {};
-    applyRouteMeta();
-  } else {
-    // Without head support (the build found no field but titles), a route's head is its title
-    const title = (match.route.meta as RouteMeta | undefined)?.title;
-    if (title) document.title = title;
-    _currentRouteTitle = document.title;
-  }
-
-  // The component failed to load (reported above): the outlet stays empty
-  if (!component) return;
-
-  try {
-    _currentHandle = mountComponent(component, target, undefined, { route: createCurrentRouteContext() });
-  } catch (error) {
-    console.error('[thane-router] Failed to load route:', error);
-    return;
-  }
-
-  // A page that navigates while it mounts (a redirect) has started a newer load, which owns the scroll
-  if (navigationId === _navigationId) {
-    applyScrollPosition(pathname, scrollAction, popScrollPosition);
   }
 };
 
@@ -790,7 +829,7 @@ export function setMeta(meta: AppRouteMeta): void {
  * @param target - The element to render pages into (outlet in Mode B, body/target in Mode C).
  */
 export function startRouter(
-  config: { routes: RoutesMap; notFound: Route },
+  config: { routes: RoutesMap; notFound: Route; error?: Route | undefined },
   target: HTMLElement,
   routerConfig?: Pick<RouterConfig, 'scrollRestoration'>,
 ): void {

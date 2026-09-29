@@ -311,7 +311,7 @@ const collectRouteTyping = async (
           const routeKey = getPropertyNameText(property.name);
           if (!routeKey) continue;
 
-          if (routeKey !== 'notFound') {
+          if (routeKey !== 'notFound' && routeKey !== 'error') {
             routePaths.add(routeKey);
           }
 

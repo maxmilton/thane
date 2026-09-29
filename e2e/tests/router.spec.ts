@@ -490,16 +490,18 @@ test.describe('10. Route Swap', () => {
     expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
   });
 
-  test('a page whose chunk fails to load leaves the outlet empty and the router usable', async ({ page }) => {
+  test('a page whose chunk fails to load shows the error route, given the error, and the router stays usable', async ({
+    page,
+  }) => {
     await page.route(/\/about-[^/]*\.js$/, (route: any) => route.abort());
     await goto(page, '/');
 
-    // Production builds drop the router's console report, so the test waits for the failed request and
-    // then for the outlet: the home page stays on screen until the load has failed, then the outlet empties.
-    const failed = page.waitForEvent('requestfailed', (request: any) => /\/about-[^/]*\.js$/.test(request.url()));
+    // The home page stays on screen until the load has failed, then the error route replaces it
     await page.getByTestId('nav-about').click();
-    await failed;
-    await expect(page.locator('#router-outlet [data-testid$="-page"]')).toHaveCount(0);
+    await expect(page.getByTestId('error-page')).toBeVisible();
+    await expect(page.getByTestId('home-page')).toHaveCount(0);
+    await expect(page.getByTestId('error-message')).not.toBeEmpty();
+    await expect(page).toHaveTitle('Error');
 
     await page.getByTestId('nav-user').click();
     await expect(page.getByTestId('user-page')).toBeVisible();

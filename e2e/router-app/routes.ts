@@ -6,6 +6,7 @@ const Routes = defineRoutes({
   '/about': { component: () => import('./pages/about.js'), meta: { title: 'About' } },
   '/users/:id': { component: () => import('./pages/user.js'), meta: { title: 'User' } },
   'notFound': { component: () => import('./pages/not-found.js'), meta: { title: '404 — Not Found' } },
+  'error': { component: () => import('./pages/error.js'), meta: { title: 'Error' } },
 });
 
 export default Routes;
