@@ -44,6 +44,8 @@ export interface RouteTableHead {
   routes: Array<{ path: string; meta: Record<string, unknown> | null }>;
   /** True when anything beyond a route title is used, or cannot be told */
   usesHead: boolean;
+  /** True when a route has `canEnter` or `redirectTo`, or when that cannot be told */
+  usesGuards: boolean;
   /** What could not be read, for a verbose note */
   notes: string[];
 }
@@ -357,6 +359,7 @@ export const readRouteTableHeads = async (
     const notes: string[] = [];
     const [routesArg, optionsArg] = call.arguments;
     let usesHead = optionsArg !== undefined;
+    let usesGuards = false;
     let site: Record<string, unknown> = {};
     let custom: Record<string, CustomFieldSource> = {};
     const options = optionsArg && unwrap(optionsArg);
@@ -389,12 +392,13 @@ export const readRouteTableHeads = async (
     const table = routesArg && unwrap(routesArg);
     if (!table || !ts.isObjectLiteralExpression(table)) {
       usesHead = true; // cannot tell
-      tables.push({ file, site, custom, routes, usesHead, notes });
+      tables.push({ file, site, custom, routes, usesHead, usesGuards: true, notes });
       continue;
     }
     for (const property of table.properties) {
       if (!ts.isPropertyAssignment(property)) {
         usesHead = true;
+        usesGuards = true;
         continue;
       }
       const routePath = propertyName(property.name);
@@ -402,12 +406,16 @@ export const readRouteTableHeads = async (
       const route = unwrap(property.initializer);
       if (!ts.isObjectLiteralExpression(route)) {
         usesHead = true;
+        usesGuards = true;
         if (routePath !== 'notFound' && routePath !== 'error') routes.push({ path: routePath, meta: null });
         continue;
       }
       let meta: Record<string, unknown> | null = {};
       for (const routeProperty of route.properties) {
-        if (!ts.isPropertyAssignment(routeProperty) || propertyName(routeProperty.name) !== 'meta') continue;
+        // A guard or a redirect, or a property that cannot be read (a spread): the router keeps its guard step
+        const name = ts.isSpreadAssignment(routeProperty) ? null : propertyName(routeProperty.name);
+        if (name === null || name === 'canEnter' || name === 'redirectTo') usesGuards = true;
+        if (!ts.isPropertyAssignment(routeProperty) || name !== 'meta') continue;
         const init = unwrap(routeProperty.initializer);
         if (ts.isObjectLiteralExpression(init)) {
           const unknownKeys: string[] = [];
@@ -426,7 +434,7 @@ export const readRouteTableHeads = async (
       }
       if (routePath !== 'notFound' && routePath !== 'error') routes.push({ path: routePath, meta });
     }
-    tables.push({ file, site, custom, routes, usesHead, notes });
+    tables.push({ file, site, custom, routes, usesHead, usesGuards, notes });
   }
   return tables;
 };
@@ -519,7 +527,7 @@ export const routePages = (html: string, table: RouteTableHead): Array<{ file: s
 export const routeTablesOf = async (
   entryPoints: string[],
   projectRoot: string,
-): Promise<{ tables: RouteTableHead[]; usesHead: boolean }> => {
+): Promise<{ tables: RouteTableHead[]; usesHead: boolean; usesGuards: boolean }> => {
   const resolve = createModuleResolver(projectRoot);
   const tables: RouteTableHead[] = [];
   let usesSetMeta = false;
@@ -527,5 +535,9 @@ export const routeTablesOf = async (
     tables.push(...(await readRouteTableHeads(file, resolve)));
     if (await importsSetMeta(file)) usesSetMeta = true;
   }
-  return { tables, usesHead: usesSetMeta || tables.some((table) => table.usesHead) };
+  return {
+    tables,
+    usesHead: usesSetMeta || tables.some((table) => table.usesHead),
+    usesGuards: tables.some((table) => table.usesGuards),
+  };
 };

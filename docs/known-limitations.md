@@ -148,7 +148,6 @@ These features are **not currently supported**:
 | Context / Provide / Inject        | Not available — use module-level signals for shared state   |
 | Async component setup             | Not supported — use `onMount` for async work                |
 | Multiple router instances         | Not supported — single-instance only                        |
-| Route guards / middleware         | Not built-in                                                |
 | Animated route transitions        | Not built-in                                                |
 
 ## Production Build Behavior

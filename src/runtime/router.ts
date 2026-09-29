@@ -34,6 +34,11 @@ import type { CustomMetaFields, CustomMetaValues, RouteMeta, SiteMeta } from './
  * them): the head renderer is then left out. Undefined everywhere else, which keeps it.
  */
 declare const __THANE_HEAD__: boolean | undefined;
+/**
+ * False in a production build of an app whose routes have no `canEnter` and no `redirectTo` (the build
+ * reads them): the guard and redirect step is then left out. Undefined everywhere else, which keeps it.
+ */
+declare const __THANE_GUARDS__: boolean | undefined;
 
 // ─────────────────────────────────────────────────────────────
 //  Route type registry — augmented by generated files
@@ -190,11 +195,32 @@ export type RouteMetaInput<M = RouteMeta> = M | ((route: UntypedRouteContext) =>
  * });
  * ```
  */
-export interface Route {
+export type Route = PageRoute | RedirectRoute;
+
+/** What a guard decides: `true` enters, a path goes there instead, `false` stays on the page on screen */
+export type RouteGuardResult = boolean | RoutePaths;
+
+/** A route that shows a page */
+export interface PageRoute {
   /** Lazy loader or eager page component (return value of defineComponent). */
   component: RouteComponent;
   /** The document head while this route is active: its title, description, preview image and more */
   meta?: RouteMetaInput<RouteMeta & Record<string, unknown>> | undefined;
+  /**
+   * Decides, before the page is fetched, whether it may be entered: `true` enters, a path redirects
+   * there (`'/login'`), `false` keeps the page on screen. It may be async.
+   */
+  canEnter?: ((route: UntypedRouteContext) => RouteGuardResult | Promise<RouteGuardResult>) | undefined;
+  redirectTo?: undefined;
+}
+
+/** A route that sends its path elsewhere, replacing the history entry: `'/old': { redirectTo: '/new' }` */
+export interface RedirectRoute {
+  /** The path to go to, or a function of the route that returns it (for a route with parameters) */
+  redirectTo: RoutePaths | ((route: UntypedRouteContext) => RoutePaths);
+  component?: undefined;
+  meta?: undefined;
+  canEnter?: undefined;
 }
 
 /**
@@ -549,7 +575,7 @@ const normalizeLoadedRouteComponent = (value: unknown): ComponentHTMLSelector<an
   return undefined;
 };
 
-const resolveRouteComponent = async (route: Route): Promise<ComponentHTMLSelector<any> | undefined> => {
+const resolveRouteComponent = async (route: PageRoute): Promise<ComponentHTMLSelector<any> | undefined> => {
   if (isEagerRouteComponent(route.component)) {
     return route.component;
   }
@@ -557,6 +583,17 @@ const resolveRouteComponent = async (route: Route): Promise<ComponentHTMLSelecto
   const mod = await route.component();
   return normalizeLoadedRouteComponent(mod);
 };
+
+/** The context of a route that is about to load, for its guard or its redirect function */
+const routeContextFor = (match: MatchResult): UntypedRouteContext => ({
+  ...createCurrentRouteContext(),
+  pattern: match.pattern,
+  params: { ...match.params },
+});
+
+/** Redirects in a row, reset once a load gets past them: a loop of redirects stops at the limit */
+let _redirects = 0;
+const MAX_REDIRECTS = 10;
 
 // ─────────────────────────────────────────────────────────────
 //  Route matching
@@ -672,9 +709,46 @@ const loadRoute = async (): Promise<void> => {
     let failure: unknown;
     let failed = false;
     if (match) {
+      const route = match.route;
       _routePending = true;
+      // A redirect, or the route's guard, decides before the page is fetched. A redirect is a guard
+      // whose answer is always a path. The build leaves this out when no route has either.
+      if (typeof __THANE_GUARDS__ === 'undefined' || __THANE_GUARDS__) {
+        const decide = route.redirectTo ?? route.canEnter;
+        if (decide) {
+          const verdict = typeof decide === 'function' ? await decide(routeContextFor(match)) : decide;
+          if (navigationId !== _navigationId || _target !== target) return;
+          if (verdict === false) {
+            _routePending = false;
+            if (_currentHandle) {
+              // The page on screen stays, and the address bar shows its URL again
+              window.history.replaceState(window.history.state, '', _loadedUrl);
+              _currentPath(window.location.pathname);
+              return;
+            }
+            // Nothing is on screen yet (the first load): the notFound route
+            if (route === _config.notFound) return;
+            match = { pattern: 'notFound', route: _config.notFound, params: {} };
+            continue;
+          }
+          if (typeof verdict === 'string') {
+            // The redirected path leaves no history entry; the load keeps how it was triggered. A loop
+            // of redirects stops at the limit.
+            if (++_redirects > MAX_REDIRECTS) {
+              _redirects = 0;
+              return console.error('[thane-router] Redirect loop at', verdict);
+            }
+            window.history.replaceState(null, '', verdict);
+            _pendingScrollAction = scrollAction;
+            _pendingPopScrollPosition = popScrollPosition;
+            return loadRoute();
+          }
+        }
+        _redirects = 0;
+      }
+
       try {
-        component = await resolveRouteComponent(match.route);
+        component = await resolveRouteComponent(route as PageRoute);
       } catch (error) {
         failure = error;
         failed = true;

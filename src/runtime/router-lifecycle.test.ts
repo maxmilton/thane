@@ -660,6 +660,113 @@ describe('route context', () => {
     });
   });
 
+  describe('redirects and guards', () => {
+    const mounts = () => log.filter((line) => /^(mount|destroy|replaceState|pushState)/.test(line));
+    const start = (routeMap: Record<string, Route>, url = 'http://app.test/a') => {
+      install(url);
+      startRouter({ routes: routeMap, notFound: { component: page('NF') } }, new FakeElement('outlet') as any, {
+        scrollRestoration: false,
+      });
+    };
+
+    test('redirectTo replaces the history entry and loads the target', async () => {
+      start({ '/old': { redirectTo: '/new' }, '/new': { component: page('New') } }, 'http://app.test/old');
+      await settle();
+      expect(mounts()).toEqual(['replaceState null /new', 'mount New into outlet']);
+      expect(g.window.location.pathname).toBe('/new');
+      expect(g.currentPath()).toBe('/new');
+    });
+
+    test('a redirectTo function gets the route, with its parameters', async () => {
+      const seen: { route?: any } = {};
+      start(
+        {
+          '/u/:id': { redirectTo: (r) => `/users/${r.params['id']}` },
+          '/users/:id': { component: page('User', seen) },
+        },
+        'http://app.test/u/7',
+      );
+      await settle();
+      expect(mounts()).toEqual(['replaceState null /users/7', 'mount User into outlet']);
+      expect(seen.route.params).toEqual({ id: '7' });
+    });
+
+    test('canEnter: true enters, a path redirects, and the guard gets the route it guards', async () => {
+      const guarded: string[] = [];
+      start({
+        '/a': { component: page('A') },
+        '/open/:id': {
+          component: page('Open'),
+          canEnter: (r) => (guarded.push(`${r.pattern} ${r.params['id']}`), true),
+        },
+        '/admin': { component: page('Admin'), canEnter: () => '/a' },
+      });
+      await settle();
+      navigate('/open/3');
+      await settle();
+      expect(guarded).toEqual(['/open/:id 3']);
+      expect(log).toContain('mount Open into outlet');
+      log = [];
+      navigate('/admin');
+      await settle();
+      expect(mounts()).toEqual([
+        'pushState null /admin',
+        'replaceState null /a',
+        'destroy Open',
+        'mount A into outlet',
+      ]);
+    });
+
+    test('canEnter false keeps the page on screen, and the address bar shows its URL again', async () => {
+      start({ '/a': { component: page('A') }, '/locked': { component: page('Locked'), canEnter: () => false } });
+      await settle();
+      log = [];
+      navigate('/locked');
+      await settle();
+      expect(mounts()).toEqual(['pushState null /locked', 'replaceState null /a']);
+      expect(g.currentPath()).toBe('/a');
+      expect(log).not.toContain('mount Locked into outlet');
+    });
+
+    test('canEnter false on the first load shows the notFound route', async () => {
+      start({ '/locked': { component: page('Locked'), canEnter: () => false } }, 'http://app.test/locked');
+      await settle();
+      expect(mounts()).toEqual(['mount NF into outlet']);
+    });
+
+    test('an async guard is awaited, and a newer navigation meanwhile wins', async () => {
+      let release: (v: boolean) => void = () => {};
+      start({
+        '/a': { component: page('A') },
+        '/slow': { component: page('Slow'), canEnter: () => new Promise<boolean>((r) => (release = r)) },
+        '/b': { component: page('B') },
+      });
+      await settle();
+      navigate('/slow');
+      await settle();
+      navigate('/b');
+      await settle();
+      release(true);
+      await settle();
+      expect(log).toContain('mount B into outlet');
+      expect(log).not.toContain('mount Slow into outlet');
+    });
+
+    test('a loop of redirects stops, with an error', async () => {
+      const errors: unknown[][] = [];
+      const consoleError = console.error;
+      console.error = (...args: unknown[]) => errors.push(args);
+      try {
+        start({ '/a': { redirectTo: '/b' }, '/b': { redirectTo: '/a' } });
+        for (let i = 0; i < 30; i++) await settle();
+        expect(log.filter((line) => line.startsWith('replaceState')).length).toBe(10);
+        expect(errors).toEqual([['[thane-router] Redirect loop at', '/b']]);
+      } finally {
+        console.error = consoleError;
+      }
+    });
+  });
+
   test('a lazy route: the default export is mounted', async () => {
     install('http://app.test/a');
     startRouter(

@@ -192,6 +192,42 @@ describe('whether an app needs head support', () => {
   });
 });
 
+describe('whether an app needs the guard and redirect step', () => {
+  const guards = async (routesSource: string) => {
+    const { dir } = project({
+      'src/main.ts': "import Routes from './routes.js';\nconsole.log(Routes);\n",
+      'src/routes.ts': routesSource,
+    });
+    return (await routeTablesOf([join(dir, 'src', 'main.ts')], dir)).usesGuards;
+  };
+  const table = (routes: string) =>
+    `import { defineRoutes } from 'thane/router';\nexport default defineRoutes({ ${routes} });\n`;
+
+  test('pages alone, titles and heads included: no', async () => {
+    expect(await guards(table(`'/': { ${PAGE}, meta: { description: 'A' } }, notFound: { ${PAGE} }`))).toBe(false);
+  });
+
+  test('a canEnter or a redirectTo on any route, notFound included, however written: yes', async () => {
+    expect(await guards(table(`'/': { ${PAGE}, canEnter: () => true }, notFound: { ${PAGE} }`))).toBe(true);
+    expect(await guards(table(`'/old': { redirectTo: '/' }, notFound: { ${PAGE} }`))).toBe(true);
+    expect(await guards(table(`'/': { ${PAGE} }, notFound: { redirectTo: '/' }`))).toBe(true);
+    expect(await guards(table(`'/': { ${PAGE}, canEnter() { return true; } }, notFound: { ${PAGE} }`))).toBe(true);
+    expect(
+      await guards(`const canEnter = () => true;\n${table(`'/': { ${PAGE}, canEnter }, notFound: { ${PAGE} }`)}`),
+    ).toBe(true);
+  });
+
+  test('what the compiler cannot read counts as a guard: a spread, a route or a table in a variable', async () => {
+    expect(await guards(`const r = { ${PAGE} };\n${table(`'/': { ...r }, notFound: { ${PAGE} }`)}`)).toBe(true);
+    expect(await guards(`const r = { ${PAGE} };\n${table(`'/': r, notFound: { ${PAGE} }`)}`)).toBe(true);
+    expect(
+      await guards(
+        "import { defineRoutes } from 'thane/router';\nconst t = { '/': {} };\nexport default defineRoutes(t as never);\n",
+      ),
+    ).toBe(true);
+  });
+});
+
 const INDEX = [
   '<!doctype html><html><head>',
   '<meta charset="utf-8">',

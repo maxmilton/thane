@@ -183,6 +183,31 @@ test.describe('3. Route Parameters', () => {
 //  4. 404 / Not Found
 // ─────────────────────────────────────────────────────────────
 
+test.describe('3b. Redirects and guards', () => {
+  test('redirectTo replaces the entry: the target loads, and back skips the redirected path', async ({ page }) => {
+    await goto(page, '/');
+    await page.evaluate(`window.navigate('/old-about')`);
+    await expect(page.getByTestId('about-page')).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/about');
+    await page.goBack();
+    await expect(page.getByTestId('home-page')).toBeVisible();
+  });
+
+  test('a redirect function gets the route parameters; a direct load redirects too', async ({ page }) => {
+    await goto(page, '/members/7');
+    await expect(page.getByTestId('user-id')).toHaveText('7');
+    expect(new URL(page.url()).pathname).toBe('/users/7');
+  });
+
+  test('a guard that returns a path sends the user there; one that returns true enters', async ({ page }) => {
+    await goto(page, '/private');
+    await expect(page.getByTestId('home-page')).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/');
+    await page.evaluate(`window.navigate('/private?key=open')`);
+    await expect(page.getByTestId('about-page')).toBeVisible();
+  });
+});
+
 test.describe('4. Not Found', () => {
   test('unknown path renders the not-found page', async ({ page }) => {
     await goto(page, '/nonexistent');

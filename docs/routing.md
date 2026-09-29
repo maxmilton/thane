@@ -137,6 +137,37 @@ A read-only signal containing the current pathname. Use it for active link styli
 template: html` <a class=${currentPath() === '/' ? 'active' : ''} @click=${navigate('/')}>Home</a> `;
 ```
 
+## Redirects and Guards
+
+A route can send its path elsewhere with `redirectTo`, or decide with `canEnter` whether it may be entered.
+Both run before the page's chunk is fetched.
+
+```typescript
+const Routes = defineRoutes({
+  '/old-about': { redirectTo: '/about' },
+  '/members/:id': { redirectTo: (route) => `/users/${route.params.id}` },
+  '/account': { component: () => import('./pages/account.js'), canEnter: () => signedIn() || '/login' },
+  '/admin': { component: () => import('./pages/admin.js'), canEnter: async () => (await session()).isAdmin },
+  // …
+});
+```
+
+- **`redirectTo`** is a path, or a function of the route that returns one. The redirect replaces the history
+  entry, so the redirected path is not in the history and back goes past it. A redirect route has no page, head or
+  guard of its own.
+- **`canEnter(route)`** gets the route about to load (its `pattern`, `params`, `searchParams`) and returns:
+  - `true` to enter;
+  - a path to go there instead, as a redirect;
+  - `false` to stay on the page on screen: the address bar shows its URL again. On the first load there is no
+    page on screen, so the `notFound` route is shown.
+
+  It may be async; a navigation started while it runs wins, as for a slow chunk.
+- Both paths are typed as `RoutePaths`: a path that is no route is a type error.
+- A loop of redirects stops after 10 in a row, with an error in the console.
+
+A production build leaves this step out of the router when no route has `canEnter` or `redirectTo` (the build
+reads the route table); an app that uses them pays about 530 B raw, 185 B gzipped.
+
 ## Route Parameters
 
 Define parameters with `:param` syntax:
