@@ -533,6 +533,7 @@ const transformComponent = (
     staticTemplates: repeatStaticTemplates,
     helpers,
     elementList,
+    domPrototype,
   } = generateInitBindingsFunction(
     allBindings,
     allConditionals,
@@ -556,6 +557,14 @@ const transformComponent = (
 
   if (repeatStaticTemplates.length > 0) {
     staticTemplateCode += '\n' + repeatStaticTemplates.join('\n');
+  }
+
+  // A file with a list imports Node's cloneNode and insertBefore from thane/runtime/dom, which every such
+  // file of the app shares. One that imports thane by a path of its own (a test) declares the pair.
+  const spec = servicesImport?.moduleSpecifier ?? '';
+  const importsDomPrototype = domPrototype && (spec === 'thane' || spec.startsWith('thane/'));
+  if (domPrototype && !importsDomPrototype) {
+    staticTemplateCode += '\n  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;';
   }
 
   // Update imports: always replace defineComponent → __registerComponent,
@@ -584,7 +593,7 @@ const transformComponent = (
     if (staticTemplateCode) used.add(BIND_FN.TEMPLATE);
     const requiredFunctions = [...used].sort((a, b) => importRank(a) - importRank(b));
 
-    const newImport = generateUpdatedImport(filteredImport, requiredFunctions);
+    const newImport = generateUpdatedImport(filteredImport, requiredFunctions, importsDomPrototype);
     edits.push({
       start: servicesImport.start,
       end: servicesImport.end,

@@ -1,5 +1,7 @@
 export const PUBLIC_RUNTIME_SPECIFIER = 'thane';
 export const INTERNAL_RUNTIME_SPECIFIER = 'thane/runtime';
+/** Where a compiled file with a list imports Node's `cloneNode` and `insertBefore` from, as `_cloneNode` and `_insertBefore` */
+export const DOM_RUNTIME_SPECIFIER = 'thane/runtime/dom';
 
 export const RUNTIME_HELPER = {
   IF: '__bindIf',

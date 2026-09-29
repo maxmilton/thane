@@ -58,6 +58,11 @@
       "import": "./dist/runtime/router-exports.js",
       "default": "./dist/runtime/router-exports.js"
     },
+    "./runtime/dom": {
+      "types": "./dist/runtime/dom-prototype.d.ts",
+      "import": "./dist/runtime/dom-prototype.js",
+      "default": "./dist/runtime/dom-prototype.js"
+    },
     "./ts-plugin": {
       "require": "./dist/ts-plugin/index.cjs",
       "default": "./dist/ts-plugin/index.cjs"

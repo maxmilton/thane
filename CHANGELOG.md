@@ -52,6 +52,7 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 
 ### Changed
 
+- Compiled files with a list share one read of Node's `cloneNode` and `insertBefore`: each imports them from `thane/runtime/dom` (a new entry, for compiled code only) instead of declaring its own. An app with many list files is smaller (the hardening test app −1,360 B raw, −434 B gzip; the store example −43 B raw); an app with one gains about 3 B. The compiled output's contract changes: components compiled by an earlier version must be rebuilt.
 - A plain `<a href>` to one of the app's routes navigates in the app (see Added); it used to load the page again. A link with its own click handler that calls `preventDefault()` is not affected.
 - **`whenElse()` branches may have any number of root nodes, text included.** A branch is everything between two comment anchors, and showing or hiding it moves the whole range. A branch with several roots used to leave its extra roots on screen when it hid, and a text-only branch never toggled.
 - **`:host-context(X)` works in component styles.** The compiler rewrites it to `X &`, which the runtime scoper turns into `X .my-card`: the rule applies when an ancestor matches `X`. `:host(X)` styles the component element itself. It used to produce an invalid selector that the browser dropped with its whole rule.

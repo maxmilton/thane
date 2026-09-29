@@ -10,6 +10,8 @@ Complete API surface for the Thane framework, covering all public exports, the t
 | `thane/router`  | `defineRoutes`, `navigate`, `navigateBack`, `href`, `setMeta`, and the head-field helpers `metaName`, `metaProperty`, `linkTag` |
 | `thane/client`  | Type declarations for `.css` imports, which `thane` includes (see below)                                   |
 | `thane/runtime` | The helpers that compiled code calls. Only the compiler imports it: never import it in an app. It is not an API and changes with every version |
+| `thane/runtime/dom` | Node's `cloneNode` and `insertBefore`, for compiled lists. Only compiled code imports it |
+| `thane/ts-plugin` | The TypeScript plugin for the editor ([Event Handling](event-handling.md#in-the-editor)) |
 
 ### `thane` (main entry)
 

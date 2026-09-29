@@ -20,6 +20,7 @@ What holds the compiler and the runtime together is `RUNTIME_HELPER` and two tes
 
 - The compiler emits and imports every runtime helper through `RUNTIME_HELPER` (`BIND_FN` in `src/compiler/utils/constants.ts` is the same object), from `INTERNAL_RUNTIME_SPECIFIER` (`thane/runtime`).
 - `src/runtime/internal-contract.test.ts` checks that `thane/runtime` exports a helper under every `RUNTIME_HELPER` name.
+- A compiled file with a list imports `_cloneNode` and `_insertBefore` (Node's `cloneNode` and `insertBefore`) from `DOM_RUNTIME_SPECIFIER` (`thane/runtime/dom`), a module of its own: it reads `Node.prototype` when it loads, so only an app with a list includes it, and `thane/runtime` still loads where there is no DOM. Every such file shares the one read. A file that imports `thane` by a path of its own (a test) declares the pair itself instead.
 - `src/compiler/plugins/reactive-binding-compiler/contract-conformance.test.ts` builds components and checks that the compiled output calls the helpers by those names; `helper-imports.test.ts` checks that a component imports exactly the helpers its code calls.
 
 The runtime imports nothing from `src/contracts/`: esbuild does not inline object properties, so an import would cost bytes in every app. The runtime writes the helper names itself, and the tests keep the two sides in step.

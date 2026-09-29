@@ -34,7 +34,11 @@ import { ErrorCode } from '../../errors.js';
 import type { ImportInfo } from '../../types.js';
 import type { ChildMountInfo } from '../component-precompiler/component-precompiler.js';
 import type { GeneratedInitBindingsArtifact, RuntimeHelperName } from '../../../contracts/index.js';
-import { INTERNAL_RUNTIME_SPECIFIER, PUBLIC_RUNTIME_SPECIFIER } from '../../../contracts/index.js';
+import {
+  DOM_RUNTIME_SPECIFIER,
+  INTERNAL_RUNTIME_SPECIFIER,
+  PUBLIC_RUNTIME_SPECIFIER,
+} from '../../../contracts/index.js';
 
 /**
  * Rows per batch clone for repeat() rows without cleanups: the reconciler clones a fragment of
@@ -1742,9 +1746,6 @@ export const generateInitBindingsFunction = (
       },
     },
   );
-  if (hasAnyRepeat) {
-    staticTemplates.push(`  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;`);
-  }
 
   // when() element content is a full sub-template — same initializer as a whenElse branch
   for (const cond of conditionals) lines.push(`    _subs.push(${whenCall(cond, top)});`);
@@ -1774,7 +1775,7 @@ export const generateInitBindingsFunction = (
   lines.splice(1, 0, ...top.head);
   if (top.usesRoot()) lines.unshift(`    const _r = _ctx.root;`);
 
-  return { code: lines.join('\n'), staticTemplates, helpers, elementList: top.used() };
+  return { code: lines.join('\n'), staticTemplates, helpers, elementList: top.used(), domPrototype: hasAnyRepeat };
 };
 
 /**
@@ -1793,7 +1794,11 @@ export const generateStaticTemplate = (content: string, emit: EmitOptions): stri
  * This keeps the public API surface clean: `import { signal } from 'thane'`
  * never shows __registerComponent or __bindIf in IDE autocomplete.
  */
-export const generateUpdatedImport = (importInfo: ImportInfo, requiredBindFunctions: string[]): string => {
+export const generateUpdatedImport = (
+  importInfo: ImportInfo,
+  requiredBindFunctions: string[],
+  domPrototype = false,
+): string => {
   const q = importInfo.quoteChar;
   const userImports = importInfo.namedImports;
   const internalImports = requiredBindFunctions;
@@ -1813,5 +1818,6 @@ export const generateUpdatedImport = (importInfo: ImportInfo, requiredBindFuncti
   if (internalImports.length > 0) {
     lines.push(`import { ${internalImports.join(', ')} } from ${q}${internalSpec}${q}`);
   }
+  if (domPrototype) lines.push(`import { _cloneNode, _insertBefore } from ${q}${DOM_RUNTIME_SPECIFIER}${q}`);
   return lines.join('\n');
 };
