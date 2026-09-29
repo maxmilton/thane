@@ -127,7 +127,6 @@
     const _ws_b0 = _r.lastChild.previousSibling;
     const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, outer, `<section><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></section>`, (_c) => {
-      const _a_b8 = _c.lastChild.lastChild;
       const _ws_b1 = _c.firstChild;
       const _we_b1 = _ws_b1.nextSibling;
       const _ws_b3 = _we_b1.nextSibling;
@@ -135,6 +134,7 @@
       const _ws_b5 = _we_b3.nextSibling;
       const _wm_b5 = _ws_b5.nextSibling;
       const _we_b5 = _wm_b5.nextSibling;
+      const _a_b8 = _c.lastChild.lastChild;
       const _rsubs_b8 = [];
       { const _subs = _rsubs_b8;
       const _tc_b8 = __tpl_b8.content.firstElementChild;
@@ -239,7 +239,6 @@
     const _wm_b0 = _ws_b0.nextSibling;
     const _we_b0 = _r.lastChild;
     _subs.push(__bindIfExpr(_ws_b0, _wm_b0, [mode], () => mode(), `<div><!----><!----><!----><!----><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
-      const _a_b8 = _c.lastChild.lastChild;
       const _ws_b2 = _c.firstChild;
       const _we_b2 = _ws_b2.nextSibling;
       const _ws_b4 = _we_b2.nextSibling;
@@ -247,6 +246,7 @@
       const _ws_b5 = _we_b4.nextSibling;
       const _wm_b5 = _ws_b5.nextSibling;
       const _we_b5 = _wm_b5.nextSibling;
+      const _a_b8 = _c.lastChild.lastChild;
       const _rsubs_b8 = [];
       { const _subs = _rsubs_b8;
       const _tc_b8 = __tpl_b8.content.firstElementChild;
@@ -501,11 +501,10 @@
     const _a_b12 = _ns[0].lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><button>1</button><!----><!----><!----><ul><!----></ul></div>`, (_c) => {
       const b8 = _c.firstElementChild;
-      const _a_b5 = _c.lastChild.lastChild;
       const _ws_b1 = b8.nextSibling;
       const _wm_b1 = _ws_b1.nextSibling;
       const _we_b1 = _wm_b1.nextSibling;
-      b8.addEventListener('click', one);
+      const _a_b5 = _c.lastChild.lastChild;
       const _rsubs_b5 = [];
       { const _subs = _rsubs_b5;
       const _tc_b5 = __tpl_b5.content.firstElementChild;
@@ -534,6 +533,7 @@
       _subs.push(typeof _rsrc_b5_0?.subscribe === 'function' ? _rsrc_b5_0.subscribe(() => { _rc_b5.reconcile(_items_b5()); }, true) : () => {});
       _subs.push(() => _rc_b5.clearAll());
       }
+      b8.addEventListener('click', one);
       return [
         __bindIfExpr(_ws_b1, _wm_b1, [b], () => b(), `<b>2</b>`, (_c) => {
       const b3 = _c;
@@ -1052,8 +1052,8 @@
     const _ws_b0 = _r.lastChild.previousSibling;
     const _we_b0 = _r.lastChild;
     _subs.push(__bindIf(_ws_b0, _we_b0, a, `<div><x-kid></x-kid><b><!----> <!----></b></div>`, (_c) => {
-      const _cm0 = _c.firstElementChild;
       const b1 = _c.lastChild.firstChild.nextSibling;
+      const _cm0 = _c.firstElementChild;
       b1.data = t() ?? '';
       return [
         t.subscribe(v => { b1.data = v ?? ''; }, true),

@@ -916,42 +916,6 @@ export const generateInitBindingsFunction = (
   );
   // Collect top-level subscription unsubscribe handles for cleanup on destroy
   lines.push(`    const _subs = [];`);
-  const topLevelBindings = bindings.filter((b) => !b.isInsideConditional);
-  // Separate expression bindings (multi-signal) from simple bindings
-  const simpleBindings = topLevelBindings.filter(isSimpleBinding);
-  const expressionBindings = topLevelBindings.filter(isExpressionBinding);
-  // Each bound node by path: a text binding's text node is declared in the head, an
-  // element is `_ns[i]`
-  for (const id of new Set(topLevelBindings.map((b) => b.id))) {
-    if (topLevelBindings.some((b) => b.id === id && b.type === 'text')) top.text(id, id);
-    else lines.push(`    const ${id} = ${top.at(id, id)};`);
-  }
-  // Simple bindings: initial value assignment + consolidated subscription
-  for (const binding of simpleBindings) {
-    lines.push(`    ${generateInitialValueCode(binding)};`);
-  }
-  const signalGroups = groupBindingsBySignal(simpleBindings);
-  for (const [signalName, signalBindings] of signalGroups) {
-    lines.push(`    _subs.push(${generateConsolidatedSubscription(signalName, signalBindings)});`);
-  }
-  // Expression bindings: multi-subscribe pattern
-  // e.g. const _upd_b2 = () => { b2.data = count() + 1; };
-  //      count.subscribe(_upd_b2, true);
-  expressionBindings.forEach((binding, idx) => {
-    const updFn = `_upd_${binding.id}_${idx}`;
-    const expr = binding.expression;
-    const signals = binding.signalNames;
-    // The expression re-runs whenever any of its signals change; the guard skips the DOM
-    // write when the result is unchanged.
-    const write = expressionWrite({ ...binding, id: binding.id });
-    if (!write) return;
-    const guard = `_pv_${binding.id}_${idx}`;
-    lines.push(`    let ${guard}; const ${updFn} = () => { ${guardedWrite(guard, write, expr).update}; };`);
-    lines.push(`    ${updFn}();`);
-    for (const sig of signals) {
-      lines.push(`    _subs.push(${sig}.subscribe(${updFn}, true));`);
-    }
-  });
 
   // The call that binds a when() block between its two anchors (reached through `scope`):
   // `__bindIf` for a bare signal read, otherwise `__bindIfExpr` over every signal the condition
@@ -1639,6 +1603,77 @@ export const generateInitBindingsFunction = (
   };
 
   // Nested initializer shared by when() content and whenElse branches
+  /**
+   * Where one level's binding code goes: the component's body, which pushes each cleanup into `_subs`, or
+   * a branch initializer, which returns them. `statement` takes a line without its indent.
+   */
+  interface BindingSink {
+    statement: (line: string) => void;
+    cleanup: (expr: string) => void;
+    repeat: (rep: RepeatBlock) => void;
+  }
+
+  /**
+   * The code that binds one template's own bindings, branches, lists, events and child components, for the
+   * component and for every branch: each bound node reached through `scope` before any code changes the
+   * DOM, then the writes, subscriptions and directives in one order.
+   */
+  const emitBindings = (
+    parts: {
+      bindings: BindingInfo[];
+      conditionals: ConditionalBlock[];
+      whenElse: WhenElseBlock[];
+      repeats: RepeatBlock[];
+      events: EventBinding[];
+      mounts: { cm: ChildMountInfo; globalIndex: number }[];
+    },
+    scope: NavScope,
+    sink: BindingSink,
+  ): void => {
+    const ids = [...new Set(parts.bindings.map((b) => b.id))];
+    const isText = (id: string) => parts.bindings.some((b) => b.id === id && b.type === 'text');
+    // Elements first: a text node's path can then start from one of them. An element the scope reaches
+    // directly (the component's `_ns[i]`) is named by a statement.
+    for (const id of ids.filter((id) => !isText(id))) {
+      const expr = scope.at(id, id);
+      if (expr !== id) sink.statement(`const ${id} = ${expr};`);
+    }
+    for (const evt of parts.events) scope.at(evt.elementId, evt.elementId);
+    for (const id of ids.filter(isText)) scope.text(id, id);
+
+    // Simple bindings: the initial value, and one subscription per signal
+    const simpleBindings = parts.bindings.filter(isSimpleBinding);
+    for (const binding of simpleBindings) sink.statement(`${generateInitialValueCode(binding)};`);
+    for (const [signalName, signalBindings] of groupBindingsBySignal(simpleBindings)) {
+      sink.cleanup(generateConsolidatedSubscription(signalName, signalBindings));
+    }
+    // Expression bindings re-run whenever any of their signals change; the guard skips the DOM write when
+    // the result is unchanged. They run once first: subscribe(…, true) skips the initial notification.
+    parts.bindings.filter(isExpressionBinding).forEach((binding, idx) => {
+      const write = expressionWrite({ ...binding, id: binding.id });
+      if (!write) return;
+      const updFn = `_upd_${binding.id}_${idx}`;
+      const guard = `_pv_${binding.id}_${idx}`;
+      sink.statement(
+        `let ${guard}; const ${updFn} = () => { ${guardedWrite(guard, write, binding.expression).update}; };`,
+      );
+      sink.statement(`${updFn}();`);
+      for (const sig of binding.signalNames) sink.cleanup(`${sig}.subscribe(${updFn}, true)`);
+    });
+
+    // when() element content is a full sub-template: the same initializer as a whenElse branch
+    for (const cond of parts.conditionals) sink.cleanup(whenCall(cond, scope));
+    for (const we of parts.whenElse) for (const call of whenElseCalls(we, scope)) sink.cleanup(call);
+    for (const rep of parts.repeats) sink.repeat(rep);
+    for (const line of buildEventListenerStatements(parts.events, scope)) sink.statement(line);
+    // Child components: mounted once, destroyed with the template around them
+    for (const mount of parts.mounts) {
+      const { setup, cleanup } = mountChild(mount, '', scope);
+      for (const line of setup) sink.statement(line);
+      sink.cleanup(cleanup);
+    }
+  };
+
   const generateNestedInitializer = (
     bindings: BindingInfo[],
     nestedConds: ConditionalBlock[],
@@ -1648,99 +1683,48 @@ export const generateInitBindingsFunction = (
     nestedEvents: EventBinding[],
     template: string,
   ): string => {
-    // Every element the branch binds is reached from the branch's first element, before any of
-    // the branch's code changes the DOM
-    const scope = branchScope(modelOf(template, emit), '      ');
-    const weMountInfo = directiveId
-      ? generateMountInfo(directiveId, '      ', scope)
-      : { setupLines: [], cleanupExprs: [] };
-    const hasWeMounts = weMountInfo.cleanupExprs.length > 0;
+    const mounts = (directiveId && childMountsByDirective?.get(directiveId)) || [];
     if (
       bindings.length === 0 &&
       nestedConds.length === 0 &&
       nestedWE.length === 0 &&
       nestedReps.length === 0 &&
       nestedEvents.length === 0 &&
-      !hasWeMounts
+      mounts.length === 0
     ) {
       return '() => []';
     }
 
-    const initLines: string[] = [];
-    // Each bound element and text node, by path from the branch's first node
-    // Elements first: a text node's path can then start from one of them
-    for (const b of bindings) if (b.type !== 'text') scope.at(b.id, b.id);
-    for (const evt of nestedEvents) scope.at(evt.elementId, evt.elementId);
-    for (const b of bindings) if (b.type === 'text') scope.text(b.id, b.id);
-    const simpleNestedBindings = bindings.filter(isSimpleBinding);
-    const exprNestedBindings = bindings.filter(isExpressionBinding);
-    for (const binding of simpleNestedBindings) {
-      initLines.push(`      ${generateInitialValueCode(binding)};`);
-    }
-    exprNestedBindings.forEach((binding, idx) => {
-      const updFn = `_upd_${binding.id}_${idx}`;
-      const expr = binding.expression;
-      const write = expressionWrite({ ...binding, id: binding.id });
-      if (write) {
-        const guard = `_pv_${binding.id}_${idx}`;
-        initLines.push(`      let ${guard}; const ${updFn} = () => { ${guardedWrite(guard, write, expr).update}; };`);
-      }
-      // Expression bindings always need an explicit initial call because
-      // subscribe(..., true) skips the initial notification.
-      initLines.push(`      ${updFn}();`);
-    });
-    for (const sl of weMountInfo.setupLines) {
-      initLines.push(sl);
-    }
-
-    // Generate addEventListener calls for event bindings inside whenElse branches
-    if (nestedEvents.length > 0) {
-      const nestedEventLines = buildEventListenerStatements(nestedEvents, scope);
-      for (const line of nestedEventLines) {
-        initLines.push(`      ${line}`);
-      }
-    }
-
-    const nestedRepeatCleanupVars: string[] = [];
-    for (const rep of nestedReps) {
-      const repLines: string[] = [];
-      emitRepeat(rep, repLines, scope);
-      initLines.push(`      const _rsubs_${rep.id} = [];`);
-      initLines.push(`      { const _subs = _rsubs_${rep.id};`);
-      for (const line of repLines) initLines.push(`  ${line}`);
-      initLines.push('      }');
-      nestedRepeatCleanupVars.push(
-        `() => { for (let i = 0; i < _rsubs_${rep.id}.length; i++) _rsubs_${rep.id}[i](); }`,
-      );
-    }
-
-    initLines.push('      return [');
-    const signalGroups = groupBindingsBySignal(simpleNestedBindings);
-    for (const [signalName, signalBindings] of signalGroups) {
-      initLines.push(`        ${generateConsolidatedSubscription(signalName, signalBindings)},`);
-    }
-    for (const ce of weMountInfo.cleanupExprs) {
-      initLines.push(`        ${ce},`);
-    }
-    exprNestedBindings.forEach((binding, idx) => {
-      const updFn = `_upd_${binding.id}_${idx}`;
-      const signals = binding.signalNames;
-      for (const sig of signals) {
-        initLines.push(`        ${sig}.subscribe(${updFn}, true),`);
-      }
-    });
-    for (const cond of nestedConds) initLines.push(`        ${whenCall(cond, scope)},`);
-    for (const nestedWe of nestedWE) {
-      for (const call of whenElseCalls(nestedWe, scope)) initLines.push(`        ${call},`);
-    }
-
-    for (const cleanupVar of nestedRepeatCleanupVars) {
-      initLines.push(`        ${cleanupVar},`);
-    }
-
-    initLines.push('      ];');
-    initLines.push('    }');
-    return ['(_c) => {', ...scope.head, ...initLines].join('\n');
+    // Every node the branch binds is reached from the branch's first node, before any of the branch's
+    // code changes the DOM
+    const scope = branchScope(modelOf(template, emit), '      ');
+    const statements: string[] = [];
+    const cleanups: string[] = [];
+    emitBindings(
+      {
+        bindings,
+        conditionals: nestedConds,
+        whenElse: nestedWE,
+        repeats: nestedReps,
+        events: nestedEvents,
+        mounts,
+      },
+      scope,
+      {
+        statement: (line) => statements.push(`      ${line}`),
+        cleanup: (expr) => cleanups.push(`        ${expr},`),
+        // A list's cleanups are its own, released by one entry
+        repeat: (rep) => {
+          const repLines: string[] = [];
+          emitRepeat(rep, repLines, scope);
+          statements.push(`      const _rsubs_${rep.id} = [];`, `      { const _subs = _rsubs_${rep.id};`);
+          for (const line of repLines) statements.push(`  ${line}`);
+          statements.push('      }');
+          cleanups.push(`        () => { for (let i = 0; i < _rsubs_${rep.id}.length; i++) _rsubs_${rep.id}[i](); },`);
+        },
+      },
+    );
+    return ['(_c) => {', ...scope.head, ...statements, '      return [', ...cleanups, '      ];', '    }'].join('\n');
   };
   // Cached prototype methods for repeat block hot paths (avoids prototype chain lookup per call).
   // Lists inside when()/whenElse() branches use them too, so any list at any depth counts.
@@ -1755,27 +1739,23 @@ export const generateInitBindingsFunction = (
     },
   );
 
-  // when() element content is a full sub-template — same initializer as a whenElse branch
-  for (const cond of conditionals) lines.push(`    _subs.push(${whenCall(cond, top)});`);
-  for (const we of whenElseBlocks) {
-    for (const call of whenElseCalls(we, top)) lines.push(`    _subs.push(${call});`);
-  }
-  for (const rep of repeatBlocks) emitRepeat(rep, lines, top);
-
-  if (eventBindings.length > 0) {
-    // Generate direct addEventListener calls (skip conditional-bound events here)
-    const topLevelEvents = eventBindings.filter((evt) => !conditionalEventIds.has(evt.id));
-    const eventLines = buildEventListenerStatements(topLevelEvents, top);
-    for (const line of eventLines) {
-      lines.push(`    ${line}`);
-    }
-  }
-
-  // Child components outside every directive: mounted once, destroyed with the component
-  for (const mount of topLevelChildMounts) {
-    const { setup, cleanup } = mountChild(mount, '    ', top);
-    lines.push(...setup, `    _subs.push(${cleanup});`);
-  }
+  // The component's own bindings, branches, lists, events and children
+  emitBindings(
+    {
+      bindings: bindings.filter((b) => !b.isInsideConditional),
+      conditionals,
+      whenElse: whenElseBlocks,
+      repeats: repeatBlocks,
+      events: eventBindings.filter((evt) => !conditionalEventIds.has(evt.id)),
+      mounts: topLevelChildMounts,
+    },
+    top,
+    {
+      statement: (line) => lines.push(`    ${line}`),
+      cleanup: (expr) => lines.push(`    _subs.push(${expr});`),
+      repeat: (rep) => emitRepeat(rep, lines, top),
+    },
+  );
 
   // Return cleanup function that unsubscribes all top-level subscriptions
   lines.push(`    return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };`);
