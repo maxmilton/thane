@@ -745,6 +745,17 @@ test('CSS scoping: component styles apply within component and do not leak acros
   // ── 4. Parent styles DO cascade into child (expected light-DOM behavior) ──
   // .contract-app .parent-scoped matches inside child because there is no Shadow DOM barrier.
   await expect(page.getByTestId('css-child-inherits')).toHaveCSS('color', 'rgb(0, 128, 0)');
+
+  // ── 5. A component's own @keyframes are scoped to it, and its animation uses the scoped name ──
+  const animation = await page.getByTestId('css-child-animated').evaluate((el) => {
+    const name = getComputedStyle(el).animationName;
+    const defined = document.adoptedStyleSheets.some((sheet) =>
+      [...sheet.cssRules].some((rule) => rule instanceof CSSKeyframesRule && rule.name === name),
+    );
+    return { name, defined };
+  });
+  expect(animation.name).toMatch(/.-pulse$/);
+  expect(animation.defined).toBe(true);
 });
 
 // ── Comment marker / mixed-text reactive binding browser-level tests ──

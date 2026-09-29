@@ -6,7 +6,7 @@
  * refactor of the scanners must keep every one of them; a fix changes its row.
  */
 import { describe, expect, test } from 'bun:test';
-import { scopeCssRules } from './component.js';
+import { scopeCssRules, scopeKeyframes } from './component.js';
 
 const scope = (css: string): string => scopeCssRules(css, '.sel');
 
@@ -126,5 +126,49 @@ describe('scopeCssRules: malformed input', () => {
     ['.a { b: c } .d', '.sel .a{ b: c } .d'],
     // A rule without a selector keeps its (empty) prelude
     ['{ a: b }', '{ a: b }'],
+  ]);
+});
+
+describe('scopeKeyframes: a stylesheet owns the keyframes it defines', () => {
+  const run = (css: string): string => scopeKeyframes(css, 'card');
+  const rows = (cases: Array<[input: string, expected: string]>) => {
+    for (const [input, expected] of cases) {
+      test(JSON.stringify(input), () => {
+        expect(run(input)).toBe(expected);
+      });
+    }
+  };
+  rows([
+    // The definition and its uses are renamed together
+    [
+      '@keyframes spin{from{a:b}}.a{animation:spin 1s linear infinite}',
+      '@keyframes card-spin{from{a:b}}.a{animation:card-spin 1s linear infinite}',
+    ],
+    [
+      '.a { animation-name: spin; } @keyframes spin { to { a: b } }',
+      '.a { animation-name: card-spin; } @keyframes card-spin { to { a: b } }',
+    ],
+    // Several animations in one value, and the prefixed forms
+    [
+      '@keyframes a{}@-webkit-keyframes b{}.x{animation:a 1s,b 2s;-webkit-animation:b 1s}',
+      '@keyframes card-a{}@-webkit-keyframes card-b{}.x{animation:card-a 1s,card-b 2s;-webkit-animation:card-b 1s}',
+    ],
+    // A name the stylesheet does not define is a global animation, and stays
+    [
+      '@keyframes spin{}.a{animation:fade 1s}.b{animation:spin 1s}',
+      '@keyframes card-spin{}.a{animation:fade 1s}.b{animation:card-spin 1s}',
+    ],
+    // Other properties and other text are left alone, even when they spell a keyframe name
+    [
+      '@keyframes spin{}.spin{content:"spin";animation-duration:1s;transition:spin 1s}',
+      '@keyframes card-spin{}.spin{content:"spin";animation-duration:1s;transition:spin 1s}',
+    ],
+    // Nothing to do: returned as it is
+    ['.a{animation:fade 1s}', '.a{animation:fade 1s}'],
+    // Inside @media too
+    [
+      '@media print{@keyframes spin{}.a{animation:spin 1s}}',
+      '@media print{@keyframes card-spin{}.a{animation:card-spin 1s}}',
+    ],
   ]);
 });

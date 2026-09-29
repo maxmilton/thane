@@ -16,7 +16,12 @@ import { createComponentResolver, type ComponentResolver } from '../../utils/com
 import { transformDefineComponentSource } from '../reactive-binding-compiler/index.js';
 import { anchorMark } from '../reactive-binding-compiler/template-utils.js';
 import type { CompileOptions } from '../reactive-binding-compiler/index.js';
-import { compileCssTemplate, declaresOwnCssTag, isCssTaggedTemplate } from '../minification/css-transform.js';
+import {
+  compileCssTemplate,
+  declaresOwnCssTag,
+  isCssTaggedTemplate,
+  KEYFRAME_SCOPING,
+} from '../minification/css-transform.js';
 import { ErrorCode, createError } from '../../errors.js';
 import { INTERNAL_RUNTIME_SPECIFIER, RUNTIME_HELPER } from '../../../contracts/index.js';
 
@@ -227,7 +232,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
      * Replace tagged templates with plain ones using the AST: html`...` loses its tag, and
      * css`...` is compiled (its tag goes, and a production build minifies the stylesheet).
      */
-    const stripTemplateTags = (code: string, filePath: string): string => {
+    const stripTemplateTags = (code: string, filePath: string, options: CompileOptions = compileOptions()): string => {
       const sf = ts.createSourceFile(filePath, code, ts.ScriptTarget.Latest, true);
       // Collect positions to strip in reverse order (end → start)
       const edits: { start: number; end: number; replacement: string }[] = [];
@@ -237,7 +242,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           edits.push({
             start: node.getStart(sf),
             end: node.getEnd(),
-            replacement: compileCssTemplate(node, sf, compileOptions()),
+            replacement: compileCssTemplate(node, sf, options),
           });
           return; // nested css templates are compiled along with this one
         }
@@ -269,14 +274,23 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
       childMounts?: ChildMountInfo[],
     ): { contents: string; loader: 'ts' } => {
       let result = modifiedSource;
+      let keyframes = false;
+      const options = { ...compileOptions(), onKeyframes: () => (keyframes = true) };
       if (extendsComponentQuick(source)) {
-        const transformed = transformDefineComponentSource(result, filePath, childMounts, compileOptions());
+        const transformed = transformDefineComponentSource(result, filePath, childMounts, options);
         if (transformed) {
           result = transformed;
         }
       }
-      result = stripTemplateTags(result, filePath);
-      return createLoaderResult(result);
+      result = stripTemplateTags(result, filePath, options);
+      return createLoaderResult(keyframes ? result + '\n' + KEYFRAME_SCOPING : result);
+    };
+
+    /** css`` templates compiled, and keyframe scoping added when one of them defines keyframes */
+    const compileCssOnly = (code: string, filePath: string): string => {
+      let keyframes = false;
+      const result = stripTemplateTags(code, filePath, { ...compileOptions(), onKeyframes: () => (keyframes = true) });
+      return keyframes ? result + '\n' + KEYFRAME_SCOPING : result;
     };
 
     build.onLoad({ filter: /\.ts$/ }, async (args) => {
@@ -294,9 +308,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           const rewritten = rewriteMountToMountComponent(source);
           if (rewritten) {
             logger.info(NAME, `Optimised mount() → mountComponent() in ${args.path}`);
-            return createLoaderResult(
-              source.includes(FN.CSS + '`') ? stripTemplateTags(rewritten, args.path) : rewritten,
-            );
+            return createLoaderResult(source.includes(FN.CSS + '`') ? compileCssOnly(rewritten, args.path) : rewritten);
           }
         }
 
@@ -304,7 +316,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
           // A module with only css`` templates (shared styles) still needs them compiled:
           // the tag is a compile-time marker and does not exist at runtime.
           if (source.includes(FN.CSS + '`')) {
-            return createLoaderResult(stripTemplateTags(source, args.path));
+            return createLoaderResult(compileCssOnly(source, args.path));
           }
           return undefined;
         }

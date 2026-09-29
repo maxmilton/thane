@@ -322,6 +322,8 @@ export interface CompileOptions {
   minify?: boolean | undefined;
   /** Selector renames planned for this build (see minification/selector-minifier.ts) */
   selectorMap?: SelectorMap | undefined;
+  /** Called when a compiled stylesheet defines `@keyframes` */
+  onKeyframes?: (() => void) | undefined;
 }
 
 /**

@@ -111,7 +111,8 @@ styles: css`
 - `@layer a, b;` declares the layers' order as usual (the compiler writes it as one empty `@layer` block per name).
 - `@charset` is removed: it means nothing in a stylesheet string.
 - `@import` is removed, and the build prints a warning. Thane applies every stylesheet as a constructed stylesheet (`adoptedStyleSheets`), and browsers ignore `@import` there. Load such a stylesheet with a `<link>` in `index.html` instead.
-- `@keyframes` and `@font-face` are copied as written, so keyframe names are global: give them a prefix of your own.
+- `@keyframes` a component's stylesheet defines are its own: `@keyframes spin` in the `card` component becomes `card-spin`, and so does every `animation` or `animation-name` in that stylesheet that names it. Two components can each define a `spin`. An animation the stylesheet does not define, such as one from a global stylesheet, keeps its name. Global stylesheets keep their keyframe names. The scoping code (about 130 B gzipped) is bundled only when a stylesheet defines keyframes.
+- `@font-face` is copied as written.
 - `@namespace svg url(http://www.w3.org/2000/svg);` works as usual, so `svg|rect` selects the SVG `rect` in the component. The compiler writes an empty `{}` after the statement, which the browser ignores, so the rule after it is scoped like any other.
 
 Comments are removed from stylesheets at build time, in development and production builds.

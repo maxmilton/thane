@@ -9,6 +9,7 @@ export const RUNTIME_HELPER = {
   TEMPLATE: '__T',
   NO_CLEANUPS: '__nc',
   ENABLE_STYLES: '__enableComponentStyles',
+  ENABLE_KEYFRAMES: '__enableKeyframeScoping',
   REGISTER_COMPONENT: '__registerComponent',
   REGISTER_COMPONENT_LEAN: '__registerComponentLean',
   DESTROY_CHILD: '__dc',

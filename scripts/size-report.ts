@@ -62,6 +62,7 @@ const FEATURE_SETS: Record<string, string | { contents: string; define: Record<s
   'signal+computed+effect+batch': `import { signal, computed, effect, batch } from './src/runtime/index.ts'; export const x = [signal, computed, effect, batch];`,
   'lean component + mount (min app)': `import { mountComponent } from './src/runtime/internal.ts'; import { __registerComponentLean } from './src/runtime/internal.ts'; export const x = [mountComponent, __registerComponentLean];`,
   'full component + styles + dc': `import { mountComponent } from './src/runtime/internal.ts'; import { __registerComponent, __enableComponentStyles, __dc } from './src/runtime/internal.ts'; export const x = [mountComponent, __registerComponent, __enableComponentStyles, __dc];`,
+  'styles with keyframes': `import { mountComponent } from './src/runtime/internal.ts'; import { __registerComponent, __enableKeyframeScoping, __dc } from './src/runtime/internal.ts'; export const x = [mountComponent, __registerComponent, __enableKeyframeScoping, __dc];`,
   'when/whenElse + keyed reconciler': `import { __bindIf, __bindIfExpr, createKeyedReconciler } from './src/runtime/internal.ts'; export const x = [__bindIf, __bindIfExpr, createKeyedReconciler];`,
   'router (defineRoutes+navigate+mount)': {
     contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,

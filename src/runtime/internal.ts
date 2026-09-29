@@ -5,6 +5,7 @@ export {
   __registerComponent,
   __registerComponentLean,
   __enableComponentStyles,
+  __enableKeyframeScoping,
   __dc,
   __T,
   mountComponent,

@@ -219,6 +219,23 @@ export function scopeCssRules(cssText: string, hostSelector: string): string {
 }
 
 /**
+ * The keyframes a component's stylesheet defines are its own: `@keyframes spin` becomes
+ * `@keyframes card-spin`, and so does every `animation` or `animation-name` in the stylesheet
+ * that names it. A name the stylesheet does not define, such as a global animation, stays.
+ */
+export const scopeKeyframes = (cssText: string, scope: string): string => {
+  const names = new Set(Array.from(cssText.matchAll(/keyframes\s+([\w-]+)/g), (match) => match[1]));
+  // One pass renames the names after `keyframes` (a definition) and in an `animation` or `animation-name` value
+  return names.size
+    ? cssText.replace(
+        /(keyframes\s+|animation(?:-name)?\s*:)([^;{}]*)/g,
+        (_, head: string, rest: string) =>
+          head + rest.replace(/[\w-]+/g, (name) => (names.has(name) ? scope + '-' + name : name)),
+      )
+    : cssText;
+};
+
+/**
  * Register global styles (deduped by CSS text).
  *
  * Tree-shakable: if no component imports this, esbuild strips it.
@@ -255,6 +272,21 @@ export function __enableComponentStyles(): void {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
     }
   };
+}
+
+let _keyframesScoped = false;
+
+/**
+ * Scope the keyframes of component stylesheets as well (see scopeKeyframes). The compiler calls it
+ * from each module whose stylesheet defines keyframes, so an app without any bundles none of this.
+ * @internal
+ */
+export function __enableKeyframeScoping(): void {
+  if (_keyframesScoped) return;
+  _keyframesScoped = true;
+  __enableComponentStyles();
+  const register = _onStyles!;
+  _onStyles = (selector, cssText) => register(selector, scopeKeyframes(cssText, selector));
 }
 
 // ============================================================================

@@ -60,7 +60,7 @@ components must be rebuilt with the matching version.
   bundle it.
 - `__T(html) → HTMLTemplateElement`: builds a compiled template (a component's, a row's, a list's empty
   template). `__nc`: the one empty cleanups array shared by rows that have no cleanups.
-- `__dc(instance) → destroy`; `__sig` = `signal`; `__enableComponentStyles()`;
+- `__dc(instance) → destroy`; `__sig` = `signal`; `__enableComponentStyles()`; `__enableKeyframeScoping()` (called by a module whose stylesheet defines `@keyframes`; it enables component styles too);
   `mountComponent(component, target?, props?)`.
 
 ## Policy
