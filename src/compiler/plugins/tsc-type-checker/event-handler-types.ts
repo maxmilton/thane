@@ -41,6 +41,10 @@ export interface RewrittenSource {
    * an error reported on the inserted type, is the whole handler's.
    */
   toOriginal: (start: number, length: number) => { start: number; length: number };
+  /** The position in `text` of a position in the source as written (inside a handler: the same code) */
+  toRewritten: (position: number) => number;
+  /** Whether a position in the source as written is inside a typed handler, its ends included */
+  inHandler: (position: number) => boolean;
 }
 
 interface Insertion {
@@ -163,5 +167,16 @@ export const rewriteEventHandlers = (fileName: string, text: string): RewrittenS
     }
     return { start: from.position, length: Math.max(0, locate(start + length).position - from.position) };
   };
-  return { text: rewritten, toOriginal };
+  // A handler's opening insertion is before the handler's first character, its closing one after its last
+  const toRewritten = (position: number): number => {
+    let shift = 0;
+    for (const insertion of insertions) {
+      if (insertion.at > position || (insertion.at === position && insertion.text !== '(')) break;
+      shift += insertion.text.length;
+    }
+    return position + shift;
+  };
+  const inHandler = (position: number): boolean =>
+    insertions.some(({ handler }) => position >= handler.start && position <= handler.end);
+  return { text: rewritten, toOriginal, toRewritten, inHandler };
 };

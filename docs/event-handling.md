@@ -36,8 +36,25 @@ template: html`<button @click=${(e: KeyboardEvent) => e.key}>Go</button>`;
 // error TS1360: Type '(e: KeyboardEvent) => string' does not satisfy the expected type 'ThaneEventListener<"click">'.
 ```
 
-Outside a list row the handler is the element's own listener, so `e.currentTarget` is typed as the element: in `<input @input=${(e) => query(e.currentTarget.value)} />` it is an `HTMLInputElement`. A handler in a `repeat()` row is delegated to the list container, so there it stays `EventTarget | null`. An event that lib.dom does not know, such as a custom event, is typed `any`. Editors do not run this check, so
-an untyped parameter is `any` in the editor; type it explicitly for completions there:
+Outside a list row the handler is the element's own listener, so `e.currentTarget` is typed as the element: in `<input @input=${(e) => query(e.currentTarget.value)} />` it is an `HTMLInputElement`. A handler in a `repeat()` row is delegated to the list container, so there it stays `EventTarget | null`. An event that lib.dom does not know, such as a custom event, is typed `any`.
+
+### In the Editor
+
+The editor sees the same types with Thane's TypeScript plugin: hovers, completions and errors inside handlers.
+Add it to `tsconfig.json`, and in VS Code choose "Use Workspace Version" of TypeScript:
+
+```json
+{
+  "compilerOptions": {
+    "plugins": [{ "name": "thane/ts-plugin" }]
+  }
+}
+```
+
+The plugin keeps a second language service over the sources with the handlers typed, and answers from it for
+a file with handlers (its errors) and for a position inside a handler (hovers, completions, signature help);
+everything else is the editor's own. Without the plugin an untyped parameter is `any` in the editor, and the
+build's type check still reports a wrong one. A handler can also be typed explicitly:
 
 ```typescript
 const handleInput = (event: Event) => {

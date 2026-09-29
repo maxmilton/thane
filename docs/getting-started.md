@@ -21,6 +21,15 @@ Include Thane's generated types in your `tsconfig.json`:
 
 Every `thane` command writes hidden type files to `.thane/types`: the route types that make `navigate()` and `route.params` type-safe. Including that folder lets your editor see them; Thane's own type check always includes it. The types of `.css` imports come with `thane` itself.
 
+For template event handler types in the editor, add the plugin too (see [Event Handling](event-handling.md#in-the-editor)):
+
+```json
+{
+  "compilerOptions": { "plugins": [{ "name": "thane/ts-plugin" }] },
+  "include": ["src/**/*.ts", ".thane/types/**/*.d.ts"]
+}
+```
+
 ## Project Structure
 
 A minimal Thane app looks like this:

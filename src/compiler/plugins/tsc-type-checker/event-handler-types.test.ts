@@ -72,3 +72,17 @@ describe('rewriteEventHandlers', () => {
     expect(result.toOriginal(0, result.text.length)).toEqual({ start: 0, length: source.length });
   });
 });
+
+describe('from the source to the rewritten text', () => {
+  test('a position maps forward: before, inside and after a handler; inHandler covers its ends', () => {
+    const source = inTemplate('<b @click=${onA} @blur=${(e) => e.type}></b>');
+    const result = rewriteEventHandlers('x.ts', source)!;
+    for (const name of ['onA', '(e) =>', 'e.type', '></b>', 'const']) {
+      expect(result.text.slice(result.toRewritten(source.indexOf(name))).startsWith(name)).toBe(true);
+    }
+    const handler = source.indexOf('(e) => e.type');
+    expect(result.inHandler(handler)).toBe(true);
+    expect(result.inHandler(handler + '(e) => e.type'.length)).toBe(true);
+    expect(result.inHandler(source.indexOf('></b>') + 1)).toBe(false);
+  });
+});
