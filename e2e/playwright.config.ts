@@ -11,8 +11,8 @@ const repoRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 // Every e2e port derives from E2E_PORT_BASE (default 4173), so that several runs can share a machine:
 // contract base+0, router base+1, cart base+2, hardening base+3, meta base+4, their production builds
-// base+10 to base+14, and the browser-error dev server base+145 (server.ts and browser-error.spec.ts read the same
-// variable).
+// base+10 to base+14, and the browser-error and hot-update dev servers base+145 and base+146 (server.ts and the
+// two specs read the same variable).
 const portBase = process.env.E2E_PORT_BASE ? Number(process.env.E2E_PORT_BASE) : 4173;
 if (!Number.isInteger(portBase) || portBase < 1024 || portBase + 145 > 65535) {
   throw new Error(`E2E_PORT_BASE must be an integer from 1024 to 65390, got "${process.env.E2E_PORT_BASE}"`);
@@ -70,7 +70,14 @@ export default defineConfig({
   projects: [
     ...browsers.map(([browser, device]) => ({
       name: `contract-${browser}`,
-      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts', 'meta.spec.ts'],
+      testIgnore: [
+        'router.spec.ts',
+        'cart.spec.ts',
+        'browser-error.spec.ts',
+        'hot-update.spec.ts',
+        'hardening.spec.ts',
+        'meta.spec.ts',
+      ],
       use: { ...devices[device], baseURL: appUrl(0) },
     })),
     ...(['router', 'cart', 'hardening', 'meta'] as const).flatMap((suite, i) =>
@@ -85,10 +92,23 @@ export default defineConfig({
       testMatch: 'browser-error.spec.ts',
       use: { ...devices['Desktop Chrome'] },
     },
+    // `thane dev` swaps a changed component in the open page: it starts its own dev server
+    {
+      name: 'hot-chromium',
+      testMatch: 'hot-update.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
     // The same apps built with --prod (minified templates, selectors and JavaScript), in Chromium.
     {
       name: 'contract-prod-chromium',
-      testIgnore: ['router.spec.ts', 'cart.spec.ts', 'browser-error.spec.ts', 'hardening.spec.ts', 'meta.spec.ts'],
+      testIgnore: [
+        'router.spec.ts',
+        'cart.spec.ts',
+        'browser-error.spec.ts',
+        'hot-update.spec.ts',
+        'hardening.spec.ts',
+        'meta.spec.ts',
+      ],
       use: { ...devices['Desktop Chrome'], baseURL: appUrl(PROD_OFFSET) },
     },
     ...(['router', 'cart', 'hardening', 'meta'] as const).map((suite, i) => ({

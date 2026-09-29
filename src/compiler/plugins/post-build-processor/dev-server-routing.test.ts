@@ -231,9 +231,23 @@ describe('page reloads', () => {
     });
   });
 
-  test('the page script reloads when told to', () => {
+  test('development: a hot update goes to every open page', async () => {
+    await withSocket(async (server, messages) => {
+      server.hotUpdate([{ key: 'src/card.ts', code: 'module.exports = 1;' }]);
+      await waitFor(() => messages.length > 0);
+      expect(messages.map((message) => JSON.parse(message))).toEqual([
+        { hot: [{ key: 'src/card.ts', code: 'module.exports = 1;' }] },
+      ]);
+    });
+  });
+
+  test('the page script reloads when told to, and when a hot update does not apply', () => {
     const html = DevServer.injectBrowserRelayScript('<head></head>');
     expect(html).toContain("if (event.data === 'reload') location.reload();");
+    expect(html).toContain('else if (!applyHotUpdates(JSON.parse(event.data).hot)) location.reload();');
+    // Components register for swapping before the app's module runs
+    expect(html.indexOf('window.__thaneHot = {};')).toBeGreaterThan(-1);
+    expect(html).toContain("id.startsWith('__thane_package__:')");
   });
 });
 

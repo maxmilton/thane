@@ -17,6 +17,12 @@ A component's selector is the class of its host element, which scopes its styles
 
 A setup function returns one object (THANE412). The compiler builds one static template per component, so an early `return { template: … }` in a branch cannot work. Use `when()` or `whenElse()` in the template instead.
 
+### Hot Updates Swap Whole Components
+
+`thane dev` swaps a changed component file in the open page, but a swapped component starts again: its own signals
+start from their initial values (its stores, and the rest of the page, keep theirs). A change to any other module
+reloads the page.
+
 ### `const` Required for Components and Templates
 
 - Components must be declared with `const` (THANE408)

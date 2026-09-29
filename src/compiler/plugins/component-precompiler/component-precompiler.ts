@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import type { Plugin } from 'esbuild';
+import type { OnLoadArgs, OnLoadResult, Plugin } from 'esbuild';
 import ts from 'typescript';
 import type { ComponentDefinition, BuildContext, FragmentDefinition } from '../../types.js';
 import {
@@ -25,6 +25,7 @@ import {
   KEYFRAME_SCOPING,
 } from '../minification/css-transform.js';
 import { ErrorCode, createError, createWarning } from '../../errors.js';
+import { hotRegistration, isSwappable, trackHotInput } from './hot-modules.js';
 import { INTERNAL_RUNTIME_SPECIFIER, RUNTIME_HELPER } from '../../../contracts/index.js';
 
 const NAME = PLUGIN_NAME.COMPONENT;
@@ -176,7 +177,11 @@ const findFragmentUses = (sourceFile: ts.SourceFile, fragments: Map<string, Frag
   return uses;
 };
 
-export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
+/**
+ * @param ctx - the build's shared context
+ * @param mode - `hotUpdate` for the build of one changed file that `thane dev` sends to the page
+ */
+export const ComponentPrecompilerPlugin = (ctx?: BuildContext, mode: { hotUpdate?: boolean } = {}): Plugin => ({
   name: NAME,
   setup(build) {
     // Which components each file can call; made anew for every build, so it sees the current sources
@@ -209,12 +214,13 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
 
     build.onStart(async () => {
       selectorOwners = new Map();
+      if (!mode.hotUpdate) ctx?.hot?.changed.clear();
       // A rebuild in watch mode scans again, so that a component file added meanwhile is found
       if (ctx && scanned) await refreshBuildContext(ctx);
       scanned = true;
       const buildContext = ctx ?? (await createBuildContext());
       resolver = createComponentResolver(buildContext.projectRoot, buildContext.components);
-      if (buildContext.components.length > 0) {
+      if (buildContext.components.length > 0 && !mode.hotUpdate) {
         logger.info(NAME, `Found ${buildContext.components.length} component(s)`);
       }
     });
@@ -400,7 +406,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
       return keyframes ? result + '\n' + KEYFRAME_SCOPING : result;
     };
 
-    build.onLoad({ filter: /\.ts$/ }, async (args) => {
+    const load = async (args: OnLoadArgs): Promise<OnLoadResult | undefined> => {
       try {
         if (args.path.includes('node_modules')) {
           return undefined;
@@ -502,6 +508,19 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
         // A component the compiler cannot process must fail the build rather than ship uncompiled
         return { errors: [{ text: diagnostic.message, location: { file: args.path } }] };
       }
+    };
+
+    build.onLoad({ filter: /\.ts$/ }, async (args) => {
+      const result = await load(args);
+      // `thane dev`: every project module registers itself in the page, for hot updates to import, and
+      // the build records whether it changed (see hot-modules.ts)
+      const hot = ctx?.hot;
+      if (!hot || mode.hotUpdate || args.path.includes('node_modules') || result?.errors) return result;
+      const cached = await sourceCache.get(args.path);
+      if (!cached) return result;
+      trackHotInput(hot, args.path, cached.source, () => isSwappable(cached.sourceFile));
+      const code = typeof result?.contents === 'string' ? result.contents : cached.source;
+      return createLoaderResult(hotRegistration(args.path, code, cached.sourceFile, ctx.projectRoot));
     });
   },
 });

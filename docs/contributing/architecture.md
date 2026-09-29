@@ -69,7 +69,11 @@ The build is then an **esbuild plugin pipeline**, registered in this order. esbu
 3. **Component Precompiler** (`onLoad` `.ts`, label `component-compiler`) — the mount-call optimiser for files without templates; `css`-only modules; for files with `html` templates: replaces `${Child(…)}` calls with anchor comments, calls the reactive binding compiler (`transformDefineComponentSource`), compiles `css` templates and strips the `html` tags. An exception becomes the file's build error
 4. **Global CSS Bundler** (`onLoad` `.css`) — `transformCss` on the file (`:host-context`, statement at-rules, planned renames, minify in prod or strip comments in dev), exported as a string
 5. **Minification** (`onStart`, prod only) — reads the project's sources and plans selector renames into `buildContext.selectorMap`. Templates and stylesheets are minified by the compiler where it emits them; emitted JavaScript is minified by esbuild and never edited
-6. **Post-Build Processor** (`onStart`, `onEnd`, `onDispose`) — `onStart` clears the source cache and empties the output directory (unless `emptyOutDir` is off); `onEnd` copies assets, writes `index.html` with the entry `<script>` tags from the metafile, compresses, prints the size report and starts the dev server
+6. **Post-Build Processor** (`onStart`, `onEnd`, `onDispose`) — `onStart` empties the output directory (unless `emptyOutDir` is off; `thane dev` empties it before its first build only); `onEnd` copies assets, writes `index.html` with the entry `<script>` tags from the metafile, compresses, prints the size report and starts the dev server, or, on a rebuild, sends the open pages a hot update or a reload
+
+### Hot Updates
+
+`thane dev` swaps a changed component file in the open pages (`plugins/component-precompiler/hot-modules.ts`, `cli/hot-updates.ts`, `runtime/hot.ts`). In a `thane dev` build, the precompiler appends to every project module the lines that register its namespace (a self-import) and the namespaces of the packages it imports in `globalThis.__thaneModules`, and records which inputs changed. When every changed file is a component file that exports only components, each is bundled on its own as CommonJS, with every other import left to the page (`require('__thane_module__:src/store.ts')`), and sent over the page's socket; the page runs it, and each component registers again: the runtime (only while the page script's `__thaneHot` flag is set) mounts every live instance again with the new factory and replaces its stylesheet. Anything else reloads the page.
 
 ### One Component File
 

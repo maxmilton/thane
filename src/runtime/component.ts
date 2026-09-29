@@ -5,6 +5,10 @@
 
 import type { RouteContextForSelector, UntypedRouteContext } from './router.js';
 import type { Fragment } from './markers.js';
+import { hotRegister, hotRuntime, hotStyles } from './hot.js';
+
+/** False in a production build, which leaves the development server's hot swapping out */
+declare const __THANE_DEV__: boolean | undefined;
 import type { ComponentRoot } from './types.js';
 
 // ============================================================================
@@ -265,6 +269,11 @@ export function __enableComponentStyles(): void {
   if (_onStyles) return;
   const registered = new Set<string>();
   _onStyles = (selector, cssText) => {
+    // A page the development server serves replaces a component's sheet when its file changes
+    if ((typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) && hotRuntime()) {
+      hotStyles(hotRuntime()!, selector, scopeCssRules(cssText, `.${selector}`));
+      return;
+    }
     if (!registered.has(selector)) {
       registered.add(selector);
       const scopedCss = scopeCssRules(cssText, `.${selector}`);
@@ -451,6 +460,10 @@ export function __registerComponent(
     return instance;
   };
 
+  // In a page the development server serves, a component is swapped when its file changes
+  if ((typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) && hotRuntime()) {
+    return hotRegister(hotRuntime()!, selector, { __f: factory });
+  }
   return { __f: factory };
 }
 
@@ -492,6 +505,9 @@ export function __registerComponentLean(
     if (bindingsCleanup) instance.__bindingsCleanup = bindingsCleanup;
     return instance;
   };
+  if ((typeof __THANE_DEV__ === 'undefined' || __THANE_DEV__) && hotRuntime()) {
+    return hotRegister(hotRuntime()!, selector, { __f: factory });
+  }
   return { __f: factory };
 }
 

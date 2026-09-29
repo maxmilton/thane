@@ -20,6 +20,7 @@ import { collectFileSizes, printAllFileSizes, printTotalSizes } from './console-
 import { minifySelectorsInHTML } from '../minification/minification.js';
 import { minifyHTML } from '../minification/template-minifier.js';
 import { routePages, routeTablesOf } from '../router-typegen/route-head.js';
+import type { HotUpdate } from '../../cli/hot-updates.js';
 
 const NAME = PLUGIN_NAME.POST_BUILD;
 
@@ -41,6 +42,11 @@ export interface PostBuildOptions {
   open?: boolean | undefined;
   host?: string | undefined;
   emptyOutDir?: boolean | undefined;
+  /**
+   * `thane dev`: the hot updates of a rebuild, sent to the open pages instead of a reload (null: reload).
+   * The output folder is emptied before the first build only, so that the pages' chunks stay.
+   */
+  hotUpdates?: (() => Promise<HotUpdate[] | null>) | undefined;
   base?: string | undefined;
 }
 
@@ -153,7 +159,9 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     if (serve && !devServer.isStarted) {
       devServer.start();
     } else if (serve && !isProd) {
-      devServer.reloadPages();
+      const updates = await config.hotUpdates?.();
+      if (updates) devServer.hotUpdate(updates);
+      else devServer.reloadPages();
     }
   };
 
@@ -195,9 +203,12 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
     name: NAME,
     setup(build) {
       const { distDir } = config;
+      let emptiedOnce = false;
 
       build.onStart(async () => {
-        if (config.emptyOutDir !== false && fs.existsSync(distDir)) {
+        const keepChunks = config.hotUpdates !== undefined && emptiedOnce;
+        emptiedOnce = true;
+        if (config.emptyOutDir !== false && fs.existsSync(distDir) && !keepChunks) {
           // Resolve to an absolute path: Bun 1.4.x on Windows fails recursive rm on "./"-prefixed paths.
           await fs.promises.rm(path.resolve(distDir), { recursive: true });
         }

@@ -16,7 +16,14 @@ thane dev --host 0.0.0.0
 
 Default port: `4200`. Always a development build (`--prod` is ignored). Source maps are enabled. All 13 lint rules are active. `console.*` calls are preserved.
 
-The build reruns when a source file changes, and the open pages reload when it is done (and when an asset or `index.html` changes). Errors in the browser (`console.error`, uncaught errors and unhandled promise rejections) are printed in the terminal, with their locations in the built files.
+The build reruns when a source file changes. When the files that changed are component files, the open pages swap
+those components in place: each instance of a changed component is mounted again with the new code and styles, in
+its place and with its props, and the rest of the page keeps its state (its other components, its stores, the
+route). Any other change reloads the pages: a module that is not a component file (a store, a helper), a component
+file that exports something else too, a stylesheet file, an asset or `index.html`, and a component the page has not
+loaded yet. A swapped component starts again, so its own signals start from their initial values.
+
+Errors in the browser (`console.error`, uncaught errors and unhandled promise rejections) are printed in the terminal, with their locations in the built files.
 
 ### `thane build`
 

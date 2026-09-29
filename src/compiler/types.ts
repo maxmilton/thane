@@ -99,4 +99,6 @@ export interface BuildContext {
   minify?: boolean;
   /** Selector renames, planned by MinificationPlugin before each build and applied by the compiler */
   selectorMap?: import('./plugins/minification/selector-minifier.js').SelectorMap;
+  /** `thane dev`: what hot updates need (see plugins/component-precompiler/hot-modules.ts) */
+  hot?: import('./plugins/component-precompiler/hot-modules.js').HotState;
 }

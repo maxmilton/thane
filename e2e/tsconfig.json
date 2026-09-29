@@ -18,6 +18,7 @@
     "cart-app/**/*.ts",
     "hardening-app/**/*.ts",
     "browser-error-app/**/*.ts",
+    "hot-app/**/*.ts",
     "tests/**/*.ts",
     "playwright.config.ts",
     "server.ts",
