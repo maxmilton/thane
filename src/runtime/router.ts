@@ -28,6 +28,7 @@ import { signal } from './signal.js';
 import type { ReadonlySignal, Signal } from './types.js';
 import { applyHead, resolveHead } from './router-head.js';
 import type { CustomMetaFields, CustomMetaValues, RouteMeta, SiteMeta } from './router-head.js';
+import type { SearchSchema } from './router-search.js';
 
 /**
  * False in a production build of an app whose routes use no head field but `title` (the build reads
@@ -44,6 +45,11 @@ declare const __THANE_GUARDS__: boolean | undefined;
  * handler) in its templates or its index.html: the router's link handling is then left out.
  */
 declare const __THANE_LINKS__: boolean | undefined;
+/**
+ * False in a production build of an app whose routes have no `search` schema: parsing `route.search` and
+ * writing search values into a path are then left out.
+ */
+declare const __THANE_SEARCH__: boolean | undefined;
 
 // ─────────────────────────────────────────────────────────────
 //  Route type registry — augmented by generated files
@@ -120,16 +126,42 @@ type HandRegisteredRoutePatterns = [ExplicitRegisterRoutePaths] extends [never]
   : ExplicitRegisterRoutePaths;
 type RegisteredRoutePatterns = TablePaths<RouteTableEntry> | HandRegisteredRoutePatterns;
 
-/** Resolves to the navigable path union when Register is augmented, else `string`. */
-export type RoutePaths = [RegisteredRoutePatterns] extends [never] ? string : RouteToPath<RegisteredRoutePatterns>;
+/** A path, and the same path with a query or a hash */
+type WithQuery<T extends string> = T | `${T}?${string}` | `${T}#${string}`;
 
-/** The registered patterns that have parameters (`/users/:id`), else `string`: what `href()` takes. */
+/** Resolves to the navigable path union when Register is augmented, else `string`. */
+export type RoutePaths = [RegisteredRoutePatterns] extends [never]
+  ? string
+  : WithQuery<RouteToPath<RegisteredRoutePatterns>>;
+
+/** Every table's search types, by pattern */
+type TableSearch<T> = T extends { search: infer S } ? S : never;
+type PatternSearch<S, P extends string> = S extends unknown ? (P extends keyof S ? S[P] : never) : never;
+type SearchPatterns =
+  TableSearch<RouteTableEntry> extends infer S ? (S extends unknown ? keyof S & string : never) : never;
+
+/** What a page of the route reads on `route.search`, from the route's `search` schema; `{}` without one */
+export type RouteSearchValues<P extends string> = [PatternSearch<TableSearch<RouteTableEntry>, P>] extends [never]
+  ? {}
+  : Readonly<PatternSearch<TableSearch<RouteTableEntry>, P>>;
+
+/** The search values `href()` and `navigate()` take for a route: any of its schema's, each optional */
+type RouteSearchInput<P extends string> = [RegisteredRoutePatterns] extends [never]
+  ? { readonly [key: string]: string | number | boolean | undefined }
+  : { readonly [K in keyof RouteSearchValues<P>]?: Exclude<RouteSearchValues<P>[K], undefined> };
+
+/**
+ * The registered patterns that have parameters (`/users/:id`) or a search schema, else `string`: what
+ * `href()` takes.
+ */
 export type RoutePatternWithParams = [RegisteredRoutePatterns] extends [never]
   ? string
-  : Extract<RegisteredRoutePatterns, `${string}:${string}`>;
+  : Extract<RegisteredRoutePatterns, `${string}:${string}`> | Extract<SearchPatterns, RegisteredRoutePatterns>;
 
-/** A value for each of a pattern's parameters: `{ id: 7 }` for `/users/:id`. */
-export type RouteParamValues<P extends string> = { readonly [K in ExtractRouteParams<P>]: string | number };
+/** A value for each of a pattern's parameters, `{ id: 7 }` for `/users/:id`, and any of its search values. */
+export type RouteParamValues<P extends string> = {
+  readonly [K in ExtractRouteParams<P>]: string | number;
+} & RouteSearchInput<P>;
 
 /** Resolves to the route param name union when Register is augmented, else `string`. */
 export type RouteParamNames = [ExplicitRegisterRouteParamNames] extends [never]
@@ -149,11 +181,18 @@ type TableComponents<T> = T extends { components: infer C } ? C : never;
 type RegisteredRoutePatternForSelector<S extends string> =
   PatternIn<TableComponents<RouteTableEntry>, S> | PatternIn<EffectiveRouteComponentRegister, S>;
 
-type RouteContextBase<TPattern extends string, TPath extends string, TParams> = Readonly<{
+type RouteContextBase<
+  TPattern extends string,
+  TPath extends string,
+  TParams,
+  TSearch = Readonly<Record<string, unknown>>,
+> = Readonly<{
   pattern: TPattern;
   path: TPath;
   params: TParams;
   searchParams: URLSearchParams;
+  /** The query parameters the route's `search` schema declares, parsed */
+  search: TSearch;
   hash: string;
   title: string;
   state: unknown;
@@ -166,7 +205,7 @@ type ResolvedRouteContext<TPattern extends string> = TPattern extends 'notFound'
         /** What failed: the page's chunk did not load, or its component threw while mounting */
         readonly error: unknown;
       }
-    : RouteContextBase<TPattern, RouteToPath<TPattern>, RouteParamsObject<TPattern>>;
+    : RouteContextBase<TPattern, RouteToPath<TPattern>, RouteParamsObject<TPattern>, RouteSearchValues<TPattern>>;
 
 export interface UntypedRouteContext extends RouteContextBase<string, string, Record<string, string>> {
   /** @deprecated Run thane dev, thane build, or thane serve once to generate route-aware component types. */
@@ -216,6 +255,11 @@ export interface PageRoute {
    * there (`'/login'`), `false` keeps the page on screen. It may be async.
    */
   canEnter?: ((route: UntypedRouteContext) => RouteGuardResult | Promise<RouteGuardResult>) | undefined;
+  /**
+   * The query parameters its page reads on `route.search`, each with its parser:
+   * `{ page: searchNumber(1), sort: searchOneOf(['price', 'name'], 'name') }`.
+   */
+  search?: SearchSchema | undefined;
   redirectTo?: undefined;
 }
 
@@ -226,6 +270,7 @@ export interface RedirectRoute {
   component?: undefined;
   meta?: undefined;
   canEnter?: undefined;
+  search?: undefined;
 }
 
 /**
@@ -432,6 +477,8 @@ let _currentRouteTitle = typeof document !== 'undefined' ? document.title : '';
 let _routeParams: Record<string, string> = {};
 /** On the error route, what failed */
 let _routeError: unknown;
+/** The current route's search values, parsed by its schema */
+let _routeSearch: Record<string, unknown> = {};
 /** The site's head and the app's own fields, from the last defineRoutes() call */
 let _siteMeta: SiteMeta & Record<string, unknown> = {};
 let _customMeta: CustomMetaFields | undefined;
@@ -487,6 +534,7 @@ const createCurrentRouteContext = (): UntypedRouteContext => ({
   path: typeof window !== 'undefined' ? window.location.pathname : _currentPath(),
   pattern: _currentRoutePattern,
   searchParams: new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''),
+  search: _routeSearch,
   hash: typeof window !== 'undefined' ? window.location.hash : '',
   title: _currentRouteTitle,
   state: typeof window !== 'undefined' ? window.history.state : undefined,
@@ -594,7 +642,19 @@ const routeContextFor = (match: MatchResult): UntypedRouteContext => ({
   ...createCurrentRouteContext(),
   pattern: match.pattern,
   params: { ...match.params },
+  search: parseSearch(match.route),
 });
+
+/** A route's search values, parsed from the query string by its schema (none without one) */
+const parseSearch = (route: Route): Record<string, unknown> => {
+  const values: Record<string, unknown> = {};
+  const schema = route.search;
+  if (schema) {
+    const params = new URLSearchParams(window.location.search);
+    for (const key in schema) values[key] = schema[key]!(params.get(key) ?? undefined);
+  }
+  return values;
+};
 
 /** Redirects in a row, reset once a load gets past them: a loop of redirects stops at the limit */
 let _redirects = 0;
@@ -783,6 +843,7 @@ const loadRoute = async (): Promise<void> => {
 
     _currentRoutePattern = match.pattern;
     _routeParams = match.params;
+    if (typeof __THANE_SEARCH__ === 'undefined' || __THANE_SEARCH__) _routeSearch = parseSearch(match.route);
 
     // The route's head goes on before the page mounts, so the page reads its title and may add to it
     if (typeof __THANE_HEAD__ === 'undefined' || __THANE_HEAD__) {
@@ -829,17 +890,33 @@ const loadRoute = async (): Promise<void> => {
 //  Navigation API — generic, zero knowledge of user routes
 // ─────────────────────────────────────────────────────────────
 
-const fillParams = (pattern: string, params: Record<string, string | number>): string =>
-  pattern.replace(/\/:([^/]+)/g, (_, name: string) => '/' + encodeURIComponent(params[name]!));
+const fillParams = (pattern: string, params: Record<string, string | number | boolean>): string => {
+  let path = pattern.replace(/\/:([^/]+)/g, (_, name: string) => '/' + encodeURIComponent(params[name]!));
+  // The other values are search values, in the query: a flag that is on as the bare name, one that is off left out
+  if (typeof __THANE_SEARCH__ === 'undefined' || __THANE_SEARCH__) {
+    const query = new URLSearchParams();
+    for (const key in params) {
+      const value = params[key];
+      if (!pattern.split('/').includes(':' + key) && value !== undefined && value !== null && value !== false) {
+        query.append(key, value === true ? '' : String(value));
+      }
+    }
+    const text = query.toString();
+    if (text) path += '?' + text;
+  }
+  return path;
+};
 
 /**
  * A route's path with its parameters filled in, each one URL-encoded: `href('/users/:id', { id: 7 })`
- * is `'/users/7'`. The pattern and the parameters are typed from the app's routes.
+ * is `'/users/7'`. Values its `search` schema declares go into the query:
+ * `href('/users/:id', { id: 7, tab: 'posts' })` is `'/users/7?tab=posts'`. The pattern, the parameters
+ * and the search values are typed from the app's routes.
  */
 export const href = fillParams as <P extends RoutePatternWithParams>(
   pattern: P,
   params: RouteParamValues<P>,
-) => RouteToPath<P>;
+) => WithQuery<RouteToPath<P>>;
 
 /**
  * Navigate to the given path using HTML5 History pushState: `navigate('/about')`, or a pattern and its
@@ -849,7 +926,7 @@ export const href = fillParams as <P extends RoutePatternWithParams>(
  */
 export function navigate(path: RoutePaths): void;
 export function navigate<P extends RoutePatternWithParams>(pattern: P, params: RouteParamValues<P>): void;
-export function navigate(path: string, params?: Record<string, string | number>): void {
+export function navigate(path: string, params?: Record<string, string | number | boolean>): void {
   if (params) path = fillParams(path, params);
   // Nothing to do when the whole URL, query and hash included, is already the current one
   const target = new URL(path, window.location.href);

@@ -83,6 +83,8 @@ export async function runBuild(config: BuildConfig): Promise<void> {
     __THANE_GUARDS__: String(routeTables?.usesGuards ?? true),
     // The router's link handling, left out when no template (nor index.html) has a plain <a href>
     __THANE_LINKS__: String(routeTables?.usesLinks ?? true),
+    // Typed search values (route.search, and search values in href() and navigate()), left out without a schema
+    __THANE_SEARCH__: String(routeTables?.usesSearch ?? true),
   };
 
   const plugins = [

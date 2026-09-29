@@ -229,3 +229,68 @@ describe('The error route', () => {
     }
   });
 });
+
+describe('Typed search values', () => {
+  const buildWithSearch = async (use: string): Promise<string> => {
+    const project = await createTempProject(MAIN, {
+      'tsconfig.json': TSCONFIG,
+      'src/routes.ts': [
+        "import { defineRoutes, searchFlag, searchNumber, searchOneOf, searchString } from 'thane/router';",
+        "import { ProductsPage } from './pages/products.js';",
+        "import { HomePage } from './pages/home.js';",
+        '',
+        'const Routes = defineRoutes({',
+        "  '/products': {",
+        '    component: ProductsPage,',
+        "    search: { page: searchNumber(1), q: searchString(), sale: searchFlag(), sort: searchOneOf(['price', 'name'], 'name'), tags: (raw): string[] => raw?.split(',') ?? [] },",
+        '  },',
+        '  notFound: { component: HomePage },',
+        '});',
+        'export default Routes;',
+        '',
+      ].join('\n'),
+      'src/pages/home.ts': page('HomePage', '/products'),
+      'src/pages/products.ts': [
+        "import { defineComponent, html } from 'thane';",
+        '',
+        "export const ProductsPage = defineComponent('products-page', ({ route }) => {",
+        '  const search = route!.search;',
+        '  const page: number = search.page;',
+        "  const sort: 'price' | 'name' = search.sort;",
+        '  const q: string | undefined = search.q;',
+        '  const tags: string[] = search.tags;',
+        '  const sale: boolean = search.sale;',
+        `  ${use}`,
+        '  return { template: html`<p>${page} ${sort} ${q} ${tags.length} ${sale}</p>` };',
+        '});',
+        '',
+      ].join('\n'),
+    });
+    try {
+      await runBuild(createTestBuildConfig(project));
+      return await readFile(join(project.root, '.thane', 'types', 'router', 'src', 'routes.generated.d.ts'), 'utf8');
+    } finally {
+      await removeTempProject(project);
+    }
+  };
+
+  test('a page reads route.search typed from the schema, and navigate() takes the declared values', async () => {
+    const generated = await buildWithSearch(
+      "const go = () => navigate('/products', { page: 2, sort: 'price', sale: true });\n  void go;",
+    );
+    expect(generated).toContain(
+      "'/products': { 'page': number; 'q': string | undefined; 'sale': boolean; 'sort': 'price' | 'name'; 'tags': string[]; };",
+    );
+  });
+
+  test('a search value the schema does not declare, or of the wrong type, is a type error', async () => {
+    await expect(buildWithSearch("const go = () => navigate('/products', { pg: 2 });\n  void go;")).rejects.toThrow();
+    await expect(
+      buildWithSearch("const go = () => navigate('/products', { sort: 'size' });\n  void go;"),
+    ).rejects.toThrow();
+  });
+
+  test('a path with a query or a hash is a route path', async () => {
+    await buildWithSearch("const go = () => { navigate('/products?page=2'); navigate('/products#top'); };\n  void go;");
+  });
+});

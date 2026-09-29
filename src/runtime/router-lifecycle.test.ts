@@ -19,6 +19,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { __registerComponentLean, mount } from './component.js';
 import { defineRoutes, navigate, navigateBack, startRouter, stopRouter } from './router.js';
 import type { Route, RoutesMap } from './router.js';
+import { searchFlag, searchNumber, searchOneOf, searchString } from './router-search.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Fake browser with an operation log
@@ -521,7 +522,18 @@ describe('route context', () => {
     );
     await settle();
     const r = seen.route;
-    expect(Object.keys(r)).toEqual(['params', 'path', 'pattern', 'searchParams', 'hash', 'title', 'state', 'error']);
+    expect(Object.keys(r)).toEqual([
+      'params',
+      'path',
+      'pattern',
+      'searchParams',
+      'search',
+      'hash',
+      'title',
+      'state',
+      'error',
+    ]);
+    expect(r.search).toEqual({});
     expect(r.error).toBeUndefined();
     expect(r.params).toEqual({ id: '42' });
     expect(r.path).toBe('/users/42');
@@ -838,6 +850,37 @@ describe('route context', () => {
       stopRouter();
       expect(b.listeners.get('click') ?? []).toEqual([]);
     });
+  });
+
+  test("route.search holds the values the route's schema parses from the query; its guard gets them too", async () => {
+    const seen: { route?: any } = {};
+    const guarded: unknown[] = [];
+    install('http://app.test/products?page=3&sort=bogus&sale');
+    startRouter(
+      {
+        routes: {
+          '/products': {
+            component: page('Products', seen),
+            search: {
+              page: searchNumber(1),
+              sort: searchOneOf(['price', 'name'], 'name'),
+              sale: searchFlag(),
+              q: searchString(),
+            },
+            canEnter: (r) => (guarded.push(r.search), true),
+          },
+        },
+        notFound: { component: page('NF') },
+      },
+      new FakeElement('outlet') as any,
+      { scrollRestoration: false },
+    );
+    await settle();
+    expect(seen.route.search).toEqual({ page: 3, sort: 'name', sale: true, q: undefined });
+    expect(guarded).toEqual([{ page: 3, sort: 'name', sale: true, q: undefined }]);
+    navigate('/products', { page: 4, q: 'x' });
+    await settle();
+    expect(seen.route.search).toEqual({ page: 4, sort: 'name', sale: false, q: 'x' });
   });
 
   test('a lazy route: the default export is mounted', async () => {

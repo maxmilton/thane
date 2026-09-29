@@ -46,6 +46,8 @@ export interface RouteTableHead {
   usesHead: boolean;
   /** True when a route has `canEnter` or `redirectTo`, or when that cannot be told */
   usesGuards: boolean;
+  /** True when a route has a `search` schema, or when that cannot be told */
+  usesSearch: boolean;
   /** What could not be read, for a verbose note */
   notes: string[];
 }
@@ -360,6 +362,7 @@ export const readRouteTableHeads = async (
     const [routesArg, optionsArg] = call.arguments;
     let usesHead = optionsArg !== undefined;
     let usesGuards = false;
+    let usesSearch = false;
     let site: Record<string, unknown> = {};
     let custom: Record<string, CustomFieldSource> = {};
     const options = optionsArg && unwrap(optionsArg);
@@ -392,13 +395,14 @@ export const readRouteTableHeads = async (
     const table = routesArg && unwrap(routesArg);
     if (!table || !ts.isObjectLiteralExpression(table)) {
       usesHead = true; // cannot tell
-      tables.push({ file, site, custom, routes, usesHead, usesGuards: true, notes });
+      tables.push({ file, site, custom, routes, usesHead, usesGuards: true, usesSearch: true, notes });
       continue;
     }
     for (const property of table.properties) {
       if (!ts.isPropertyAssignment(property)) {
         usesHead = true;
         usesGuards = true;
+        usesSearch = true;
         continue;
       }
       const routePath = propertyName(property.name);
@@ -407,6 +411,7 @@ export const readRouteTableHeads = async (
       if (!ts.isObjectLiteralExpression(route)) {
         usesHead = true;
         usesGuards = true;
+        usesSearch = true;
         if (routePath !== 'notFound' && routePath !== 'error') routes.push({ path: routePath, meta: null });
         continue;
       }
@@ -415,6 +420,7 @@ export const readRouteTableHeads = async (
         // A guard or a redirect, or a property that cannot be read (a spread): the router keeps its guard step
         const name = ts.isSpreadAssignment(routeProperty) ? null : propertyName(routeProperty.name);
         if (name === null || name === 'canEnter' || name === 'redirectTo') usesGuards = true;
+        if (name === null || name === 'search') usesSearch = true;
         if (!ts.isPropertyAssignment(routeProperty) || name !== 'meta') continue;
         const init = unwrap(routeProperty.initializer);
         if (ts.isObjectLiteralExpression(init)) {
@@ -434,7 +440,7 @@ export const readRouteTableHeads = async (
       }
       if (routePath !== 'notFound' && routePath !== 'error') routes.push({ path: routePath, meta });
     }
-    tables.push({ file, site, custom, routes, usesHead, usesGuards, notes });
+    tables.push({ file, site, custom, routes, usesHead, usesGuards, usesSearch, notes });
   }
   return tables;
 };
@@ -541,7 +547,13 @@ export const routeTablesOf = async (
   entryPoints: string[],
   projectRoot: string,
   htmlFile?: string,
-): Promise<{ tables: RouteTableHead[]; usesHead: boolean; usesGuards: boolean; usesLinks: boolean }> => {
+): Promise<{
+  tables: RouteTableHead[];
+  usesHead: boolean;
+  usesGuards: boolean;
+  usesLinks: boolean;
+  usesSearch: boolean;
+}> => {
   const resolve = createModuleResolver(projectRoot);
   const tables: RouteTableHead[] = [];
   let usesSetMeta = false;
@@ -556,5 +568,6 @@ export const routeTablesOf = async (
     usesHead: usesSetMeta || tables.some((table) => table.usesHead),
     usesGuards: tables.some((table) => table.usesGuards),
     usesLinks,
+    usesSearch: tables.some((table) => table.usesSearch),
   };
 };

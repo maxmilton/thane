@@ -228,6 +228,23 @@ describe('whether an app needs the guard and redirect step', () => {
   });
 });
 
+describe('whether an app needs typed search values', () => {
+  const search = async (routes: string) => {
+    const { dir } = project({
+      'src/main.ts': "import Routes from './routes.js';\nconsole.log(Routes);\n",
+      'src/routes.ts': `import { defineRoutes, searchNumber } from 'thane/router';\nexport default defineRoutes({ ${routes} });\n`,
+    });
+    return (await routeTablesOf([join(dir, 'src', 'main.ts')], dir)).usesSearch;
+  };
+
+  test('a route with a search schema: yes; none, or only guards: no; a route it cannot read: yes', async () => {
+    expect(await search(`'/': { ${PAGE}, search: { page: searchNumber(1) } }, notFound: { ${PAGE} }`)).toBe(true);
+    expect(await search(`'/': { ${PAGE}, canEnter: () => true }, notFound: { ${PAGE} }`)).toBe(false);
+    expect(await search(`'/': { ${PAGE} }, notFound: { ${PAGE} }`)).toBe(false);
+    expect(await search(`'/': { ...{ ${PAGE} } }, notFound: { ${PAGE} }`)).toBe(true);
+  });
+});
+
 describe('whether an app needs the link handling', () => {
   test('a plain link to a path or an expression counts; one with its own click handler, or to elsewhere, does not', () => {
     const cases: Array<[string, boolean]> = [

@@ -165,11 +165,47 @@ const getRouteComponentSelector = async (
   return null;
 };
 
+/** One route's search values: each parameter and the type of its parsed value */
+type SearchTypes = Array<[pattern: string, fields: Array<[key: string, type: string]>]>;
+
+/**
+ * The type of the value a search parser gives, from the source: the helpers' by their arguments, a
+ * function's from its return type annotation, `unknown` otherwise.
+ */
+const searchValueType = (parser: ts.Expression, sourceFile: ts.SourceFile): string => {
+  let node = parser;
+  while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)) node = node.expression;
+  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+    const [first, second] = node.arguments;
+    const optional = (type: string, fallback: ts.Expression | undefined) => (fallback ? type : `${type} | undefined`);
+    switch (node.expression.text) {
+      case 'searchString':
+        return optional('string', first);
+      case 'searchNumber':
+        return optional('number', first);
+      case 'searchFlag':
+        return 'boolean';
+      case 'searchOneOf': {
+        let list = first;
+        while (list && (ts.isAsExpression(list) || ts.isParenthesizedExpression(list))) list = list.expression;
+        const values =
+          list && ts.isArrayLiteralExpression(list) && list.elements.every(ts.isStringLiteral)
+            ? list.elements.map((element) => `'${escapeTypeLiteral((element as ts.StringLiteral).text)}'`).join(' | ')
+            : 'string';
+        return optional(values || 'never', second);
+      }
+    }
+  }
+  if ((ts.isArrowFunction(node) || ts.isFunctionExpression(node)) && node.type) return node.type.getText(sourceFile);
+  return 'unknown';
+};
+
 const generateFileContent = (
   tableKey: string,
   routePaths: string[],
   selectorEntries: Array<[string, string]>,
   customMeta: Array<[string, string]>,
+  search: SearchTypes = [],
 ): string => {
   // The paths are written out as string literals. Deriving them from `typeof Routes` made the
   // global `navigate()` depend on the type of the route table, which depends on the type of
@@ -194,6 +230,17 @@ const generateFileContent = (
     ...(customMeta.length > 0
       ? [
           `        customMeta: { ${customMeta.map(([key, type]) => `'${escapeTypeLiteral(key)}'?: ${type};`).join(' ')} };`,
+        ]
+      : []),
+    // Each route's search values, from its `search` schema
+    ...(search.length > 0
+      ? [
+          '        search: {',
+          ...search.map(
+            ([pattern, fields]) =>
+              `          '${escapeTypeLiteral(pattern)}': { ${fields.map(([key, type]) => `'${escapeTypeLiteral(key)}': ${type};`).join(' ')} };`,
+          ),
+          '        };',
         ]
       : []),
     // Each page component's selector, and the route pattern it is mounted for
@@ -258,9 +305,10 @@ const writeGeneratedFile = async (
   routePaths: Set<string>,
   selectorMap: Map<string, string>,
   customMeta: Array<[string, string]>,
+  search: SearchTypes,
 ): Promise<void> => {
   const sortedSelectorEntries = Array.from(selectorMap.entries()).sort(([left], [right]) => left.localeCompare(right));
-  const nextContent = generateFileContent(tableKey, Array.from(routePaths), sortedSelectorEntries, customMeta);
+  const nextContent = generateFileContent(tableKey, Array.from(routePaths), sortedSelectorEntries, customMeta, search);
   const previousContent = await fs.readFile(filePath, 'utf8').catch(() => null);
 
   if (previousContent === nextContent) {
@@ -289,6 +337,7 @@ const collectRouteTyping = async (
   routePaths: Set<string>;
   selectorMap: Map<string, string>;
   customMeta: Array<[string, string]>;
+  search: SearchTypes;
 } | null> => {
   const cached = await sourceCache.get(routesFilePath);
   if (!cached || !cached.source.includes('defineRoutes(')) {
@@ -298,6 +347,7 @@ const collectRouteTyping = async (
   const importBindings = collectImportBindings(cached.sourceFile);
   const routePaths = new Set<string>();
   const routeComponents: Array<[routeKey: string, routeProp: ts.PropertyAssignment]> = [];
+  const search: SearchTypes = [];
   let foundRoutes = false;
 
   const visit = (node: ts.Node): void => {
@@ -322,6 +372,15 @@ const collectRouteTyping = async (
           for (const routeProp of property.initializer.properties) {
             if (!ts.isPropertyAssignment(routeProp)) continue;
             const routePropName = getPropertyNameText(routeProp.name);
+            if (routePropName === 'search' && ts.isObjectLiteralExpression(routeProp.initializer)) {
+              const fields: Array<[string, string]> = [];
+              for (const field of routeProp.initializer.properties) {
+                const key = ts.isPropertyAssignment(field) ? getPropertyNameText(field.name) : null;
+                if (key)
+                  fields.push([key, searchValueType((field as ts.PropertyAssignment).initializer, cached.sourceFile)]);
+              }
+              search.push([routeKey, fields]);
+            }
             if (!routePropName || !ROUTE_COMPONENT_PROPS.has(routePropName)) continue;
 
             routeComponents.push([routeKey, routeProp]);
@@ -352,7 +411,7 @@ const collectRouteTyping = async (
       customMeta.push([key, field.kind === 'function' ? field.valueType : 'string']);
     }
   }
-  return { routePaths, selectorMap, customMeta };
+  return { routePaths, selectorMap, customMeta, search };
 };
 
 /**
@@ -412,6 +471,7 @@ export const syncProjectTypes = async (projectRoot: string = process.cwd()): Pro
       routeTyping.routePaths,
       routeTyping.selectorMap,
       routeTyping.customMeta,
+      routeTyping.search,
     );
     generatedCount++;
   }

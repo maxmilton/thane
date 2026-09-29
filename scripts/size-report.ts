@@ -67,19 +67,23 @@ const FEATURE_SETS: Record<string, string | { contents: string; define: Record<s
   'when/whenElse + keyed reconciler': `import { __bindIf, __bindIfExpr, createKeyedReconciler } from './src/runtime/internal.ts'; export const x = [__bindIf, __bindIfExpr, createKeyedReconciler];`,
   'router (defineRoutes+navigate+mount)': {
     contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,
-    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'false' },
+    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'false', __THANE_SEARCH__: 'false' },
   },
   'router with guards and redirects': {
     contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,
-    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'true', __THANE_LINKS__: 'false' },
+    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'true', __THANE_LINKS__: 'false', __THANE_SEARCH__: 'false' },
   },
   'router with link handling': {
     contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; export const x = [mount, defineRoutes, navigate];`,
-    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'true' },
+    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'true', __THANE_SEARCH__: 'false' },
+  },
+  'router with typed search': {
+    contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate } from './src/runtime/router.ts'; import { searchNumber } from './src/runtime/router-search.ts'; export const x = [mount, defineRoutes, navigate, searchNumber];`,
+    define: { __THANE_HEAD__: 'false', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'false', __THANE_SEARCH__: 'true' },
   },
   'router with route heads (+setMeta, metaName)': {
     contents: `import { mount } from './src/runtime/index.ts'; import { defineRoutes, navigate, setMeta } from './src/runtime/router.ts'; import { metaName } from './src/runtime/router-head.ts'; export const x = [mount, defineRoutes, navigate, setMeta, metaName];`,
-    define: { __THANE_HEAD__: 'true', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'false' },
+    define: { __THANE_HEAD__: 'true', __THANE_GUARDS__: 'false', __THANE_LINKS__: 'false', __THANE_SEARCH__: 'false' },
   },
 };
 

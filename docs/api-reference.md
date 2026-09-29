@@ -55,7 +55,8 @@ Complete API surface for the Thane framework, covering all public exports, the t
 | :------------- | :------------------------------------------------------ | :----------------------------------------------------------------------- |
 | `defineRoutes` | `(routes: { [pattern: string]: Route; notFound: Route; error?: Route }, options?: RouterOptions) => typeof routes` | Define the route map with type-safe keys; required before `mount()` with a `router` option. `options` gives the site's head and the app's own head fields ([Route Heads](routing.md#route-heads)) |
 | `navigate`     | `(path: RoutePaths) => void`, `(pattern, params) => void` | Navigate to a path, or to a route pattern with its parameters filled in (also available as a global) |
-| `href`         | `(pattern, params) => RoutePaths`                       | A route pattern's path with its parameters filled in, URL-encoded: `href('/users/:id', { id: 7 })` is `/users/7` |
+| `href`         | `(pattern, params) => RoutePaths`                       | A route pattern's path with its parameters filled in, URL-encoded: `href('/users/:id', { id: 7 })` is `/users/7`; the route's search values go into the query |
+| `searchString`, `searchNumber`, `searchFlag`, `searchOneOf` | `(…) => SearchParser<T>` | Parsers for a route's `search` schema ([Search Parameters](routing.md#search-parameters)) |
 | `navigateBack` | `() => void`                                            | Navigate back in browser history (also available as a global)            |
 | `setMeta`      | `(meta: AppRouteMeta) => void`                          | Set head fields of the page on screen, until the next route loads         |
 | `metaName`     | `(name: string) => CustomMetaField<string>`             | A custom head field for `<meta name="…">`                                |

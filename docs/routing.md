@@ -215,6 +215,50 @@ export const UserPage = defineComponent('user-page', ({ route }) => {
 
 Parameters are decoded: `/users/ada%20lovelace` gives `id` the value `ada lovelace`. A segment that is not valid percent-encoding (`/users/100%`) is kept as written.
 
+## Search Parameters
+
+A route declares the query parameters its page reads in a `search` schema: each name with a parser. The page
+reads the parsed values on `route.search`, typed from the schema.
+
+```typescript
+import { defineRoutes, searchFlag, searchNumber, searchOneOf, searchString } from 'thane/router';
+
+'/products': {
+  component: () => import('./pages/products.js'),
+  search: {
+    page: searchNumber(1), // number: 1 when missing or not a number
+    q: searchString(), // string | undefined
+    sale: searchFlag(), // boolean: true for ?sale or ?sale=1
+    sort: searchOneOf(['price', 'name'], 'name'), // 'price' | 'name'
+    tags: (raw): string[] => raw?.split(',') ?? [], // any parser: typed from its return type annotation
+  },
+},
+
+// pages/products.ts: /products?page=2&sort=price
+const { page, sort } = route!.search; // 2, 'price'
+```
+
+| Helper                        | Value                                                                |
+| :---------------------------- | :------------------------------------------------------------------- |
+| `searchString(fallback?)`     | the value, or `fallback` when the URL has none                       |
+| `searchNumber(fallback?)`     | the value as a number, or `fallback` when missing or not a number    |
+| `searchFlag()`                | `true` when present, `false` when missing, `0` or `false`            |
+| `searchOneOf(values, fallback?)` | one of `values`, or `fallback` for anything else                  |
+
+A parser gets the raw value, or `undefined` when the URL has none; any function of that shape works. Without a
+fallback, a helper's value may be `undefined`. `route.searchParams` still holds every query parameter, raw.
+
+`href()` and `navigate()` take the declared values next to the path parameters and write them into the query:
+
+```typescript
+href('/products', { page: 2, sale: true }); // '/products?page=2&sale='
+navigate('/users/:id', { id: user.id, tab: 'posts' }); // if /users/:id declares tab
+```
+
+A flag that is on is written as its bare name, and one that is off, or a value that is `undefined`, is left
+out. A value the schema does not declare is a type error. A production build leaves the parsing and the writing
+out when no route has a `search` schema.
+
 ## Route Context
 
 Every component has access to route context via `ctx.route`:
@@ -225,6 +269,7 @@ Every component has access to route context via `ctx.route`:
 | `pattern`      | `string`                 | Matched route pattern (e.g., `/users/:id`) |
 | `params`       | `Record<string, string>` | Extracted route parameters                 |
 | `searchParams` | `URLSearchParams`        | URL query parameters                       |
+| `search`       | typed from the schema    | The route's [search parameters](#search-parameters), parsed |
 | `hash`         | `string`                 | URL hash fragment                          |
 | `title`        | `string`                 | The document title the route's head set    |
 | `state`        | `unknown`                | History state object                       |
