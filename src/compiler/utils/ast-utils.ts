@@ -65,9 +65,8 @@ export const extractStaticValue = (arg: ts.Expression): string | number | boolea
 };
 
 /**
- * Find all signal property declarations and their initial values under `root`, except inside the
- * nodes in `skip`. Supports both class property pattern (this._count = signal(0))
- * and variable pattern (const count = signal(0)).
+ * The signals declared under `root` (`const count = signal(0)`), except inside the nodes in `skip`,
+ * with their initial values where they are literals. A template's static text holds them.
  */
 export const findSignalInitializers = (
   root: ts.Node,
@@ -77,26 +76,6 @@ export const findSignalInitializers = (
 
   const visit = (node: ts.Node) => {
     if (skip?.has(node)) return;
-    // Class property pattern: private _count = signal(0)
-    if (
-      ts.isPropertyDeclaration(node) &&
-      node.name &&
-      ts.isIdentifier(node.name) &&
-      node.initializer &&
-      ts.isCallExpression(node.initializer) &&
-      isSignalCall(node.initializer)
-    ) {
-      const args = node.initializer.arguments;
-      const firstArg = args[0];
-      if (args.length > 0 && firstArg) {
-        const value = extractStaticValue(firstArg);
-        if (value !== null) {
-          initializers.set(node.name.text, value);
-        }
-      }
-    }
-
-    // Variable pattern: const count = signal(0)
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
