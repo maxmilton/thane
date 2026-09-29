@@ -129,7 +129,7 @@ Compiled components import these helpers from `thane/runtime`, the compiler's ow
 
 A call to a known component inside a template, `${Card({ title })}`, is replaced at build time by the child's host element (`<card>`), and the parent's binding function mounts the child into it. Where the browser's parser would not keep an element in that place (directly in a table row, inside `<svg>`), a comment stands there instead and the child's host replaces it at mount.
 
-Components are matched to calls by export name, across the scanned folders: give every component a unique export name.
+A call is matched to the component the file declares under that name, or imports under it (following re-exports and the tsconfig's `paths`). A file can declare several components; each is compiled on its own.
 
 ## CSS Processing
 

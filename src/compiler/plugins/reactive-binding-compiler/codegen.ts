@@ -1779,12 +1779,12 @@ export const generateInitBindingsFunction = (
 };
 
 /**
- * Generate a static template property for pre-compiled HTML (the file imports the runtime's `__T`)
+ * Generate the static template declaration `name` for pre-compiled HTML (the file imports the runtime's `__T`)
  */
-export const generateStaticTemplate = (content: string, emit: EmitOptions): string => {
+export const generateStaticTemplate = (content: string, emit: EmitOptions, name = '__tpl'): string => {
   const escapedContent = escapeTemplateLiteral(stripMarks(emit.html(content)));
   return `
-  const __tpl = ${BIND_FN.TEMPLATE}(\`${escapedContent}\`);`;
+  const ${name} = ${BIND_FN.TEMPLATE}(\`${escapedContent}\`);`;
 };
 
 /**

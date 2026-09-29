@@ -1,6 +1,6 @@
 /**
- * Which components a file can call in its templates: the ones it declares, and the ones it imports,
- * under the names it gives them. An import is followed to the file that defines the component, through
+ * Which components a file can call in its templates: the ones it declares, exported or not, and the ones it
+ * imports, under the names it gives them. An import is followed to the file that defines the component, through
  * re-exports (`export { Card } from`, `export * from`, `export { Card }` of an imported binding), with
  * TypeScript's module resolution and the project's tsconfig (paths, extensions, index files). A call to
  * any other name is an ordinary expression, whatever components elsewhere in the project are called.
@@ -91,7 +91,7 @@ export const createComponentResolver = (
   const exported = async (filePath: string, name: string, depth: number): Promise<ComponentDefinition | null> => {
     if (depth > MAX_REEXPORT_DEPTH) return null;
     const own = (await definitionsIn(filePath)).get(name);
-    if (own) return own;
+    if (own?.exported) return own;
     const sourceFile = await parsedFile(filePath);
     if (!sourceFile) return null;
     for (const statement of sourceFile.statements) {

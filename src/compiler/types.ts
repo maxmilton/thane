@@ -39,9 +39,12 @@ export interface Diagnostic {
  * Component definition
  */
 export interface ComponentDefinition {
+  /** The name the component is declared under */
   name: string;
   selector: string;
   filePath: string;
+  /** Exported, so other files can import it; one that is not is called in its own file only */
+  exported: boolean;
 }
 
 /**

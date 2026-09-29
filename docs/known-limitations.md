@@ -4,10 +4,6 @@ This page documents current constraints, browser requirements, and by-design dec
 
 ## Compiler Constraints
 
-### One Component Per File
-
-Only one `defineComponent()` call is allowed per file (THANE407). The compiler processes the entire file as a single component unit — multiple calls cause silent skipping.
-
 ### No Nested `html` Tags
 
 `html` tagged templates cannot be nested inside other `html` templates (THANE404). Inner templates must be extracted to `const` variables:
@@ -27,9 +23,9 @@ Templates inside directive callbacks (`repeat`, `whenElse`) are the exception �
 
 `html` template variables used inside `defineComponent()` must be defined in the same file (THANE410). The compiler resolves templates via AST analysis and cannot process imported variables. CSS imports are unaffected.
 
-### Unique Component Names
+### Unique Selectors
 
-The compiler recognises a child component call, `${Card({ … })}`, by the component's export name, over every component in the working directory and the project. Two components exported under the same name collide: the last one found wins, and its selector names the host element of both. A function called in a template with the name of a component defined elsewhere is taken for that component too. Give every component a unique export name.
+A component's selector is the class of its host element, which scopes its styles. Two components of an app with one selector (two components declared under one name, each with a derived selector) share it: the styles of the one registered first apply to both. The build reports them (THANE013). Give one of them another name or an explicit selector. A child component call, `${Card({ … })}`, is resolved through the file's own declarations and imports, so two components with one name in different files are never confused for each other.
 
 
 ### One Return Object per Setup

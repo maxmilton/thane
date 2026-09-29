@@ -24,6 +24,8 @@ export {
   isDefineComponentCall,
   isSignalCall,
   extractComponentDefinitions,
+  findComponentDeclarations,
+  type ComponentDeclaration,
   extractStaticValue,
   findSignalInitializers,
   isHtmlTemplate,

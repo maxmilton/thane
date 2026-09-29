@@ -16,7 +16,7 @@ export const MyButton = defineComponent(() => {
 });
 ```
 
-The compiler auto-derives the CSS selector from the export name: `MyButton` → `my-button`. The selector is used as a CSS class on the host element for style scoping.
+The compiler auto-derives the CSS selector from the name the component is declared under: `MyButton` → `my-button`. The selector is used as a CSS class on the host element for style scoping.
 
 ### Explicit Selector
 
@@ -215,9 +215,31 @@ template: html` ${Counter({})} ${Counter({})} `;
 
 These two `Counter` instances maintain their own signal values.
 
-## One Component Per File
+## Several Components in One File
 
-The compiler enforces one `defineComponent` per file (lint rule THANE407). This ensures each component gets a unique selector and avoids ambiguity in the compilation pipeline.
+A file can declare several components. Each is compiled on its own, with its own template, bindings and
+styles. A component the file does not export is private to it: the file's other components mount it like
+any child, and no other file can import it.
+
+```typescript
+import { defineComponent, html, repeat, signal } from 'thane';
+
+const OrderRow = defineComponent<{ order: Order }>(({ props }) => ({
+  template: html`<li>${props.order.name}: ${props.order.total}</li>`,
+}));
+
+export const Orders = defineComponent(() => {
+  const orders = signal<Order[]>([]);
+  return {
+    template: html`<ul>${repeat(orders(), (o) => OrderRow({ order: o }), null, (o) => o.id)}</ul>`,
+  };
+});
+```
+
+A private component's selector is derived from its name like an exported one's (`OrderRow` → `order-row`).
+Selectors must differ across the app: two components with one selector share their host class, and the styles
+of the one registered first apply to both. The build reports two such components (THANE013); give one of them
+another name or an explicit selector.
 
 ## One Return Object
 

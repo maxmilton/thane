@@ -4,7 +4,8 @@
  * lint-rules.test.ts pins codes and counts. These tests pin everything else a user sees, plus the
  * shapes each rule accepts or skips: which return objects THANE401/402 inspect, which calls count as
  * defineComponent, which tags count as html/css, and how THANE411 keys mount targets.
- * THANE406 (no-element-id) is retired: compiled code no longer uses ids.
+ * THANE406 (no-element-id) is retired: compiled code no longer uses ids. THANE407 (single-component-per-file)
+ * is retired: each component of a file is compiled on its own.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -19,7 +20,6 @@ import {
   requireConstTaggedTemplates,
   noNestedHtmlTags,
   noConditionalTemplateInit,
-  singleComponentPerFile,
   componentConstDeclaration,
   noAliasedComponentExport,
   noCrossFileHtmlTemplate,
@@ -337,43 +337,6 @@ describe('THANE405 diagnostics', () => {
       warning(src, 6, 'g =', LOGICAL),
       warning(src, 7, 'h =', TERNARY),
     ]);
-  });
-});
-
-// ============================================================================
-// THANE407: single-component-per-file
-// ============================================================================
-
-describe('THANE407 diagnostics', () => {
-  const error = diag('error', ErrorCode.SINGLE_COMPONENT_PER_FILE);
-  const message = (n: number) =>
-    `Only one defineComponent() is allowed per file. Found ${n} calls — ` +
-    'the compiler processes only one component per file. Split additional components into separate files.';
-
-  test('reports every call after the first, however it is written, with the total count', () => {
-    const src = [
-      'export const A = defineComponent(() => ({ template: html`<a/>` }));',
-      'function make() {',
-      '  let B = defineComponent(() => ({})), C = defineComponent(() => ({}));',
-      '}',
-      '/** Doc. */',
-      'export default defineComponent(() => ({ template: html`<c/>` }));',
-      'const notOne = lib.defineComponent(() => ({}));',
-      'const alsoNot = (defineComponent(() => ({})));',
-      'defineComponent(() => ({}));',
-    ];
-    expect(run(singleComponentPerFile, src)).toStrictEqual([
-      error(src, 3, 'B =', message(6)),
-      error(src, 3, 'C =', message(6)),
-      error(src, 6, 'export default', message(6)),
-      error(src, 8, 'alsoNot', message(6)),
-      error(src, 9, 'defineComponent', message(6)),
-    ]);
-  });
-
-  test('counts a defineComponent declared inside a setup function', () => {
-    const src = ['export const A = defineComponent(() => {', '  const Inner = defineComponent(() => ({}));', '});'];
-    expect(run(singleComponentPerFile, src)).toStrictEqual([error(src, 2, 'Inner', message(2))]);
   });
 });
 

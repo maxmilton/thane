@@ -128,7 +128,7 @@ const resolveImportedSourceFile = async (specifier: string, importerPath: string
   return null;
 };
 
-/** The selector of the component `exportName` names in the imported file, or of its last component. */
+/** The selector of the component `exportName` names in the imported file, or of its last exported component. */
 const resolveSelector = async (
   specifier: string,
   exportName: string | undefined,
@@ -140,7 +140,7 @@ const resolveSelector = async (
     return null;
   }
 
-  const definitions = extractComponentDefinitions(cached.sourceFile, sourcePath);
+  const definitions = extractComponentDefinitions(cached.sourceFile, sourcePath).filter((d) => d.exported);
   const definition = exportName ? definitions.find((d) => d.name === exportName) : definitions.at(-1);
   return definition?.selector ?? null;
 };

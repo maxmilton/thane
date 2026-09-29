@@ -1413,6 +1413,30 @@ test.describe('calls to the component’s own functions in a template', () => {
   });
 });
 
+test.describe('several components in one file', () => {
+  test("C1 the file's components mount one another, each with its own signals and styles", async ({ page }) => {
+    const probe = await mountProbe(page, 'c1');
+    const green = 'rgb(0, 128, 0)';
+    await expect(page.locator('.c1-own')).toHaveText('1');
+    await expect(page.locator('.c1-count-value')).toHaveText('3');
+    await expect(page.locator('.c1-pill-text')).toHaveText(['top 2', 'a 2', 'b 2']);
+    await expect(page.locator('.c1-pill-text').first()).toHaveCSS('color', green);
+    await expect(page.locator('.c1-plain')).not.toHaveCSS('color', green);
+
+    await setProbe(page, 'c1', 'items', [
+      { id: 2, label: 'b' },
+      { id: 3, label: 'c' },
+    ]);
+    await expect(page.locator('.c1-rows .c1-pill-text')).toHaveText(['b 2', 'c 2']);
+    await setProbe(page, 'c1count', 'count', 4);
+    await expect(page.locator('.c1-count-value')).toHaveText('4');
+    await setProbe(page, 'c1', 'count', 5);
+    await expect(page.locator('.c1-own')).toHaveText('5');
+    await expect(page.locator('.c1-count-value')).toHaveText('4');
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
 test.describe('a keyed list reordered while a row goes', () => {
   test('R1 the rows stay before the list anchor, so a later append goes last', async ({ page }) => {
     const probe = await mountProbe(page, 'r1');

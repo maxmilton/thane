@@ -17,7 +17,7 @@ src/
       tsc-type-checker/        # Type sync and TypeScript type checking at build start
     testing/                   # Shared helpers for build-through tests (not published)
     utils/                     # Shared compiler utilities (HTML parser, AST helpers, file scan, logger)
-    errors.ts                  # Diagnostic codes (THANE006–THANE012, THANE200, THANE202, THANE400–THANE413)
+    errors.ts                  # Diagnostic codes (THANE006–THANE013, THANE200, THANE202, THANE400–THANE413)
   contracts/                   # Names shared by the compiler and the runtime's compiled-output contract
     compiler/                  # Binding kinds, parser states, the code generator's result type
     runtime/                   # Runtime helper names, package entry specifiers
@@ -73,14 +73,14 @@ The build is then an **esbuild plugin pipeline**, registered in this order. esbu
 
 ### One Component File
 
-Inside the precompiler's `onLoad`, `transformDefineComponentSource` (`reactive-binding-compiler/index.ts`) compiles a component file from one parse of it:
+Inside the precompiler's `onLoad`, `transformDefineComponentSource` (`reactive-binding-compiler/index.ts`) compiles a component file from one parse of it. Each `const X = defineComponent(…)` in it is compiled on its own (steps 1 to 5), with ids counted across the file; step 6 is the file's:
 
-1. Find the `defineComponent` call and its selector (explicit, or derived from the export name), and the initial values of `const x = signal(literal)` declarations.
+1. Find the component's selector (explicit, or derived from the name it is declared under), and the initial values of the `const x = signal(literal)` declarations of its setup and of the module.
 2. Collect the templates of the setup's return objects (local `html` fragments inlined). A setup has one return object; THANE412 reports more.
 3. Process each template (`template-processing.ts`, `repeat-analysis.ts`): parse it, find text, attribute, style and event bindings, and compile `when()`, `whenElse()` and `repeat()` content as sub-templates, at any depth, including directives inside list rows.
 4. Build the DOM model of each template as emitted (`dom-model.ts`, the browser's tree construction) and compute, for every bound node, the shortest path of DOM properties from its scope's starting nodes: the component template's elements, a branch's first node, a row element.
 5. Generate the code (`codegen.ts`): the `__b` binding function, branch initializers and row factories. Lists at every level are emitted by one generator, `emitRepeat`.
-6. Apply every change to the source as one list of edits: the registration call, the static templates, `__b`, and an import of exactly the runtime helpers the code uses, from `thane/runtime`.
+6. Apply every change to the source as one list of edits: each component's registration call, static templates (`__tpl`, `__tpl1`…) and `__b`, and one import of exactly the runtime helpers the file's code uses, from `thane/runtime`.
 
 ## Runtime Architecture
 

@@ -4,9 +4,9 @@ import ts from 'typescript';
 import type { ImportInfo, TemplateInfo } from '../../types.js';
 import {
   findSignalInitializers,
+  findComponentDeclarations,
+  type ComponentDeclaration,
   isHtmlTemplate,
-  isDefineComponentCall,
-  pascalToKebab,
   applyEdits,
   type SourceEdit,
   sourceCache,
@@ -329,11 +329,11 @@ export interface CompileOptions {
 }
 
 /**
- * Transform a defineComponent source file: compile its templates and stylesheets, generate the
- * binding code, and turn the call into the registration call. The file is parsed once, and
- * every change is an edit positioned on that parse, applied in one pass: static templates
- * before the component's statement, `__b` into its return object, the registration name (and
- * a derived selector) at the call, `__tpl` as the call's last argument.
+ * Transform a defineComponent source file: compile its stylesheets, and each of its components'
+ * templates and binding code. The file is parsed once, and every change is an edit positioned on
+ * that parse, applied in one pass: a component's static templates before its statement, `__b` into
+ * its return object, the registration name (and a derived selector) at its call, its template
+ * (`__tpl`, `__tpl1`…) as the call's last argument.
  */
 export const transformDefineComponentSource = (
   source: string,
@@ -344,11 +344,44 @@ export const transformDefineComponentSource = (
   try {
     return transformComponent(source, filePath, childMounts, options);
   } finally {
-    // The scope is this component's alone
+    // A component's scope is its own alone
     setTemplateScope(undefined);
   }
 };
 
+/** A component file as it is compiled: its one parse, its edits, and what its components share. */
+interface FileCompilation {
+  source: string;
+  sourceFile: ts.SourceFile;
+  /** Every change to the file, positioned on its one parse */
+  edits: SourceEdit[];
+  emit: EmitOptions;
+  options: CompileOptions;
+  /** The file's child placeholders, numbered by the precompiler */
+  childMounts: readonly ChildMountInfo[];
+  /** Signals declared outside every component, with their initial values */
+  moduleSignals: Map<string, string | number | boolean>;
+  /** The next id. Ids are names inside the file: its components share one count. */
+  nextId: number;
+}
+
+/** What compiling one component contributes to its file */
+interface CompiledComponent {
+  statement: ts.VariableStatement;
+  /** The static templates it declares, before its statement (they have no closure dependencies) */
+  declarations: string;
+  /** The runtime helpers it calls, its registration function first */
+  helpers: string[];
+  hasStyles: boolean;
+  /** Its lists call Node's cloneNode and insertBefore */
+  domPrototype: boolean;
+}
+
+/**
+ * Transform a defineComponent source file: compile each component's templates, generate its binding
+ * code and turn its call into the registration call, and compile the file's stylesheets. The file is
+ * parsed once, and every change is an edit positioned on that parse, applied in one pass.
+ */
 const transformComponent = (
   source: string,
   filePath: string,
@@ -356,61 +389,119 @@ const transformComponent = (
   options: CompileOptions,
 ): string | null => {
   const sourceFile = sourceCache.parse(filePath, source);
+  const components = findComponentDeclarations(sourceFile);
+  if (components.length === 0) return null;
 
-  // Find the defineComponent call and the statement that declares it
-  let defineComponentCall: ts.CallExpression | null = null;
-  let componentStatement: ts.VariableStatement | null = null;
-  let exportName: string | null = null;
-
-  const findDefineComponent = (node: ts.Node) => {
-    if (ts.isVariableStatement(node)) {
-      const hasExport = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-      for (const decl of node.declarationList.declarations) {
-        if (
-          ts.isIdentifier(decl.name) &&
-          decl.initializer &&
-          ts.isCallExpression(decl.initializer) &&
-          isDefineComponentCall(decl.initializer)
-        ) {
-          defineComponentCall = decl.initializer;
-          componentStatement = node;
-          exportName = hasExport ? decl.name.text : null;
-        }
-      }
-    }
-    if (!defineComponentCall) ts.forEachChild(node, findDefineComponent);
+  const file: FileCompilation = {
+    source,
+    sourceFile,
+    edits: [],
+    // A production build minifies templates and renames selectors
+    emit: {
+      html: options.minify ? minifyHTML : (template) => template,
+      selector: (name) => options.selectorMap?.get(name) ?? name,
+    },
+    options,
+    childMounts: childMounts ?? [],
+    moduleSignals: findSignalInitializers(sourceFile, new Set(components.map((component) => component.call))),
+    // Ids count from 0, after the child placeholders' (b0…), and do not depend on where the file is
+    nextId: childMounts?.length ?? 0,
   };
-  findDefineComponent(sourceFile);
+  const { edits } = file;
 
-  if (!defineComponentCall || !componentStatement) return null;
+  // Strip css tags. The text is known to be a stylesheet here, so this is where it is
+  // minified and where class selectors that address a renamed component host are renamed.
+  const ownCssTag = declaresOwnCssTag(sourceFile);
+  const visitCss = (node: ts.Node) => {
+    if (!ownCssTag && isCssTaggedTemplate(node)) {
+      edits.push({
+        start: node.getStart(sourceFile),
+        end: node.getEnd(),
+        replacement: compileCssTemplate(node, sourceFile, options),
+      });
+      return; // a css template nested in a substitution is compiled along with this one
+    }
+    ts.forEachChild(node, visitCss);
+  };
+  visitCss(sourceFile);
 
-  // Narrow for TypeScript — the null check above guarantees this
-  const dcCall: ts.CallExpression = defineComponentCall;
-  const statement: ts.VariableStatement = componentStatement;
+  // Each component on its own. The first keeps the name `__tpl` for its template.
+  const compiled = components.map((component, index) =>
+    compileComponent(file, component, index === 0 ? '__tpl' : `__tpl${index}`),
+  );
 
-  // Determine selector
-  let selector: string | null = null;
-  let hasExplicitSelector = false;
-  const args = dcCall.arguments;
-
-  if (args.length >= 2 && ts.isStringLiteral(args[0]!)) {
-    selector = (args[0] as ts.StringLiteral).text;
-    hasExplicitSelector = true;
-  } else if (exportName) {
-    selector = pascalToKebab(exportName);
+  // A file with a list imports Node's cloneNode and insertBefore from thane/runtime/dom, which every such
+  // file of the app shares. One that imports thane by a path of its own (a test) declares the pair, once,
+  // before its first component at the top level.
+  const servicesImport = findServicesImport(sourceFile);
+  const spec = servicesImport?.moduleSpecifier ?? '';
+  const domPrototype = compiled.some((component) => component.domPrototype);
+  const importsDomPrototype = domPrototype && (spec === 'thane' || spec.startsWith('thane/'));
+  const hasStyles = compiled.some((component) => component.hasStyles);
+  const hasTemplates = compiled.some((component) => component.declarations);
+  if (domPrototype && !importsDomPrototype) {
+    const first = compiled.find((component) => component.statement.parent === sourceFile) ?? compiled[0]!;
+    first.declarations += '\n  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;';
   }
 
-  if (!selector) return null;
+  for (const { statement, declarations } of compiled) {
+    const code = declarations.trim();
+    if (!code) continue;
+    const at = statement.getStart(sourceFile);
+    edits.push({ start: at, end: at, replacement: code + '\n\n' });
+  }
+
+  // Update imports: defineComponent goes, and the helpers the compiled code calls come from the
+  // compiler's entry
+  if (servicesImport) {
+    const filteredImport: typeof servicesImport = {
+      ...servicesImport,
+      namedImports: servicesImport.namedImports.filter((n) => n !== 'defineComponent'),
+    };
+    // The registration functions, the styles switch, and exactly the helpers the binding code calls
+    const used = new Set<string>(compiled.flatMap((component) => component.helpers));
+    if (hasStyles) used.add(BIND_FN.ENABLE_STYLES);
+    // The components' and the lists' templates are built by the runtime's __T
+    if (hasTemplates) used.add(BIND_FN.TEMPLATE);
+    const requiredFunctions = [...used].sort((a, b) => importRank(a) - importRank(b));
+
+    const newImport = generateUpdatedImport(filteredImport, requiredFunctions, importsDomPrototype);
+    edits.push({
+      start: servicesImport.start,
+      end: servicesImport.end,
+      replacement: newImport,
+    });
+  }
+
+  if (hasStyles) {
+    edits.push({ start: source.length, end: source.length, replacement: '\n__enableComponentStyles();\n' });
+  }
+
+  return applyEdits(source, edits);
+};
+
+/**
+ * Compile one component: its templates, its binding code in its return object, the registration
+ * name (and a derived selector) at its call, and its template, `templateName`, as the call's last
+ * argument. The edits go into the file's list; the static templates are returned, for the file to
+ * place before the component's statement.
+ */
+const compileComponent = (
+  file: FileCompilation,
+  component: ComponentDeclaration,
+  templateName: string,
+): CompiledComponent => {
+  const { source, sourceFile, edits, emit, options } = file;
+  const { call: dcCall, statement, selector, explicitSelector: hasExplicitSelector } = component;
 
   // The name the selector is emitted under: its own, or the short name planned for this build.
   const emittedSelector = options.selectorMap?.get(selector) ?? selector;
 
-  const signalInitializers = findSignalInitializers(sourceFile);
-
-  // Find html templates directly — no normalization needed.
-  // The regex pipeline natively matches bare signal() calls.
-  const servicesImport = findServicesImport(sourceFile);
   const setupArg = getSetupFunction(dcCall);
+  // The initial values of the signals the templates can read: the module's, and the component's own
+  const signalInitializers = setupArg
+    ? new Map([...file.moduleSignals, ...findSignalInitializers(setupArg)])
+    : file.moduleSignals;
   // The signal detector resolves a template's calls in the component's scope
   setTemplateScope(setupArg ? templateScopeOf(sourceFile, setupArg) : undefined);
   // Every return object's template is compiled; the last object is the component's: it
@@ -419,21 +510,20 @@ const transformComponent = (
   const returnObj = returnObjects[returnObjects.length - 1];
   const htmlTemplates = setupArg ? findHtmlTemplates(sourceFile, setupArg, returnObjects) : [];
 
-  // Every change to the file, positioned on this one parse of it
-  const edits: SourceEdit[] = [];
   let allBindings: BindingInfo[] = [];
   let allConditionals: ConditionalBlock[] = [];
   let allWhenElseBlocks: WhenElseBlock[] = [];
   let allRepeatBlocks: RepeatBlock[] = [];
   let allEventBindings: EventBinding[] = [];
-  // Ids are names inside this file only: they count from 0, after the child placeholders'
-  // (b0…, numbered by the precompiler), and no longer depend on where the file is
-  let idCounter = childMounts?.length ?? 0;
+  let idCounter = file.nextId;
   let lastProcessedTemplateContent = '';
+  // The templates as written, with the child placeholders in them
+  const writtenTemplates: string[] = [];
 
   for (const templateInfo of htmlTemplates) {
     // htmlTemplates is empty without a setup function
     let templateContent = extractAndInlineFragment(templateInfo.node, sourceFile, setupArg!, new Set());
+    writtenTemplates.push(templateContent);
 
     const result = processHtmlTemplateWithConditionals(templateContent, signalInitializers, idCounter);
     templateContent = result.processedContent;
@@ -452,10 +542,11 @@ const transformComponent = (
       replacement: '``',
     });
   }
+  file.nextId = idCounter;
 
   // An explicit selector is a string literal in the source: write the emitted name over it
   if (hasExplicitSelector && emittedSelector !== selector) {
-    const selectorArg = args[0]!;
+    const selectorArg = dcCall.arguments[0]!;
     edits.push({
       start: selectorArg.getStart(sourceFile),
       end: selectorArg.getEnd(),
@@ -463,28 +554,18 @@ const transformComponent = (
     });
   }
 
-  // Strip css tags. The text is known to be a stylesheet here, so this is where it is
-  // minified and where class selectors that address a renamed component host are renamed.
-  const ownCssTag = declaresOwnCssTag(sourceFile);
-  const visitCss = (node: ts.Node) => {
-    if (!ownCssTag && isCssTaggedTemplate(node)) {
-      edits.push({
-        start: node.getStart(sourceFile),
-        end: node.getEnd(),
-        replacement: compileCssTemplate(node, sourceFile, options),
-      });
-      return; // a css template nested in a substitution is compiled along with this one
-    }
-    ts.forEachChild(node, visitCss);
-  };
-  visitCss(sourceFile);
-
   // Styles and non-empty lifecycle hooks, read once from the component's return object.
   // They decide the styles import and call, and the registration function: the lean variant when
   // the component has no styles and no lifecycle hooks, so esbuild can tree-shake the styles
   // subsystem entirely for style-free apps.
   const { hasStyles, hasLifecycle } = detectFeatures(returnObj);
   const registerFnName = hasStyles || hasLifecycle ? BIND_FN.REGISTER_COMPONENT : BIND_FN.REGISTER_COMPONENT_LEAN;
+
+  // The component's children: the ones whose placeholder is in its templates. Each keeps its index
+  // in the file, which names its variables.
+  const ownMounts = file.childMounts
+    .map((cm, globalIndex) => ({ cm, globalIndex }))
+    .filter(({ cm }) => writtenTemplates.some((template) => template.includes(anchorMark(cm.anchorId, '.'))));
 
   // ── Partition child mounts by directive containment ──
   const directiveChildMounts = new Map<string, { cm: ChildMountInfo; globalIndex: number }[]>();
@@ -495,8 +576,8 @@ const transformComponent = (
   // hold it are nested in one another (a pre-rendered branch is in its parent's too), and the walk
   // visits a block before the blocks inside it, so the last one found is the innermost. A child in
   // no directive is a top-level mount.
-  (childMounts ?? []).forEach((cm, globalIndex) => {
-    const marker = anchorMark(cm.anchorId, '.');
+  for (const mount of ownMounts) {
+    const marker = anchorMark(mount.cm.anchorId, '.');
     let owner: string | undefined;
     walkDirectives(
       { conditionals: allConditionals, whenElse: allWhenElseBlocks, repeats: allRepeatBlocks },
@@ -509,25 +590,20 @@ const transformComponent = (
         repeat: (rep) => void (rep.itemTemplate.includes(marker) && (owner = rep.id)),
       },
     );
-    if (!owner) topLevelChildMounts.push({ cm, globalIndex });
-    else if (directiveChildMounts.has(owner)) directiveChildMounts.get(owner)!.push({ cm, globalIndex });
-    else directiveChildMounts.set(owner, [{ cm, globalIndex }]);
-  });
+    if (!owner) topLevelChildMounts.push(mount);
+    else if (directiveChildMounts.has(owner)) directiveChildMounts.get(owner)!.push(mount);
+    else directiveChildMounts.set(owner, [mount]);
+  }
 
-  // Generate bindings code. A production build minifies templates and renames selectors.
-  const emit: EmitOptions = {
-    html: options.minify ? minifyHTML : (template) => template,
-    selector: (name) => options.selectorMap?.get(name) ?? name,
-  };
   // Each child's host goes into the template in place of its placeholder, where it fits
-  const component = { template: lastProcessedTemplateContent };
+  const template = { template: lastProcessedTemplateContent };
   const childHosts = placeChildHosts(
-    childMounts ?? [],
-    component,
+    ownMounts.map(({ cm }) => cm),
+    template,
     { conditionals: allConditionals, whenElse: allWhenElseBlocks, repeats: allRepeatBlocks },
     emit,
   );
-  lastProcessedTemplateContent = component.template;
+  lastProcessedTemplateContent = template.template;
   const {
     code: bindingsBody,
     staticTemplates: repeatStaticTemplates,
@@ -552,64 +628,25 @@ const transformComponent = (
 
   let staticTemplateCode = '';
   if (lastProcessedTemplateContent) {
-    staticTemplateCode = generateStaticTemplate(lastProcessedTemplateContent, emit);
+    staticTemplateCode = generateStaticTemplate(lastProcessedTemplateContent, emit, templateName);
   }
 
   if (repeatStaticTemplates.length > 0) {
     staticTemplateCode += '\n' + repeatStaticTemplates.join('\n');
   }
 
-  // A file with a list imports Node's cloneNode and insertBefore from thane/runtime/dom, which every such
-  // file of the app shares. One that imports thane by a path of its own (a test) declares the pair.
-  const spec = servicesImport?.moduleSpecifier ?? '';
-  const importsDomPrototype = domPrototype && (spec === 'thane' || spec.startsWith('thane/'));
-  if (domPrototype && !importsDomPrototype) {
-    staticTemplateCode += '\n  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;';
-  }
-
-  // Update imports: always replace defineComponent → __registerComponent,
-  // and add binding / styles imports as needed.
   const hasAnyBindings =
     allBindings.length > 0 ||
     allConditionals.length > 0 ||
     allWhenElseBlocks.length > 0 ||
     allRepeatBlocks.length > 0 ||
     allEventBindings.length > 0 ||
-    (childMounts != null && childMounts.length > 0);
+    ownMounts.length > 0;
   // The binding function goes into the component's return object
   const injectBindings = hasAnyBindings && returnObj !== undefined;
 
-  if (servicesImport) {
-    // Filter out defineComponent (replaced by __registerComponent in compiled output)
-    const filteredImport: typeof servicesImport = {
-      ...servicesImport,
-      namedImports: servicesImport.namedImports.filter((n) => n !== 'defineComponent'),
-    };
-    // The registration function, the styles switch, and exactly the helpers the binding code
-    // calls (when that code is emitted)
-    const used = new Set<string>([registerFnName, ...(injectBindings ? helpers : [])]);
-    if (hasStyles) used.add(BIND_FN.ENABLE_STYLES);
-    // The component's and the lists' templates are built by the runtime's __T
-    if (staticTemplateCode) used.add(BIND_FN.TEMPLATE);
-    const requiredFunctions = [...used].sort((a, b) => importRank(a) - importRank(b));
-
-    const newImport = generateUpdatedImport(filteredImport, requiredFunctions, importsDomPrototype);
-    edits.push({
-      start: servicesImport.start,
-      end: servicesImport.end,
-      replacement: newImport,
-    });
-  }
-
-  // Static templates go before the component's statement (they have no closure dependencies)
-  const declarations = staticTemplateCode.trim();
-  if (declarations) {
-    const at = statement.getStart(sourceFile);
-    edits.push({ start: at, end: at, replacement: declarations + '\n\n' });
-  }
-
-  // `defineComponent<…>(` becomes the registration call; a selector derived from the export
-  // name goes in as its first argument
+  // `defineComponent<…>(` becomes the registration call; a selector derived from the name goes in
+  // as its first argument
   edits.push({
     start: dcCall.expression.getStart(sourceFile),
     end: dcCall.arguments.pos,
@@ -639,12 +676,14 @@ const transformComponent = (
   // The compiled template is the registration call's last argument
   if (lastProcessedTemplateContent) {
     const at = dcCall.getEnd() - 1;
-    edits.push({ start: at, end: at, replacement: ', __tpl' });
+    edits.push({ start: at, end: at, replacement: `, ${templateName}` });
   }
 
-  if (hasStyles) {
-    edits.push({ start: source.length, end: source.length, replacement: '\n__enableComponentStyles();\n' });
-  }
-
-  return applyEdits(source, edits);
+  return {
+    statement,
+    declarations: staticTemplateCode,
+    helpers: [registerFnName, ...(injectBindings ? helpers : [])],
+    hasStyles,
+    domPrototype,
+  };
 };

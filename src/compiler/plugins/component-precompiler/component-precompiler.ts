@@ -12,6 +12,7 @@ import {
   createBuildContext,
   refreshBuildContext,
   applyEdits,
+  findComponentDeclarations,
 } from '../../utils/index.js';
 import { createComponentResolver, type ComponentResolver } from '../../utils/component-resolver.js';
 import { transformDefineComponentSource } from '../reactive-binding-compiler/index.js';
@@ -23,7 +24,7 @@ import {
   isCssTaggedTemplate,
   KEYFRAME_SCOPING,
 } from '../minification/css-transform.js';
-import { ErrorCode, createError } from '../../errors.js';
+import { ErrorCode, createError, createWarning } from '../../errors.js';
 import { INTERNAL_RUNTIME_SPECIFIER, RUNTIME_HELPER } from '../../../contracts/index.js';
 
 const NAME = PLUGIN_NAME.COMPONENT;
@@ -118,7 +119,29 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
     const compileOptions = (): CompileOptions => ({ minify: ctx?.minify, selectorMap: ctx?.selectorMap });
     let scanned = false;
 
+    // The component that declares each selector in this build. Two components with one selector share
+    // their host class, and the styles of the one registered first apply to both (THANE013).
+    let selectorOwners = new Map<string, { name: string; file: string }>();
+    const reportSharedSelectors = (sourceFile: ts.SourceFile, file: string): void => {
+      for (const { name, selector, call } of findComponentDeclarations(sourceFile)) {
+        const owner = selectorOwners.get(selector);
+        if (!owner) selectorOwners.set(selector, { name, file });
+        if (!owner || (owner.name === name && owner.file === file)) continue;
+        const { line, character } = sourceFile.getLineAndCharacterOfPosition(call.getStart(sourceFile));
+        logger.diagnostic(
+          createWarning(
+            `${name} has the selector '${selector}', and so does ${owner.name} (${owner.file}). The two share ` +
+              'their host class, and the styles of the one registered first apply to both. Give one of them ' +
+              'another name or an explicit selector.',
+            { file, line: line + 1, column: character + 1 },
+            ErrorCode.SHARED_SELECTOR,
+          ),
+        );
+      }
+    };
+
     build.onStart(async () => {
+      selectorOwners = new Map();
       // A rebuild in watch mode scans again, so that a component file added meanwhile is found
       if (ctx && scanned) await refreshBuildContext(ctx);
       scanned = true;
@@ -333,6 +356,7 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
         let childMounts: ChildMountInfo[] | undefined;
 
         const sourceFile = sourceCache.parse(args.path, source);
+        reportSharedSelectors(sourceFile, args.path);
         const componentsInScope = resolver ? await resolver.componentsInScope(sourceFile) : new Map();
         if (componentsInScope.size > 0) {
           const componentCalls = findComponentCalls(source, sourceFile, componentsInScope);

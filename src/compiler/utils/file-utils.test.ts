@@ -1,6 +1,6 @@
 /**
  * Characterisation of createBuildContext: it scans the working directory, skips the
- * excluded folders and .d.ts files, and indexes every exported defineComponent by name and by
+ * excluded folders and .d.ts files, and indexes every defineComponent, exported or not, by name and by
  * selector. It also scans the project root when that lies outside the working directory.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
@@ -62,18 +62,20 @@ test('createBuildContext scans the working directory', async () => {
   ]);
   expect(Object.keys(ctx).sort()).toEqual(['components', 'componentsBySelector', 'projectRoot', 'tsFiles']);
   expect(relative(root, ctx.projectRoot)).toBe('');
-  const byName = Object.fromEntries(ctx.components.map((d) => [d.name, [d.selector, rel(d.filePath)]]));
+  const byName = Object.fromEntries(ctx.components.map((d) => [d.name, [d.selector, rel(d.filePath), d.exported]]));
   const bySelector = Object.fromEntries([...ctx.componentsBySelector].map(([k, d]) => [k, [d.name, rel(d.filePath)]]));
   expect(byName).toEqual({
-    AppShell: ['app-shell', 'src/app-shell.ts'],
-    Card: ['x-card', 'src/widgets/card.ts'],
-    Other: ['x-other', 'src/widgets/card.ts'],
-    LeafNode: ['leaf-node', 'deep/a/b/c/leaf.ts'],
+    AppShell: ['app-shell', 'src/app-shell.ts', true],
+    Card: ['x-card', 'src/widgets/card.ts', true],
+    Other: ['x-other', 'src/widgets/card.ts', true],
+    Hidden: ['x-hidden', 'src/widgets/card.ts', false],
+    LeafNode: ['leaf-node', 'deep/a/b/c/leaf.ts', true],
   });
   expect(bySelector).toEqual({
     'app-shell': ['AppShell', 'src/app-shell.ts'],
     'x-card': ['Card', 'src/widgets/card.ts'],
     'x-other': ['Other', 'src/widgets/card.ts'],
+    'x-hidden': ['Hidden', 'src/widgets/card.ts'],
     'leaf-node': ['LeafNode', 'deep/a/b/c/leaf.ts'],
   });
 });
