@@ -41,12 +41,15 @@ declare const __THANE_HEAD__: boolean | undefined;
 
 /**
  * The hidden files that `thane build`, `dev`, `serve` and `types` generate in
- * `.thane/types` augment these interfaces with the app's route paths (`Register`) and
- * the route pattern of each page component's selector (`RouteComponentRegister`). That
- * makes `navigate()`, `RoutePaths` and a page's `ctx.route` type-safe.
+ * `.thane/types` add one entry per route table to `RouteTables`, keyed by the table's file:
+ * its paths, its custom head fields, and the route pattern of each page component's selector.
+ * That makes `navigate()`, `RoutePaths`, `setMeta()` and a page's `ctx.route` type-safe. Two
+ * tables in one program (two apps that share a tsconfig) add up. `Register` and
+ * `RouteComponentRegister` take the same information written by hand.
  */
 declare global {
   namespace ThaneTypeRegistry {
+    interface RouteTables {}
     interface Register {}
     interface RouteComponentRegister {}
   }
@@ -92,15 +95,20 @@ type RegisteredRoutePaths<T extends Record<string, any>> = T extends { readonly 
 type EffectiveRegister = ThaneTypeRegistry.Register;
 type EffectiveRouteComponentRegister = ThaneTypeRegistry.RouteComponentRegister;
 
+/** Every generated route table's entry, as a union (never when there is none) */
+type RouteTableEntry = ThaneTypeRegistry.RouteTables[keyof ThaneTypeRegistry.RouteTables];
+type TablePaths<T> = T extends { routePaths: infer P extends string } ? P : never;
+
 type ExplicitRegisterRoutePaths = EffectiveRegister extends { routePaths: infer P extends string } ? P : never;
 type ExplicitRegisterRouteParamNames = EffectiveRegister extends { routeParamNames: infer P extends string }
   ? P
   : never;
-type RegisteredRoutePatterns = [ExplicitRegisterRoutePaths] extends [never]
+type HandRegisteredRoutePatterns = [ExplicitRegisterRoutePaths] extends [never]
   ? EffectiveRegister extends { routes: infer R extends Record<string, any> }
     ? RegisteredRoutePaths<R>
     : never
   : ExplicitRegisterRoutePaths;
+type RegisteredRoutePatterns = TablePaths<RouteTableEntry> | HandRegisteredRoutePatterns;
 
 /** Resolves to the navigable path union when Register is augmented, else `string`. */
 export type RoutePaths = [RegisteredRoutePatterns] extends [never] ? string : RouteToPath<RegisteredRoutePatterns>;
@@ -124,11 +132,12 @@ export type RouteParamsObject<T extends string> = [ExtractRouteParams<T>] extend
   ? Record<string, never>
   : { readonly [K in ExtractRouteParams<T>]: string };
 
-type RegisteredRoutePatternForSelector<S extends string> = S extends keyof EffectiveRouteComponentRegister
-  ? EffectiveRouteComponentRegister[S] extends string
-    ? EffectiveRouteComponentRegister[S]
-    : never
-  : never;
+/** The pattern a selector is mounted for in one table's components (never when it is not there) */
+type PatternIn<C, S extends string> = C extends unknown ? (S extends keyof C ? Extract<C[S], string> : never) : never;
+type TableComponents<T> = T extends { components: infer C } ? C : never;
+
+type RegisteredRoutePatternForSelector<S extends string> =
+  PatternIn<TableComponents<RouteTableEntry>, S> | PatternIn<EffectiveRouteComponentRegister, S>;
 
 type RouteContextBase<TPattern extends string, TPath extends string, TParams> = Readonly<{
   pattern: TPattern;
@@ -745,8 +754,11 @@ export function navigateBack(): void {
   window.history.back();
 }
 
-/** The app's own head fields, as the generated route types give them (from `customMeta`) */
-type RegisteredCustomMeta = EffectiveRegister extends { customMeta: infer C extends object } ? C : {};
+/** The app's own head fields, as the generated route types give them (from `customMeta`), every table's together */
+type TableCustomMeta<T> = T extends { customMeta: infer C extends object } ? C : never;
+type IntersectionOf<U> = (U extends unknown ? (u: U) => void : never) extends (i: infer I) => void ? I : never;
+type AllCustomMeta = TableCustomMeta<RouteTableEntry> | TableCustomMeta<EffectiveRegister>;
+type RegisteredCustomMeta = [AllCustomMeta] extends [never] ? {} : IntersectionOf<AllCustomMeta>;
 
 /** The head fields a page may set: the built-in ones and the app's own */
 export type AppRouteMeta = RouteMeta & RegisteredCustomMeta;

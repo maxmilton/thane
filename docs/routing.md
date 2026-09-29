@@ -388,7 +388,7 @@ Thane generates type definitions for your routes automatically. After running `t
 3. Reject invalid paths at compile time
 4. Type the patterns and parameters of `href()` and `navigate(pattern, params)`
 
-The types are generated at the start of every build, and by `thane types`, from your `defineRoutes()` call. Include `.thane/types` in your `tsconfig.json` so your editor sees them (see [Getting Started](getting-started.md#installation)).
+The types are generated at the start of every build, and by `thane types`, from your `defineRoutes()` call. A project with several route tables, such as two apps that share one `tsconfig.json`, gets one entry per table, keyed by its file: `navigate()` accepts the paths of all of them. Include `.thane/types` in your `tsconfig.json` so your editor sees them (see [Getting Started](getting-started.md#installation)).
 
 To type a variable or prop that holds a navigation target, use `RoutePaths`:
 

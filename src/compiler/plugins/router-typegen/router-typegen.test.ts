@@ -140,3 +140,53 @@ describe('Route head types', () => {
     await expect(buildMetaProject("{ title: 'x' }", "{ autor: 'typo' }")).rejects.toThrow();
   });
 });
+
+// Two apps under one tsconfig: each route table is its own entry, and the paths add up
+describe('Two route tables in one project', () => {
+  const appFiles = (name: string, target: string): Record<string, string> => ({
+    [`src/${name}/page.ts`]: [
+      "import { defineComponent, html } from 'thane';",
+      '',
+      `export const ${name.toUpperCase()}Page = defineComponent('${name}-page', ({ route }) => {`,
+      '  const pattern: string = route!.pattern;',
+      `  return { template: html\`<a @click=\${navigate('${target}')}>\${pattern}</a>\` };`,
+      '});',
+      '',
+    ].join('\n'),
+    [`src/${name}/routes.ts`]: [
+      "import { defineRoutes } from 'thane/router';",
+      `import { ${name.toUpperCase()}Page } from './page.js';`,
+      '',
+      `export default defineRoutes({ '/${name}': { component: ${name.toUpperCase()}Page }, notFound: { component: ${name.toUpperCase()}Page } });`,
+      '',
+    ].join('\n'),
+  });
+
+  const buildTwoApps = async (targetOfB: string): Promise<string[]> => {
+    const project = await createTempProject('export {};\n', {
+      'tsconfig.json': TSCONFIG,
+      ...appFiles('a', '/a'),
+      ...appFiles('b', targetOfB),
+    });
+    try {
+      await runBuild(createTestBuildConfig(project));
+      const read = (name: string) =>
+        readFile(join(project.root, '.thane', 'types', 'router', 'src', name, 'routes.generated.d.ts'), 'utf8');
+      return [await read('a'), await read('b')];
+    } finally {
+      await removeTempProject(project);
+    }
+  };
+
+  test('each table is keyed by its file, and each app may navigate to its own paths', async () => {
+    const [a, b] = await buildTwoApps('/b');
+    expect(a).toContain("'src/a/routes.ts': {");
+    expect(a).toContain("routePaths: '/a';");
+    expect(b).toContain("'src/b/routes.ts': {");
+    expect(b).toContain("'b-page': 'notFound';");
+  });
+
+  test('a path in neither table is still a type error', async () => {
+    await expect(buildTwoApps('/c')).rejects.toThrow();
+  });
+});
