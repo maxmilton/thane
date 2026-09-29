@@ -68,6 +68,10 @@ describe('parseArgs', () => {
     expect(parseArgs(['--assets', './public']).assetsDir).toBe('./public');
   });
 
+  test('parses --public flag with value', () => {
+    expect(parseArgs(['--public', './static']).publicDir).toBe('./static');
+  });
+
   test('parses --html flag with value', () => {
     expect(parseArgs(['--html', './src/index.html']).html).toBe('./src/index.html');
   });
@@ -223,6 +227,12 @@ describe('createBuildConfig', () => {
   test('uses custom assets directory', () => {
     const config = createBuildConfig({ ...baseOptions, assetsDir: './public' });
     expect(config.assetsInputDir).toBe('./public');
+  });
+
+  test('the public folder is ./public, unless that is the assets folder; a given one is used as it is', () => {
+    expect(createBuildConfig(baseOptions).publicInputDir).toBe('./public');
+    expect(createBuildConfig({ ...baseOptions, assetsDir: './public' }).publicInputDir).toBeUndefined();
+    expect(createBuildConfig({ ...baseOptions, publicDir: './static' }).publicInputDir).toBe('./static');
   });
 
   test('uses custom root HTML file', () => {

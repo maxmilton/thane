@@ -50,6 +50,7 @@ const OPTIONS: OptionSpec[] = [
   { key: 'entry', flag: '--entry', config: true },
   { key: 'outDir', flag: '--out', config: true },
   { key: 'assetsDir', flag: '--assets', config: true },
+  { key: 'publicDir', flag: '--public', config: true },
   { key: 'html', flag: '--html', config: true },
   { key: 'logLevel', set: { '--verbose': 'verbose', '-V': 'verbose', '--quiet': 'silent', '-q': 'silent' } },
   { key: 'configPath', flag: '--config' },
@@ -298,6 +299,7 @@ Options:
   --entry <path>      Custom entry point (default: ./src/main.ts)
   --out <dir>         Output directory (default: ./dist)
   --assets <dir>      Assets directory (default: ./src/assets)
+  --public <dir>      Folder copied to the root of the output (default: ./public)
   --html <path>       Root HTML file (default: ./index.html)
   --config <path>     Path to thane config file (default: ./thane.config.json or .jsonc)
   --drop-console      Strip console.* calls from the bundle (default: on in prod)
@@ -355,6 +357,9 @@ export function createBuildConfig(options: CLIOptions): BuildConfig {
   const distDir = options.outDir ?? './dist';
   const assetsInputDir = options.assetsDir ?? './src/assets';
   const assetsOutputDir = `${distDir}/assets`;
+  // ./public by default, unless it is the assets folder, which is copied into assets/ already
+  const publicInputDir =
+    options.publicDir ?? (resolve(assetsInputDir) === resolve('./public') ? undefined : './public');
   const inputHTMLFilePath = options.html ?? `./${indexHTMLFileName}`;
   const outputHTMLFilePath = `${distDir}/${indexHTMLFileName}`;
   const entryPoints = options.entry ? [options.entry] : ['./src/main.ts'];
@@ -373,6 +378,7 @@ export function createBuildConfig(options: CLIOptions): BuildConfig {
     outDir: distDir,
     assetsInputDir,
     assetsOutputDir,
+    publicInputDir,
     inputHTMLFilePath,
     outputHTMLFilePath,
     isProd: options.prod,

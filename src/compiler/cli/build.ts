@@ -100,6 +100,7 @@ export async function runBuild(config: BuildConfig): Promise<void> {
       entryPoints: config.entryPoints,
       assetsInputDir: config.assetsInputDir,
       assetsOutputDir: config.assetsOutputDir,
+      publicInputDir: config.publicInputDir,
       serve: config.serve,
       isProd: config.isProd,
       useGzip: config.useGzip,

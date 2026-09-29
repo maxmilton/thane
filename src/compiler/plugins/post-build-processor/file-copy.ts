@@ -8,7 +8,15 @@ import { logger } from '../../utils/index.js';
 
 type WatchCleanup = () => void;
 
-export const recursivelyCopyAssetsIntoDist = async (src: string, dest: string): Promise<void> => {
+/** A path to leave out of a copy, relative to the copied folder, with `/` separators. */
+export type CopySkip = (relativePath: string) => boolean;
+
+export const recursivelyCopyAssetsIntoDist = async (
+  src: string,
+  dest: string,
+  skip?: CopySkip,
+  relativeDir = '',
+): Promise<void> => {
   await fs.promises.mkdir(dest, { recursive: true });
 
   try {
@@ -17,9 +25,11 @@ export const recursivelyCopyAssetsIntoDist = async (src: string, dest: string): 
     for (const entry of entries) {
       const srcPath = path.join(src, entry.name);
       const destPath = path.join(dest, entry.name);
+      const relativePath = relativeDir + entry.name;
+      if (skip?.(relativePath)) continue;
 
       if (entry.isDirectory()) {
-        await recursivelyCopyAssetsIntoDist(srcPath, destPath);
+        await recursivelyCopyAssetsIntoDist(srcPath, destPath, skip, relativePath + '/');
       } else {
         await fs.promises.copyFile(srcPath, destPath);
       }
@@ -48,18 +58,21 @@ export const watchAndRecursivelyCopyAssetsIntoDist = (
   src: string,
   dest: string,
   onUpdate?: () => void,
+  skip?: CopySkip,
 ): WatchCleanup => {
   if (!fs.existsSync(src)) {
     return () => {};
   }
 
-  recursivelyCopyAssetsIntoDist(src, dest);
+  recursivelyCopyAssetsIntoDist(src, dest, skip);
 
   // One path is synchronised at a time, in the order its debounce ends: a deleted folder and a file
   // inside it are reported together, and removing both at once can fail on Windows
   let pending: Promise<void> = Promise.resolve();
 
   const sync = async (filename: string): Promise<void> => {
+    const relativePath = filename.split(path.sep).join('/');
+    if (skip?.(relativePath)) return;
     const srcPath = path.join(src, filename);
     const destPath = path.join(dest, filename);
     try {
@@ -67,7 +80,7 @@ export const watchAndRecursivelyCopyAssetsIntoDist = (
       // keeps one, and Windows can report a deleted folder's `change` after its `rename`
       const stat = await fs.promises.lstat(srcPath).catch(() => null);
       if (stat?.isDirectory()) {
-        await recursivelyCopyAssetsIntoDist(srcPath, destPath);
+        await recursivelyCopyAssetsIntoDist(srcPath, destPath, skip, relativePath + '/');
       } else if (stat) {
         await fs.promises.copyFile(srcPath, destPath);
       } else {

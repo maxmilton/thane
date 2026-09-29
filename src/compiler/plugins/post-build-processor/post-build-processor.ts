@@ -31,6 +31,8 @@ export interface PostBuildOptions {
   entryPoints: string[];
   assetsInputDir?: string | undefined;
   assetsOutputDir?: string | undefined;
+  /** A folder whose files are copied to the root of `distDir`, `index.html` at its root excepted */
+  publicInputDir?: string | undefined;
   serve?: boolean | undefined;
   isProd?: boolean | undefined;
   useGzip?: boolean | undefined;
@@ -58,6 +60,8 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
   });
 
   let watchersStarted = false;
+  let publicIndexWarned = false;
+  const skipPublicIndex = (relativePath: string): boolean => relativePath === 'index.html';
   let cachedHashedFileNames: Record<string, string> = {};
 
   /**
@@ -205,7 +209,26 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
       build.onEnd(async (result) => {
         totalBundleSizeInBytes = 0;
 
-        const { assetsInputDir, assetsOutputDir, serve, inputHTMLFilePath } = config;
+        const { assetsInputDir, assetsOutputDir, publicInputDir, serve, inputHTMLFilePath } = config;
+        // The public folder first: a file the build writes (index.html, a bundle, a route's page) wins
+        if (publicInputDir && fs.existsSync(publicInputDir)) {
+          if (!publicIndexWarned && fs.existsSync(path.join(publicInputDir, 'index.html'))) {
+            logger.warn(NAME, `${publicInputDir}/index.html is not copied: the build writes index.html from --html`);
+            publicIndexWarned = true;
+          }
+          if (serve && !watchersStarted) {
+            cleanupCallbacks.add(
+              watchAndRecursivelyCopyAssetsIntoDist(
+                publicInputDir,
+                distDir,
+                () => devServer.reloadPages(),
+                skipPublicIndex,
+              ),
+            );
+          } else {
+            await recursivelyCopyAssetsIntoDist(publicInputDir, distDir, skipPublicIndex);
+          }
+        }
         if (assetsInputDir && assetsOutputDir) {
           if (serve && !watchersStarted) {
             cleanupCallbacks.add(

@@ -72,6 +72,7 @@ thane types
 | `--entry <path>`                             | string          | `./src/main.ts`               | Entry point file                                              |
 | `--out <dir>`                                | string          | `./dist`                      | Output directory                                              |
 | `--assets <dir>`                             | string          | `./src/assets`                | Static assets directory copied into the output                |
+| `--public <dir>`                             | string          | `./public`                    | Folder copied to the root of the output (see below)           |
 | `--html <path>`                              | string          | `./index.html`                | Root HTML file                                                |
 | `--config <path>`                            | string          | `./thane.config.json`         | Config file path (see below)                                  |
 | `--port <number>`                            | number          | `4200`                        | Dev server port                                               |
@@ -94,12 +95,20 @@ thane types
 
 Compile-time constant replacements (`define`) can only be set in the config file.
 
+### The Public Folder
+
+Files that must sit at the root of the site, such as `robots.txt`, `sitemap.xml`, `favicon.ico`, `manifest.webmanifest` or
+`.well-known/`, go in `./public` (or the folder `--public` names). Every build copies its contents, folders included, to the
+root of the output, and `thane dev` copies a changed file and reloads the page. A file the build writes itself wins: an
+`index.html` at the root of the public folder is not copied (the build writes `index.html` from `--html`, and warns), and a
+route's own page replaces a file of the same path. When `--assets` is `./public`, there is no default public folder.
+
 ### Flags That Take a Value
 
-A value flag (`--entry`, `--out`, `--assets`, `--html`, `--config`, `--port`, `--host`, `--base`, `--target`, `--env-prefix`, `--legal-comments`) takes the next argument as its value. The rules are the same with or without a config file:
+A value flag (`--entry`, `--out`, `--assets`, `--public`, `--html`, `--config`, `--port`, `--host`, `--base`, `--target`, `--env-prefix`, `--legal-comments`) takes the next argument as its value. The rules are the same with or without a config file:
 
 - When the next argument is missing or starts with `-`, the flag is bare and takes no value: `thane dev --host --open` sets `open` and a bare `--host`.
-- A bare flag stands for its fallback, which overrides the config file: `--host` means `0.0.0.0`, `--port` `4200`, `--base` `/`, `--env-prefix` `THANE_`, `--legal-comments` `none`, and `--target` the default targets. A bare `--entry`, `--out`, `--assets`, `--html` or `--config` is ignored.
+- A bare flag stands for its fallback, which overrides the config file: `--host` means `0.0.0.0`, `--port` `4200`, `--base` `/`, `--env-prefix` `THANE_`, `--legal-comments` `none`, and `--target` the default targets. A bare `--entry`, `--out`, `--assets`, `--public`, `--html` or `--config` is ignored.
 - `--port` accepts digits only. Anything else (`--port abc`, `--port 3000x`) stops with an error.
 
 An unknown flag, or an argument that is neither a command nor a flag's value (`thane biuld`), prints a warning; the command then runs as if it were not there, so `thane biuld` runs `build`. `--help` and `--version` print and exit, whether or not a config file is present.
@@ -134,6 +143,7 @@ A key that is not in the table below prints a warning and is ignored, with the k
 | `entry`                                                                                                        | `--entry`                                                          |
 | `outDir`                                                                                                       | `--out`                                                            |
 | `assetsDir`                                                                                                    | `--assets`                                                         |
+| `publicDir`                                                                                                    | `--public`                                                         |
 | `html`                                                                                                         | `--html`                                                           |
 | `hashFileNames`, `dropConsole`, `dropDebugger`, `strictTypeCheck`, `emptyOutDir`, `legalComments`, `envPrefix` | Same name in kebab-case (`--hash-file-names`, `--drop-console`, …) |
 | `prod`, `gzip`, `port`, `open`, `host`, `base`, `sourcemap`, `analyze`, `splitting`, `target`                  | Same name                                                          |
