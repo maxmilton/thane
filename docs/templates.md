@@ -224,6 +224,9 @@ with expressions (`Badge`) is compiled, in its module, into a template and the c
 each use mounts a copy, bound to the fragment's own signals, and releases it with the template around it. A
 fragment no template uses is left out of a production bundle.
 
+A fragment's type is `Fragment` (`import type { Fragment } from 'thane'`), and so is a child component call:
+each goes where a template goes, and has nothing to read or call.
+
 ### `const` Required for Tagged Templates
 
 The `html` and `css` tagged templates must be assigned to `const` variables or used directly in the return statement (lint rule THANE403):

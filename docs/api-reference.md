@@ -43,13 +43,13 @@ Complete API surface for the Thane framework, covering all public exports, the t
 
 | Export     | Signature                                                                                                                                                                         | Description                                  |
 | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------- |
-| `html`     | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for HTML content             |
+| `html`     | `(strings: TemplateStringsArray, ...values: any[]) => Fragment`                                                                                                                   | Tagged template for HTML content             |
 | `css`      | `(strings: TemplateStringsArray, ...values: any[]) => any`                                                                                                                        | Tagged template for CSS content              |
 | `when`     | `(condition: boolean \| (() => boolean)) => string`                                                                                                                               | Conditional rendering — show/hide an element |
-| `whenElse` | `<T, F>(condition: boolean \| (() => boolean), thenTemplate: T, elseTemplate: F) => T \| F`                                                                                       | If/else conditional rendering                |
-| `repeat`   | `<T>(items: T[] \| (() => T[]), templateFn: (item: T, index: number) => any, emptyTemplate?: string \| null, trackBy?: (item: T, index: number) => string \| number) => any[]` | List rendering with keyed reconciliation     |
+| `whenElse` | `(condition: boolean \| (() => boolean), thenTemplate: Fragment \| string, elseTemplate: Fragment \| string) => Fragment`                                                        | If/else conditional rendering                |
+| `repeat`   | `<T>(items: T[] \| (() => T[]), templateFn: (item: T, index: number) => Fragment \| string, emptyTemplate?: Fragment \| string \| null, trackBy?: (item: T, index: number) => string \| number) => Fragment` | List rendering with keyed reconciliation     |
 
-`repeat()`'s third argument is the empty template (an `html` template, or `null`); the key function goes fourth: `repeat(items(), row, null, (item) => item.id)`. A function in third place is a build error (THANE010).
+`repeat()`'s third argument is the empty template (an `html` template, or `null`); the key function goes fourth: `repeat(items(), row, null, (item) => item.id)`. A function in third place is a build error (THANE010). A directive's templates may also be plain template literals of markup; a component's `template` is an `html` template.
 
 ### `thane/router` (subpath export)
 
@@ -96,11 +96,20 @@ The router installs these as globals when it starts, so a template calls them wi
 | `ReadonlySignal<T>`        | A signal that others may only read, such as state a service owns and exposes                |
 | `ComponentContext<P>`      | The setup function's parameter, for example in a helper shared by several setup functions  |
 | `ComponentHTMLSelector<P>` | What `defineComponent()` returns: a parameter that receives a component to `mount()`        |
+| `Fragment`                 | An `html` template as a value: a fragment a module exports, a prop that holds one           |
 | `MountHandle`              | The result of `mount()`, kept to destroy the component later                                |
 | `RoutePaths`               | A variable or prop that holds a navigation target                                           |
 
 ```typescript
-import type { Signal, ReadonlySignal, ComponentContext, ComponentHTMLSelector, MountHandle, RoutePaths } from 'thane';
+import type {
+  Signal,
+  ReadonlySignal,
+  ComponentContext,
+  ComponentHTMLSelector,
+  Fragment,
+  MountHandle,
+  RoutePaths,
+} from 'thane';
 ```
 
 ### Core Types
@@ -125,7 +134,11 @@ interface ComponentContext<P = {}, S extends string = string> {
   route?: RouteContextForSelector<S>; // Route context (when mounted by the router)
 }
 
-type ComponentHTMLSelector<P> = (props: P) => string;
+// Calling a component in a template gives a Fragment
+type ComponentHTMLSelector<P> = (props: P) => Fragment;
+
+// An html template, a child component call or a directive: it has no members
+interface Fragment {}
 
 interface MountHandle {
   root: HTMLElement; // Host element
@@ -152,7 +165,7 @@ The objects below are typed where you write them — TypeScript infers them, and
 
 ```typescript
 type ComponentReturnType = {
-  template?: string; // html`` template
+  template?: Fragment; // html`` template
   styles?: string; // css`` template or an imported .css file
   onMount?: () => void;
   onDestroy?: () => void;

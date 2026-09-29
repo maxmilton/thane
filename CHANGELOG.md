@@ -11,6 +11,7 @@ Two sets of changes: the fixes found by porting a real Angular site (routing, fo
 
 ### Breaking
 
+- **An `html` template is a `Fragment`, a type `thane` exports.** `html` returned `any`, and a component call `string`: both are now `Fragment`, which has no members, and a component's `template` takes a `Fragment` (the compiler compiles nothing else there), so `template: '<p>…</p>'` is a type error. `whenElse()` returns a `Fragment` and takes a `Fragment` or a plain template literal as each branch (a number there is a type error); `repeat()` takes one as the row and the empty template. Code that used an `html` template as a string no longer type-checks.
 - **`thane` exports what apps use, and nothing else.** It keeps nine values (`signal`, `computed`, `effect`, `batch`, `untrack`, `defineComponent`, `mount`, `unmount`, `registerGlobalStyles`), the template markers (see the next entry) and six types (`Signal`, `ReadonlySignal`, `ComponentContext`, `ComponentHTMLSelector`, `MountHandle`, `RoutePaths`). Removed, with the migration:
   - `mountComponent`: call `mount({ component, target, props })`. The compiler still turns a component-only `mount()` into `mountComponent`, now imported from `thane/runtime`.
   - The `html` and `css` runtime string shims: `html` and `css` are now template markers, compiled away.

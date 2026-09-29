@@ -4,6 +4,7 @@
  */
 
 import type { RouteContextForSelector, UntypedRouteContext } from './router.js';
+import type { Fragment } from './markers.js';
 import type { ComponentRoot } from './types.js';
 
 // ============================================================================
@@ -11,7 +12,7 @@ import type { ComponentRoot } from './types.js';
 // ============================================================================
 
 type ComponentProps = Record<string, any>;
-export type ComponentHTMLSelector<T> = (props: T) => string;
+export type ComponentHTMLSelector<T> = (props: T) => Fragment;
 
 /**
  * Context object passed to the defineComponent setup function.
@@ -31,7 +32,7 @@ export interface ComponentContext<P = {}, S extends string = string> {
  */
 export type ComponentReturnType = {
   /** HTML template (html tagged template literal) */
-  template?: string;
+  template?: Fragment;
   /** Scoped styles (css tagged template literal) */
   styles?: string;
 } & {
@@ -357,9 +358,9 @@ export function defineComponent<P extends ComponentProps = {}>(
       stylesRegistered = true;
     }
 
-    // Apply template
+    // Apply template: uncompiled, it is the markup string the caller passed
     if (result.template) {
-      root.innerHTML = result.template;
+      root.innerHTML = result.template as unknown as string;
     }
 
     // Initialize reactive bindings (injected by the compiler into the return object)

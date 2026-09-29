@@ -45,7 +45,15 @@ const KEPT: Record<string, EntrySurface> = {
       'when',
       'whenElse',
     ],
-    types: ['Signal', 'ReadonlySignal', 'ComponentContext', 'ComponentHTMLSelector', 'MountHandle', 'RoutePaths'],
+    types: [
+      'Signal',
+      'ReadonlySignal',
+      'ComponentContext',
+      'ComponentHTMLSelector',
+      'Fragment',
+      'MountHandle',
+      'RoutePaths',
+    ],
   },
   'thane/router': {
     values: [
