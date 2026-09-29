@@ -60,7 +60,7 @@ Unit tests sit next to the code they cover (`*.test.ts`); they are excluded from
 
 ## Compiler Pipeline
 
-`runBuild()` (`cli/build.ts`) first resolves the project root (the nearest folder above the entry with a `tsconfig.json` or `package.json`) and scans the working directory, and the project root when it lies outside it, for exported `defineComponent()` calls (`createBuildContext`, `utils/file-utils.ts`). That map of components by name is how child component calls are recognised. It is built once per `runBuild`; watch rebuilds reuse it.
+`runBuild()` (`cli/build.ts`) first resolves the project root (the nearest folder above the entry with a `tsconfig.json` or `package.json`) and scans the working directory, and the project root when it lies outside it, for exported `defineComponent()` calls (`createBuildContext`, `utils/file-utils.ts`). That map of components by name is how child component calls are recognised. A watch rebuild scans again in the component compiler's `onStart` (`refreshBuildContext`), updating the context every plugin holds; the source cache checks modification times, so only changed files are parsed again.
 
 The build is then an **esbuild plugin pipeline**, registered in this order. esbuild runs the `onStart` callbacks concurrently and waits for all of them before it loads a file, and for each file the first `onLoad` callback that returns contents wins.
 

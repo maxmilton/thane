@@ -31,7 +31,6 @@ Templates inside directive callbacks (`repeat`, `whenElse`) are the exception â€
 
 The compiler recognises a child component call, `${Card({ â€¦ })}`, by the component's export name, over every component in the working directory and the project. Two components exported under the same name collide: the last one found wins, and its selector names the host element of both. A function called in a template with the name of a component defined elsewhere is taken for that component too. Give every component a unique export name.
 
-A component file added while `thane dev` is running is recognised as a child component only after `thane dev` is restarted.
 
 ### One Return Object per Setup
 

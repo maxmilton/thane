@@ -7,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
-import { createBuildContext, getContentType, projectRootWarning } from './file-utils.js';
+import { createBuildContext, getContentType, projectRootWarning, refreshBuildContext } from './file-utils.js';
+import { sourceCache } from './cache.js';
 
 const FILES: Record<string, string> = {
   'src/main.ts': `import { AppShell } from './app-shell';\nconsole.log(AppShell);\n`,
@@ -140,4 +141,31 @@ describe('getContentType', () => {
     expect(getContentType('/LICENSE')).toBe('application/octet-stream');
     expect(getContentType('/v1.2/LICENSE')).toBe('application/octet-stream');
   });
+});
+
+test('refreshBuildContext finds a component file added since the scan and forgets a removed one, in place', async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'thane-rescan-')));
+  const component = (name: string) =>
+    `export const ${name} = defineComponent(() => ({ template: html\`<p></p>\` }));\n`;
+  writeFileSync(join(dir, 'a.ts'), component('Alpha'));
+  writeFileSync(join(dir, 'b.ts'), component('Beta'));
+  process.chdir(dir);
+  try {
+    const ctx = await createBuildContext(dir);
+    const parsedA = (await sourceCache.get(join(dir, 'a.ts')))!.sourceFile;
+    expect(ctx.components.map((d) => d.name).sort()).toEqual(['Alpha', 'Beta']);
+
+    writeFileSync(join(dir, 'c.ts'), component('Gamma'));
+    rmSync(join(dir, 'b.ts'));
+    await refreshBuildContext(ctx);
+
+    expect(ctx.components.map((d) => d.name).sort()).toEqual(['Alpha', 'Gamma']);
+    expect([...ctx.componentsBySelector.keys()].sort()).toEqual(['alpha', 'gamma']);
+    expect(ctx.tsFiles.map((f) => relative(dir, f)).sort()).toEqual(['a.ts', 'c.ts']);
+    // An unchanged file is not parsed again
+    expect((await sourceCache.get(join(dir, 'a.ts')))!.sourceFile).toBe(parsedA);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -10,6 +10,7 @@ import {
   createLoaderResult,
   extendsComponentQuick,
   createBuildContext,
+  refreshBuildContext,
   applyEdits,
 } from '../../utils/index.js';
 import { createComponentResolver, type ComponentResolver } from '../../utils/component-resolver.js';
@@ -115,8 +116,12 @@ export const ComponentPrecompilerPlugin = (ctx?: BuildContext): Plugin => ({
 
     // Read per file: a production build plans its selector renames in onStart, before any load
     const compileOptions = (): CompileOptions => ({ minify: ctx?.minify, selectorMap: ctx?.selectorMap });
+    let scanned = false;
 
     build.onStart(async () => {
+      // A rebuild in watch mode scans again, so that a component file added meanwhile is found
+      if (ctx && scanned) await refreshBuildContext(ctx);
+      scanned = true;
       const buildContext = ctx ?? (await createBuildContext());
       resolver = createComponentResolver(buildContext.projectRoot, buildContext.components);
       if (buildContext.components.length > 0) {

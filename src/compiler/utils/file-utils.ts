@@ -4,6 +4,10 @@ import type { BuildContext, ComponentDefinition } from '../types.js';
 import { sourceCache } from './cache.js';
 import { extractComponentDefinitions } from './ast-utils.js';
 import { logger } from './logger.js';
+import type ts from 'typescript';
+
+/** The definitions found in a parsed file: the cache keeps a file's parse while it is unchanged, so a rescan reuses them */
+const definitionsByFile = new WeakMap<ts.SourceFile, ComponentDefinition[]>();
 
 export const safeReadFile = async (filePath: string): Promise<string | null> => {
   try {
@@ -101,8 +105,7 @@ export const createBuildContext = async (projectRoot?: string): Promise<BuildCon
   const components: ComponentDefinition[] = [];
   const componentsBySelector = new Map<string, ComponentDefinition>();
 
-  sourceCache.clear();
-
+  // The source cache checks each file's modification time, so a rescan parses only what changed
   const tsFiles = await collectFilesRecursively(workspaceRoot, tsFilter);
   const toProject = projectRoot ? path.relative(workspaceRoot, projectRoot) : '';
   if (toProject === '..' || toProject.startsWith('..' + path.sep) || path.isAbsolute(toProject)) {
@@ -112,7 +115,11 @@ export const createBuildContext = async (projectRoot?: string): Promise<BuildCon
   for (const filePath of tsFiles) {
     const cached = await sourceCache.get(filePath);
     if (cached) {
-      const definitions = extractComponentDefinitions(cached.sourceFile, filePath);
+      let definitions = definitionsByFile.get(cached.sourceFile);
+      if (!definitions) {
+        definitions = extractComponentDefinitions(cached.sourceFile, filePath);
+        definitionsByFile.set(cached.sourceFile, definitions);
+      }
       for (const def of definitions) {
         components.push(def);
         componentsBySelector.set(def.selector, def);
@@ -121,6 +128,17 @@ export const createBuildContext = async (projectRoot?: string): Promise<BuildCon
   }
 
   return { tsFiles, projectRoot: projectRoot ?? workspaceRoot, components, componentsBySelector };
+};
+
+/**
+ * Scan again, for a rebuild in watch mode: a component file added (or removed) since the last scan
+ * is found. The context is updated in place, since every plugin of the build holds it.
+ */
+export const refreshBuildContext = async (context: BuildContext): Promise<void> => {
+  const next = await createBuildContext(context.projectRoot);
+  context.tsFiles = next.tsFiles;
+  context.components = next.components;
+  context.componentsBySelector = next.componentsBySelector;
 };
 
 /**

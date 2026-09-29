@@ -10,6 +10,7 @@ export {
   collectFilesRecursively,
   getContentType,
   createBuildContext,
+  refreshBuildContext,
   resolveProjectRoot,
   projectRootWarning,
 } from './file-utils.js';

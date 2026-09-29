@@ -4,7 +4,7 @@ Thane's compiler is an esbuild-based plugin pipeline that transforms your TypeSc
 
 ## Build Pipeline
 
-Before esbuild starts, the build finds the project (the nearest folder above the entry file with a `tsconfig.json` or `package.json`) and scans the working directory, and the project folder when it lies outside it, for every exported `defineComponent()`. That list is how the compiler recognises a child component call such as `${Card({ … })}` in a template. The scan runs once per `thane` command, so a component file added while `thane dev` runs is only recognised after a restart.
+Before esbuild starts, the build finds the project (the nearest folder above the entry file with a `tsconfig.json` or `package.json`) and scans the working directory, and the project folder when it lies outside it, for every exported `defineComponent()`. That list is how the compiler recognises a child component call such as `${Card({ … })}` in a template. Under `thane dev` every rebuild scans again, so a component file added while it runs is recognised on the next rebuild; files that did not change are not parsed again.
 
 A folder without its own `tsconfig.json` or `package.json` therefore builds as part of the enclosing project, whose type check and generated types then cover it; the build warns when that project lies above the folder `thane` runs in (a scratch app inside a repository, for example). Add a `package.json` to build such a folder on its own.
 

@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Metafile, Plugin } from 'esbuild';
-import { sourceCache, PLUGIN_NAME, consoleColors, logger } from '../../utils/index.js';
+import { PLUGIN_NAME, consoleColors, logger } from '../../utils/index.js';
 import type { BuildContext } from '../../types.js';
 
 import {
@@ -197,8 +197,6 @@ export const PostBuildPlugin = (options: PostBuildOptions): Plugin => {
       const { distDir } = config;
 
       build.onStart(async () => {
-        sourceCache.clear();
-
         if (config.emptyOutDir !== false && fs.existsSync(distDir)) {
           // Resolve to an absolute path: Bun 1.4.x on Windows fails recursive rm on "./"-prefixed paths.
           await fs.promises.rm(path.resolve(distDir), { recursive: true });
