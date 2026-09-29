@@ -199,6 +199,31 @@ export const Orders = defineComponent(() => {
 Anywhere else in a `${…}`, such as a ternary or a `map()`, an `html` template would be a plain value, and the
 build reports it (lint rule THANE404): use `whenElse()` to choose between templates, and `repeat()` for a list.
 
+#### Fragments Shared Across Files
+
+A module can export a fragment, `` export const Name = html`…` ``, for other modules' templates, which use it
+wherever a fragment of their own goes. Its expressions belong to its own module: they read that module's
+signals and functions, and it can mount that module's components.
+
+```typescript
+// pieces.ts
+import { html, signal } from 'thane';
+
+export const theme = signal('light');
+export const Spinner = html`<span class="spinner"></span>`;
+export const Badge = html`<b class=${theme()}>New</b>`;
+
+// orders.ts
+import { Spinner, Badge } from './pieces.js';
+
+template: html`<h2>Orders ${Badge}</h2>${whenElse(loading(), Spinner, html`<ul>…</ul>`)}`;
+```
+
+A fragment without `${…}` (`Spinner`) is written out where it is used, like a fragment of the same file. One
+with expressions (`Badge`) is compiled, in its module, into a template and the code that binds a copy of it;
+each use mounts a copy, bound to the fragment's own signals, and releases it with the template around it. A
+fragment no template uses is left out of a production bundle.
+
 ### `const` Required for Tagged Templates
 
 The `html` and `css` tagged templates must be assigned to `const` variables or used directly in the return statement (lint rule THANE403):
@@ -210,10 +235,6 @@ let tpl = html`<div>...</div>`;
 // ✅ GOOD
 const tpl = html`<div>...</div>`;
 ```
-
-### Template Variables Must Be Local
-
-Template variables must be declared in the same file — you cannot import an `html` template from another module and use it in a template. The compiler needs to see the full template at build time.
 
 ### Expression Order
 

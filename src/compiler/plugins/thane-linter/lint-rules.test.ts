@@ -1,7 +1,7 @@
 /**
  * Lint rule unit tests
  *
- * Tests the Thane lint rules THANE400–THANE411 (THANE406 and THANE407 are retired) by parsing
+ * Tests the Thane lint rules THANE400–THANE411 (THANE406, THANE407 and THANE410 are retired) by parsing
  * source strings into TS ASTs and running each rule's check function.
  */
 
@@ -22,7 +22,6 @@ import {
   noConditionalTemplateInit,
   componentConstDeclaration,
   noAliasedComponentExport,
-  noCrossFileHtmlTemplate,
   duplicateMountTarget,
 } from './rules/index.js';
 
@@ -316,41 +315,6 @@ describe('THANE409 — no-aliased-component-export', () => {
   test('passes with type-only re-export of PascalCase names', () => {
     const src = `export type { ComponentRoot } from './types.js';`;
     expect(noAliasedComponentExport.check(parse(src), 'test.ts')).toEqual([]);
-  });
-});
-
-// ============================================================================
-// THANE410 — no-cross-file-html-template
-// ============================================================================
-
-describe('THANE410 — no-cross-file-html-template', () => {
-  test('passes when template variables are local', () => {
-    const src = `
-      const header = html\`<header>Title</header>\`;
-      export const A = defineComponent(() => ({
-        template: html\`\${header}<main>Content</main>\`,
-      }));
-    `;
-    expect(noCrossFileHtmlTemplate.check(parse(src), 'test.ts')).toEqual([]);
-  });
-
-  test('fails when imported variable is used in html template', () => {
-    const src = `
-      import { header } from './shared-templates.js';
-      export const A = defineComponent(() => ({
-        template: html\`\${header}<main>Content</main>\`,
-      }));
-    `;
-    const d = noCrossFileHtmlTemplate.check(parse(src), 'test.ts');
-    expect(d).toHaveLength(1);
-    expect(codes(d)).toEqual([ErrorCode.NO_CROSS_FILE_HTML_TEMPLATE]);
-  });
-
-  test('passes with no imports', () => {
-    const src = `export const A = defineComponent(() => ({
-      template: html\`<div>\${count()}</div>\`,
-    }));`;
-    expect(noCrossFileHtmlTemplate.check(parse(src), 'test.ts')).toEqual([]);
   });
 });
 

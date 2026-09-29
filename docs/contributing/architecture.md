@@ -73,7 +73,7 @@ The build is then an **esbuild plugin pipeline**, registered in this order. esbu
 
 ### One Component File
 
-Inside the precompiler's `onLoad`, `transformDefineComponentSource` (`reactive-binding-compiler/index.ts`) compiles a component file from one parse of it. Each `const X = defineComponent(…)` in it is compiled on its own (steps 1 to 5), with ids counted across the file; step 6 is the file's:
+Inside the precompiler's `onLoad`, `transformDefineComponentSource` (`reactive-binding-compiler/index.ts`) compiles a component file from one parse of it. Each `const X = defineComponent(…)` in it is compiled on its own (steps 1 to 5), and so is each exported fragment (`` export const X = html`…` ``, into its `{ t, b }` value), with ids counted across the file; step 6 is the file's:
 
 1. Find the component's selector (explicit, or derived from the name it is declared under), and the initial values of the `const x = signal(literal)` declarations of its setup and of the module.
 2. Collect the templates of the setup's return objects (local `html` fragments inlined). A setup has one return object; THANE412 reports more.

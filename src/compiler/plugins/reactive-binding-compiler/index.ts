@@ -6,6 +6,8 @@ import {
   findSignalInitializers,
   findComponentDeclarations,
   type ComponentDeclaration,
+  findExportedFragments,
+  type FragmentDeclaration,
   isHtmlTemplate,
   applyEdits,
   type SourceEdit,
@@ -178,14 +180,20 @@ const importRank = (helper: string): number => {
   return rank === -1 ? HELPER_IMPORT_ORDER.length : rank;
 };
 
-/** The import declaration that imports `defineComponent`: the compiler's helpers are imported next to it. */
-export const findServicesImport = (sourceFile: ts.SourceFile): ImportInfo | null => {
+/**
+ * The import declaration that imports `defineComponent`, or else `html` (a module of fragments only): the
+ * compiler's helpers are imported next to it.
+ */
+export const findServicesImport = (sourceFile: ts.SourceFile): ImportInfo | null =>
+  importOf(sourceFile, 'defineComponent') ?? importOf(sourceFile, FN.HTML);
+
+const importOf = (sourceFile: ts.SourceFile, name: string): ImportInfo | null => {
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
     const namedBindings = statement.importClause?.namedBindings;
     if (!namedBindings || !ts.isNamedImports(namedBindings)) continue;
     const namedImports = namedBindings.elements.map((element) => element.name.text);
-    if (!namedImports.includes('defineComponent')) continue;
+    if (!namedImports.includes(name)) continue;
 
     const fullText = statement.moduleSpecifier.getFullText(sourceFile);
     return {
@@ -204,7 +212,7 @@ export const findServicesImport = (sourceFile: ts.SourceFile): ImportInfo | null
 // ============================================================================
 
 /** Where a directive takes a template, by argument position: whenElse()'s branches, repeat()'s empty template */
-const TEMPLATE_ARGUMENTS: ReadonlyMap<string, readonly number[]> = new Map([
+export const TEMPLATE_ARGUMENTS: ReadonlyMap<string, readonly number[]> = new Map([
   [FN.WHEN_ELSE, [1, 2]],
   [FN.REPEAT, [2]],
 ]);
@@ -468,9 +476,10 @@ interface CompiledComponent {
 }
 
 /**
- * Transform a defineComponent source file: compile each component's templates, generate its binding
- * code and turn its call into the registration call, and compile the file's stylesheets. The file is
- * parsed once, and every change is an edit positioned on that parse, applied in one pass.
+ * Transform a component source file: compile each component's templates, generate its binding code and
+ * turn its call into the registration call, compile each exported fragment into its value, and compile the
+ * file's stylesheets. The file is parsed once, and every change is an edit positioned on that parse,
+ * applied in one pass.
  */
 const transformComponent = (
   source: string,
@@ -480,7 +489,8 @@ const transformComponent = (
 ): string | null => {
   const sourceFile = sourceCache.parse(filePath, source);
   const components = findComponentDeclarations(sourceFile);
-  if (components.length === 0) return null;
+  const fragments = findExportedFragments(sourceFile);
+  if (components.length === 0 && fragments.length === 0) return null;
 
   const file: FileCompilation = {
     source,
@@ -516,14 +526,15 @@ const transformComponent = (
   };
   visitCss(sourceFile);
 
-  // Each component on its own. The first keeps the name `__tpl` for its template.
-  const compiled = components.map((component, index) =>
-    compileComponent(file, component, index === 0 ? '__tpl' : `__tpl${index}`),
-  );
+  // Each component on its own (the first keeps the name `__tpl` for its template), then each exported fragment
+  const compiled = [
+    ...components.map((component, index) => compileComponent(file, component, index === 0 ? '__tpl' : `__tpl${index}`)),
+    ...fragments.map((fragment, index) => compileFragment(file, fragment, `__frag${index}`)),
+  ];
 
   // A file with a list imports Node's cloneNode and insertBefore from thane/runtime/dom, which every such
   // file of the app shares. One that imports thane by a path of its own (a test) declares the pair, once,
-  // before its first component at the top level.
+  // before its first component or fragment at the top level.
   const servicesImport = findServicesImport(sourceFile);
   const spec = servicesImport?.moduleSpecifier ?? '';
   const domPrototype = compiled.some((component) => component.domPrototype);
@@ -531,7 +542,8 @@ const transformComponent = (
   const hasStyles = compiled.some((component) => component.hasStyles);
   const hasTemplates = compiled.some((component) => component.declarations);
   if (domPrototype && !importsDomPrototype) {
-    const first = compiled.find((component) => component.statement.parent === sourceFile) ?? compiled[0]!;
+    const inOrder = [...compiled].sort((a, b) => a.statement.pos - b.statement.pos);
+    const first = inOrder.find((component) => component.statement.parent === sourceFile) ?? inOrder[0]!;
     first.declarations += '\n  const { cloneNode: _cloneNode, insertBefore: _insertBefore } = Node.prototype;';
   }
 
@@ -582,36 +594,39 @@ const transformComponent = (
   return applyEdits(source, edits);
 };
 
+/** A component's or an exported fragment's templates, compiled */
+interface CompiledTemplates {
+  /** The template as emitted, the last one when there are several ('' when there is none) */
+  template: string;
+  /** The static template declarations: `templateName`'s and its lists' */
+  staticTemplateCode: string;
+  /** The binding function's body */
+  bindingsBody: string;
+  /** The runtime helpers the binding code calls */
+  helpers: Set<string>;
+  /** The binding code reads the template's elements (`_ns`) */
+  elementList: boolean;
+  /** Its lists call Node's cloneNode and insertBefore */
+  domPrototype: boolean;
+  /** There is anything to bind: without it, no binding function is needed */
+  hasAnyBindings: boolean;
+}
+
 /**
- * Compile one component: its templates, its binding code in its return object, the registration
- * name (and a derived selector) at its call, and its template, `templateName`, as the call's last
- * argument. The edits go into the file's list; the static templates are returned, for the file to
- * place before the component's statement.
+ * Compile templates: inline their fragments, process them, place their children's hosts and generate the
+ * binding code. `scopeRoot` is where fragments are looked for before the module. The template, when there
+ * is one, is declared as `templateName`. For an exported fragment (`fragment`), the binding code places the
+ * copy it binds (see generateInitBindingsFunction).
  */
-const compileComponent = (
+const compileTemplates = (
   file: FileCompilation,
-  component: ComponentDeclaration,
+  templates: readonly ts.TaggedTemplateExpression[],
+  scopeRoot: ts.Node,
+  signalInitializers: Map<string, string | number | boolean>,
   templateName: string,
-): CompiledComponent => {
-  const { source, sourceFile, edits, emit, options } = file;
-  const { call: dcCall, statement, selector, explicitSelector: hasExplicitSelector } = component;
-
-  // The name the selector is emitted under: its own, or the short name planned for this build.
-  const emittedSelector = options.selectorMap?.get(selector) ?? selector;
-
-  const setupArg = getSetupFunction(dcCall);
-  // The initial values of the signals the templates can read: the module's, and the component's own
-  const signalInitializers = setupArg
-    ? new Map([...file.moduleSignals, ...findSignalInitializers(setupArg)])
-    : file.moduleSignals;
-  // The signal detector resolves a template's calls in the component's scope
-  setTemplateScope(setupArg ? templateScopeOf(sourceFile, setupArg) : undefined);
-  // Every return object's template is compiled; the last object is the component's: it
-  // decides the features, loses its dead properties and receives the binding function.
-  const returnObjects = setupArg ? findReturnObjects(setupArg) : [];
-  const returnObj = returnObjects[returnObjects.length - 1];
-  const htmlTemplates = setupArg ? findHtmlTemplates(sourceFile, setupArg, returnObjects) : [];
-
+  fragment = false,
+): CompiledTemplates => {
+  const { sourceFile, emit } = file;
   let allBindings: BindingInfo[] = [];
   let allConditionals: ConditionalBlock[] = [];
   let allWhenElseBlocks: WhenElseBlock[] = [];
@@ -637,11 +652,8 @@ const compileComponent = (
       return anchorMark(copy.anchorId, '.');
     });
 
-  for (const templateInfo of htmlTemplates) {
-    // htmlTemplates is empty without a setup function
-    let templateContent = ownAnchors(
-      extractAndInlineFragment(templateInfo.node, { sourceFile, scopeRoot: setupArg!, inlined: file.inlined }),
-    );
+  for (const node of templates) {
+    let templateContent = ownAnchors(extractAndInlineFragment(node, { sourceFile, scopeRoot, inlined: file.inlined }));
     writtenTemplates.push(templateContent);
 
     const result = processHtmlTemplateWithConditionals(templateContent, signalInitializers, idCounter);
@@ -654,34 +666,11 @@ const compileComponent = (
     idCounter = result.nextId;
 
     lastProcessedTemplateContent = templateContent;
-
-    edits.push({
-      start: templateInfo.templateStart,
-      end: templateInfo.templateEnd,
-      replacement: '``',
-    });
   }
   file.nextId = idCounter;
 
-  // An explicit selector is a string literal in the source: write the emitted name over it
-  if (hasExplicitSelector && emittedSelector !== selector) {
-    const selectorArg = dcCall.arguments[0]!;
-    edits.push({
-      start: selectorArg.getStart(sourceFile),
-      end: selectorArg.getEnd(),
-      replacement: `'${emittedSelector}'`,
-    });
-  }
-
-  // Styles and non-empty lifecycle hooks, read once from the component's return object.
-  // They decide the styles import and call, and the registration function: the lean variant when
-  // the component has no styles and no lifecycle hooks, so esbuild can tree-shake the styles
-  // subsystem entirely for style-free apps.
-  const { hasStyles, hasLifecycle } = detectFeatures(returnObj);
-  const registerFnName = hasStyles || hasLifecycle ? BIND_FN.REGISTER_COMPONENT : BIND_FN.REGISTER_COMPONENT_LEAN;
-
-  // The component's children: the ones whose placeholder is in its templates. Each keeps its index
-  // in the file, which names its variables.
+  // The children: the ones whose placeholder is in these templates. Each keeps its index in the file,
+  // which names its variables.
   const ownMounts = [...file.childMounts, ...copiedMounts]
     .map((cm, globalIndex) => ({ cm, globalIndex }))
     .filter(({ cm }) => writtenTemplates.some((template) => template.includes(anchorMark(cm.anchorId, '.'))));
@@ -740,10 +729,8 @@ const compileComponent = (
     topLevelChildMounts,
     lastProcessedTemplateContent,
     childHosts,
+    fragment,
   );
-
-  // A template that reads one of the binding code's own names would read the compiler's value (THANE012)
-  if (setupArg) checkBindingNames(setupArg, bindingsBody);
 
   let staticTemplateCode = '';
   if (lastProcessedTemplateContent) {
@@ -761,8 +748,82 @@ const compileComponent = (
     allRepeatBlocks.length > 0 ||
     allEventBindings.length > 0 ||
     ownMounts.length > 0;
+
+  return {
+    template: lastProcessedTemplateContent,
+    staticTemplateCode,
+    bindingsBody,
+    helpers,
+    elementList,
+    domPrototype,
+    hasAnyBindings,
+  };
+};
+
+/**
+ * Compile one component: its templates, its binding code in its return object, the registration
+ * name (and a derived selector) at its call, and its template, `templateName`, as the call's last
+ * argument. The edits go into the file's list; the static templates are returned, for the file to
+ * place before the component's statement.
+ */
+const compileComponent = (
+  file: FileCompilation,
+  component: ComponentDeclaration,
+  templateName: string,
+): CompiledComponent => {
+  const { source, sourceFile, edits, options } = file;
+  const { call: dcCall, statement, selector, explicitSelector: hasExplicitSelector } = component;
+
+  // The name the selector is emitted under: its own, or the short name planned for this build.
+  const emittedSelector = options.selectorMap?.get(selector) ?? selector;
+
+  const setupArg = getSetupFunction(dcCall);
+  // The initial values of the signals the templates can read: the module's, and the component's own
+  const signalInitializers = setupArg
+    ? new Map([...file.moduleSignals, ...findSignalInitializers(setupArg)])
+    : file.moduleSignals;
+  // The signal detector resolves a template's calls in the component's scope
+  setTemplateScope(setupArg ? templateScopeOf(sourceFile, setupArg) : undefined);
+  // Every return object's template is compiled; the last object is the component's: it
+  // decides the features, loses its dead properties and receives the binding function.
+  const returnObjects = setupArg ? findReturnObjects(setupArg) : [];
+  const returnObj = returnObjects[returnObjects.length - 1];
+  const htmlTemplates = setupArg ? findHtmlTemplates(sourceFile, setupArg, returnObjects) : [];
+
+  // htmlTemplates is empty without a setup function
+  const compiled = compileTemplates(
+    file,
+    htmlTemplates.map((templateInfo) => templateInfo.node),
+    setupArg!,
+    signalInitializers,
+    templateName,
+  );
+  for (const templateInfo of htmlTemplates) {
+    edits.push({ start: templateInfo.templateStart, end: templateInfo.templateEnd, replacement: '``' });
+  }
+
+  // An explicit selector is a string literal in the source: write the emitted name over it
+  if (hasExplicitSelector && emittedSelector !== selector) {
+    const selectorArg = dcCall.arguments[0]!;
+    edits.push({
+      start: selectorArg.getStart(sourceFile),
+      end: selectorArg.getEnd(),
+      replacement: `'${emittedSelector}'`,
+    });
+  }
+
+  // Styles and non-empty lifecycle hooks, read once from the component's return object.
+  // They decide the styles import and call, and the registration function: the lean variant when
+  // the component has no styles and no lifecycle hooks, so esbuild can tree-shake the styles
+  // subsystem entirely for style-free apps.
+  const { hasStyles, hasLifecycle } = detectFeatures(returnObj);
+  const registerFnName = hasStyles || hasLifecycle ? BIND_FN.REGISTER_COMPONENT : BIND_FN.REGISTER_COMPONENT_LEAN;
+
+  // A template that reads one of the binding code's own names would read the compiler's value (THANE012)
+  if (setupArg) checkBindingNames(setupArg, compiled.bindingsBody);
+
   // The binding function goes into the component's return object
-  const injectBindings = hasAnyBindings && returnObj !== undefined;
+  const injectBindings = compiled.hasAnyBindings && returnObj !== undefined;
 
   // `defineComponent<…>(` becomes the registration call; a selector derived from the name goes in
   // as its first argument
@@ -775,7 +836,7 @@ const compileComponent = (
   if (returnObj) {
     // Dead properties leave the return object. A removed `template: html\`…\`` takes the
     // template's own edit with it.
-    for (const removal of deadPropertyRemovals(source, sourceFile, returnObj, !!lastProcessedTemplateContent)) {
+    for (const removal of deadPropertyRemovals(source, sourceFile, returnObj, !!compiled.template)) {
       for (let i = edits.length - 1; i >= 0; i--) {
         if (edits[i]!.start >= removal.start && edits[i]!.end <= removal.end) edits.splice(i, 1);
       }
@@ -787,22 +848,59 @@ const compileComponent = (
     if (injectBindings) {
       const at = returnObj.getStart(sourceFile) + 1;
       // The registration factory passes the template's elements when the code reaches them by position
-      const params = elementList ? '_ctx, _ns' : '_ctx';
-      edits.push({ start: at, end: at, replacement: `\n  __b: (${params}) => {\n  ${bindingsBody.trim()}\n  },` });
+      const params = compiled.elementList ? '_ctx, _ns' : '_ctx';
+      edits.push({
+        start: at,
+        end: at,
+        replacement: `\n  __b: (${params}) => {\n  ${compiled.bindingsBody.trim()}\n  },`,
+      });
     }
   }
 
   // The compiled template is the registration call's last argument
-  if (lastProcessedTemplateContent) {
+  if (compiled.template) {
     const at = dcCall.getEnd() - 1;
     edits.push({ start: at, end: at, replacement: `, ${templateName}` });
   }
 
   return {
     statement,
-    declarations: staticTemplateCode,
-    helpers: [registerFnName, ...(injectBindings ? helpers : [])],
+    declarations: compiled.staticTemplateCode,
+    helpers: [registerFnName, ...(injectBindings ? compiled.helpers : [])],
     hasStyles,
-    domPrototype,
+    domPrototype: compiled.domPrototype,
+  };
+};
+
+/**
+ * Compile an exported fragment into the value another module's template mounts (see runtime/fragment.ts):
+ * `{ t, b }`, its static template, `templateName`, and the function that binds a copy of it, closed over
+ * the module. Its static templates are marked pure, so a fragment no module uses is dropped.
+ */
+const compileFragment = (
+  file: FileCompilation,
+  fragment: FragmentDeclaration,
+  templateName: string,
+): CompiledComponent => {
+  const { sourceFile, edits } = file;
+  // The signal detector resolves the template's calls in the module's scope
+  setTemplateScope(templateScopeOf(sourceFile));
+  const compiled = compileTemplates(file, [fragment.template], sourceFile, file.moduleSignals, templateName, true);
+  const params = compiled.elementList ? '_ctx, _ns' : '_ctx';
+  edits.push({
+    start: fragment.template.getStart(sourceFile),
+    end: fragment.template.getEnd(),
+    replacement: compiled.hasAnyBindings
+      ? `{ t: ${templateName}, b: (${params}) => {\n  ${compiled.bindingsBody.trim()}\n  } }`
+      : `{ t: ${templateName} }`,
+  });
+  return {
+    statement: fragment.statement,
+    declarations: compiled.staticTemplateCode
+      .split(` = ${BIND_FN.TEMPLATE}(`)
+      .join(` = /* @__PURE__ */ ${BIND_FN.TEMPLATE}(`),
+    helpers: compiled.hasAnyBindings ? [...compiled.helpers] : [],
+    hasStyles: false,
+    domPrototype: compiled.domPrototype,
   };
 };

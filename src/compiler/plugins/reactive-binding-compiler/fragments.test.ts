@@ -2,6 +2,9 @@
  * Fragments: html`` consts of the component or the module, inlined wherever a template goes. A fragment
  * named as a whenElse() branch or a repeat() empty template is its markup (it was its name, as text), a
  * fragment can be used twice, and a child component in a fragment used twice is mounted twice.
+ *
+ * A fragment another module exports is written out where it is used when it has no `${}`, and is otherwise
+ * mounted from the value its module compiles it into.
  */
 import { describe, expect, test } from 'bun:test';
 import { buildAndReadJs } from '../../testing/build-project.js';
@@ -75,5 +78,100 @@ describe('fragments are inlined wherever a template goes', () => {
   test('an html template written as a whole ${} is inlined, and its fragments with it', async () => {
     const js = await build('', '<div>${html`<p>${spinner}${loading()}</p>`}</div>');
     expect(componentTemplate(js)).toBe('<div><p><span class="spin"></span><!---->true<!----></p></div>');
+  });
+});
+
+/** src/pieces.ts: exported fragments, a static one and ones with bindings, a child component and a list */
+const PIECES = [
+  "import { html, signal, repeat } from 'thane';",
+  "import { FragKid } from './kid.js';",
+  "export const theme = signal('dark');",
+  "const label = () => 'Total';",
+  'export const Spinner = html`<span class="spin"></span>`;',
+  'export const Badge = html`<b class=${theme()}>${label()}</b>${FragKid({ n: 2 })}`;',
+  "export const Tags = html`<ul>${repeat(['a', 'b'], (t) => html`<li>${t}</li>`)}</ul>`;",
+  'export const Unused = html`<i class="unused">${theme()}</i>`;',
+  '',
+].join('\n');
+
+/** A component that imports the pieces, built in development mode (or the production bundle) */
+const buildWithPieces = (
+  imports: string,
+  template: string,
+  mode: 'dev' | 'prod' = 'dev',
+  extraFiles: Record<string, string> = {},
+): Promise<string> =>
+  buildAndReadJs(
+    [
+      "import { defineComponent, signal, mount, html, whenElse, repeat } from 'thane';",
+      imports,
+      "export const App = defineComponent('frag-app', () => {",
+      '  const loading = signal(true);',
+      '  const rows = signal([1, 2]);',
+      `  return { template: html\`${template}\` };`,
+      '});',
+      'mount({ component: App });',
+    ].join('\n'),
+    {
+      extraFiles: { 'src/pieces.ts': PIECES, 'src/kid.ts': KID, ...extraFiles },
+      config: { ...DEV, isProd: mode === 'prod' },
+    },
+  ).then((js) => (mode === 'dev' ? js.slice(js.indexOf('// .tmp-thane')) : js));
+
+describe('fragments shared across files', () => {
+  test('a fragment without ${} is written out where it is used', async () => {
+    const js = await buildWithPieces(
+      "import { Spinner } from './pieces.js';",
+      '<div>${Spinner}${whenElse(loading(), Spinner, html``)}</div>',
+    );
+    expect(componentTemplate(js.slice(js.indexOf('src/main.ts')))).toBe(
+      '<div><span class="spin"></span><!----><span class="spin"></span><!----><!----></div>',
+    );
+    expect(js).not.toContain('__mf(');
+  });
+
+  test('a fragment with bindings is compiled into a value, and mounted where it is used', async () => {
+    const js = await buildWithPieces(
+      "import { Badge } from './pieces.js';",
+      '<div>${Badge}${whenElse(loading(), Badge, html``)}<ol>${repeat(rows(), (r) => html`<li>${r}${Badge}</li>`)}</ol></div>',
+    );
+    // Its module: the static template, marked pure, and the binding function, which places the copy
+    // after reaching its nodes and before binding them
+    expect(js).toMatch(
+      /var (__frag\d+) = \/\* @__PURE__ \*\/ __T\(`<b class="dark"><!----> <!----><\/b><frag-kid><\/frag-kid>`\);\nvar Badge = \{ t: \1, b: \(_ctx, _ns\) => \{/,
+    );
+    const badge = js.slice(js.indexOf('var Badge'), js.indexOf('src/main.ts'));
+    expect(badge.indexOf('_ns[0].firstChild.nextSibling')).toBeLessThan(badge.indexOf('_ctx.place();'));
+    expect(badge.indexOf('_ctx.place();')).toBeLessThan(badge.indexOf('theme.subscribe('));
+    expect(badge).toContain('__dc(FragKid.__f(_ns[1], { n: 2 }))');
+    // The importer: at the top level, in a branch and in each row
+    expect(js.match(/__mf\(_cma\d+, Badge\)/g)).toHaveLength(3);
+  });
+
+  test('a fragment with a list is mounted, its list with it', async () => {
+    const js = await buildWithPieces("import { Tags } from './pieces.js';", '<section>${Tags}</section>');
+    expect(js).toMatch(
+      /var Tags = \{ t: __frag\d+, b: \(_ctx, _ns\) => \{\n\s+const _subs = \[\];\n\s+const _a_b\d+ = _ns\[0\]\.lastChild;\n\s+_ctx\.place\(\);/,
+    );
+    expect(js).toContain('__mf(');
+  });
+
+  test('a fragment imported through a re-export is found', async () => {
+    const js = await buildWithPieces("import { Badge } from './ui.js';", '<div>${Badge}</div>', 'dev', {
+      'src/ui.ts': "export * from './pieces.js';\n",
+    });
+    expect(js).toMatch(/__mf\(_cma\d+, Badge\)/);
+  });
+
+  test('a production bundle ships only the fragments a template uses', async () => {
+    const js = await buildWithPieces(
+      "import { Badge, Spinner } from './pieces.js';",
+      '<div>${Spinner}${Badge}</div>',
+      'prod',
+    );
+    expect(js).toContain('<b class="dark"><!----> <!----></b>');
+    expect(js).not.toMatch(/class="unused"|<ul><!----><\/ul>|<li><\/li>/);
+    // The static fragment is only in the component's template
+    expect(js.match(/<span class="spin"><\/span>/g)).toHaveLength(1);
   });
 });

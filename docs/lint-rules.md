@@ -1,6 +1,6 @@
 # Lint Rules
 
-Thane includes 12 compile-time lint rules (THANE400–THANE413; THANE406 and THANE407 are retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
+Thane includes 11 compile-time lint rules (THANE400–THANE413; THANE406, THANE407 and THANE410 are retired) that catch patterns the compiler cannot process correctly. These rules run during `thane dev` and `thane build` — errors prevent the build from completing, warnings are displayed but don't block.
 
 The compiler reports a few more problems itself, while it compiles a template: see [Template Errors](#template-errors).
 
@@ -16,7 +16,6 @@ The compiler reports a few more problems itself, while it compiles a template: s
 | THANE405 | [no-conditional-template-init](#thane405--no-conditional-template-init)     | Warning  |
 | THANE408 | [component-const-declaration](#thane408--component-const-declaration)       | Error    |
 | THANE409 | [no-aliased-component-export](#thane409--no-aliased-component-export)       | Error    |
-| THANE410 | [no-cross-file-html-template](#thane410--no-cross-file-html-template)       | Warning  |
 | THANE411 | [duplicate-mount-target](#thane411--duplicate-mount-target)                 | Warning  |
 | THANE412 | [single-return-object](#thane412--single-return-object)                     | Error    |
 | THANE413 | [no-aliased-thane-import](#thane413--no-aliased-thane-import)               | Error    |
@@ -227,27 +226,11 @@ export const MyCounter = defineComponent(() => { ... });
 
 ---
 
-## THANE410 — no-cross-file-html-template
+## THANE410 — retired
 
-**Severity:** Warning
-
-`html` template variables used inside `defineComponent()` must be defined in the **same file**. The compiler resolves templates via AST analysis and cannot process imported variables.
-
-```typescript
-// ❌ BAD — imported html template
-import { header } from './shared-templates.js';
-export const App = defineComponent(() => ({
-  template: html`${header}<main>Content</main>`,
-}));
-
-// ✅ GOOD — template defined locally
-const header = html`<header>Title</header>`;
-export const App = defineComponent(() => ({
-  template: html`${header}<main>Content</main>`,
-}));
-```
-
-> Note: CSS imports _are_ allowed (`import styles from './Component.module.css'`). This rule only applies to `html` tagged templates.
+THANE410 (no-cross-file-html-template) warned about an imported variable used in an `html` template, because
+the compiler could not see an imported template. A template can now use a fragment another module exports
+(see [Templates](templates.md#fragments)). The code is not reused.
 
 ---
 

@@ -5,7 +5,8 @@
  * shapes each rule accepts or skips: which return objects THANE401/402 inspect, which calls count as
  * defineComponent, which tags count as html/css, and how THANE411 keys mount targets.
  * THANE406 (no-element-id) is retired: compiled code no longer uses ids. THANE407 (single-component-per-file)
- * is retired: each component of a file is compiled on its own.
+ * is retired: each component of a file is compiled on its own. THANE410 (no-cross-file-html-template) is
+ * retired: a template can use a fragment another module exports.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -22,7 +23,6 @@ import {
   noConditionalTemplateInit,
   componentConstDeclaration,
   noAliasedComponentExport,
-  noCrossFileHtmlTemplate,
   duplicateMountTarget,
   singleReturnObject,
   noAliasedThaneImport,
@@ -409,40 +409,6 @@ describe('THANE409 diagnostics', () => {
       error(src, 7, 'Deep', deferred('Deep')),
       error(src, 8, 'Card', reExport('Card')),
       error(src, 9, 'x as', reExport('Button')),
-    ]);
-  });
-});
-
-// ============================================================================
-// THANE410: no-cross-file-html-template
-// ============================================================================
-
-describe('THANE410 diagnostics', () => {
-  const warning = diag('warning', ErrorCode.NO_CROSS_FILE_HTML_TEMPLATE);
-  const message = (name: string) =>
-    `Imported variable '${name}' is used inside an html\`\` template. ` +
-    'The compiler cannot resolve imported template variables at compile time. ' +
-    'Define the template fragment in the same file as a const variable instead.';
-
-  test('reports bare imported identifiers in html interpolations, at the identifier', () => {
-    const src = [
-      "import Header from './header.js';",
-      "import { footer as Footer, nav } from './parts.js';",
-      "import * as parts from './parts.js';",
-      "import './side-effect.js';",
-      'const local = html`<i/>`;',
-      'export const A = defineComponent(() => ({',
-      '  template: html`${Header}<main>${local}${ Footer }${nav()}${parts.x}${parts}</main>`,',
-      '}));',
-      'const t = lib.html`${Header}`;',
-      'const u = css`${Header}`;',
-      'const v = html`<p>${nav}</p>`;',
-    ];
-    expect(run(noCrossFileHtmlTemplate, src)).toStrictEqual([
-      warning(src, 7, 'Header', message('Header')),
-      warning(src, 7, 'Footer', message('Footer')),
-      warning(src, 7, 'parts}', message('parts')),
-      warning(src, 11, 'nav', message('nav')),
     ]);
   });
 });

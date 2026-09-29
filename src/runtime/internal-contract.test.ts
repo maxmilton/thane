@@ -7,6 +7,7 @@ import {
   __bindIf,
   __bindIfExpr,
   __dc,
+  __mf,
   __enableComponentStyles,
   __enableKeyframeScoping,
   __registerComponent,
@@ -29,6 +30,7 @@ describe('runtime internal contract', () => {
     [RUNTIME_HELPER.REGISTER_COMPONENT]: __registerComponent,
     [RUNTIME_HELPER.REGISTER_COMPONENT_LEAN]: __registerComponentLean,
     [RUNTIME_HELPER.DESTROY_CHILD]: __dc,
+    [RUNTIME_HELPER.MOUNT_FRAGMENT]: __mf,
     [RUNTIME_HELPER.SIGNAL]: __sig,
     [RUNTIME_HELPER.MOUNT_COMPONENT]: mountComponent,
   };

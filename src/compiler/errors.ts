@@ -33,7 +33,7 @@ export enum ErrorCode {
   // THANE407 (single-component-per-file) is retired and not reused
   COMPONENT_CONST_DECLARATION = 'THANE408',
   NO_ALIASED_COMPONENT_EXPORT = 'THANE409',
-  NO_CROSS_FILE_HTML_TEMPLATE = 'THANE410',
+  // THANE410 (no-cross-file-html-template) is retired and not reused
   DUPLICATE_MOUNT_TARGET = 'THANE411',
   SINGLE_RETURN_OBJECT = 'THANE412',
   NO_ALIASED_THANE_IMPORT = 'THANE413',

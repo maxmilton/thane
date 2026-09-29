@@ -61,11 +61,14 @@ const localNames = (fn: ts.FunctionLikeDeclaration): Set<string> => {
   return names;
 };
 
-/** The template scope of a component: the file's top-level declarations, then the setup function's */
-export const templateScopeOf = (sourceFile: ts.SourceFile, setup: ts.FunctionLikeDeclaration): TemplateScope => {
+/**
+ * The template scope of a component: the file's top-level declarations, then the setup function's. An
+ * exported fragment's is the file's alone.
+ */
+export const templateScopeOf = (sourceFile: ts.SourceFile, setup?: ts.FunctionLikeDeclaration): TemplateScope => {
   const declared = new Map<string, Declared | null>();
   declareFrom(sourceFile.statements, declared);
-  if (setup.body && ts.isBlock(setup.body)) declareFrom(setup.body.statements, declared);
+  if (setup?.body && ts.isBlock(setup.body)) declareFrom(setup.body.statements, declared);
 
   const reads = new Map<string, string[]>();
   const readsOf = (name: string, visiting: Set<string>): string[] => {

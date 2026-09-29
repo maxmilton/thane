@@ -8,10 +8,6 @@ This page documents current constraints, browser requirements, and by-design dec
 
 An `html` template inside another is compiled where it is the whole `${…}` or a directive argument. In a ternary or a `map()` it would be a plain value (THANE404): use `whenElse()` and `repeat()`.
 
-### Template Variables Must Be Local
-
-`html` template variables used inside `defineComponent()` must be defined in the same file (THANE410). The compiler resolves templates via AST analysis and cannot process imported variables. CSS imports are unaffected.
-
 ### Unique Selectors
 
 A component's selector is the class of its host element, which scopes its styles. Two components of an app with one selector (two components declared under one name, each with a derived selector) share it: the styles of the one registered first apply to both. The build reports them (THANE013). Give one of them another name or an explicit selector. A child component call, `${Card({ … })}`, is resolved through the file's own declarations and imports, so two components with one name in different files are never confused for each other.

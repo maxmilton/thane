@@ -821,7 +821,9 @@ const isSimpleConditional = (cond: ConditionalBlock): boolean =>
  * Generate the body of the component's binding function (`__b`) and the static templates.
  * Child components are mounted where their anchor is: the top-level ones by the body itself,
  * the others by the directive that contains them. `helpers` holds every runtime helper the
- * generated code calls, so that the component imports exactly those.
+ * generated code calls, so that the component imports exactly those. For an exported fragment
+ * (`fragment`), the body binds a copy of the template that is not in the page yet: it reaches the
+ * nodes it binds, then puts the copy in its place (`_ctx.place()`), then binds.
  */
 export const generateInitBindingsFunction = (
   bindings: BindingInfo[],
@@ -834,6 +836,7 @@ export const generateInitBindingsFunction = (
   topLevelChildMounts: { cm: ChildMountInfo; globalIndex: number }[] = [],
   componentTemplate = '',
   childHosts: ReadonlySet<string> = new Set(),
+  fragment = false,
 ): GeneratedInitBindingsArtifact => {
   const lines: string[] = [];
   // The component template's elements, by position
@@ -860,6 +863,11 @@ export const generateInitBindingsFunction = (
     rep?: RepeatBlock,
   ): { setup: string[]; cleanup: string } => {
     const varName = `_cm${globalIndex}`;
+    // An imported fragment: its nodes go before its placeholder
+    if (cm.fragment) {
+      const anchor = scope.at(`${cm.anchorId}.`, `_cma${globalIndex}`);
+      return { setup: [], cleanup: `${use(BIND_FN.MOUNT_FRAGMENT)}(${anchor}, ${cm.componentName})` };
+    }
     const props = rowProps(cm.propsExpression, rep);
     const mount = (host: string) => `${use(BIND_FN.DESTROY_CHILD)}(${cm.componentName}.__f(${host}, ${props}))`;
     if (childHosts.has(cm.anchorId)) return { setup: [], cleanup: mount(scope.at(cm.anchorId, varName)) };
@@ -1773,6 +1781,7 @@ export const generateInitBindingsFunction = (
   lines.push(`    return () => { for (let i = 0; i < _subs.length; i++) _subs[i](); };`);
   // The component's anchors are reached before any of its code changes the DOM
   lines.splice(1, 0, ...top.head);
+  if (fragment) lines.splice(1 + top.head.length, 0, '    _ctx.place();');
   if (top.usesRoot()) lines.unshift(`    const _r = _ctx.root;`);
 
   return { code: lines.join('\n'), staticTemplates, helpers, elementList: top.used(), domPrototype: hasAnyRepeat };

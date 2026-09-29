@@ -15,6 +15,7 @@ export const RUNTIME_HELPER = {
   REGISTER_COMPONENT: '__registerComponent',
   REGISTER_COMPONENT_LEAN: '__registerComponentLean',
   DESTROY_CHILD: '__dc',
+  MOUNT_FRAGMENT: '__mf',
   SIGNAL: '__sig',
   MOUNT_COMPONENT: 'mountComponent',
 } as const;

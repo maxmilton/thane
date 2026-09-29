@@ -61,6 +61,10 @@ components must be rebuilt with the matching version.
   bundle it.
 - `__T(html) → HTMLTemplateElement`: builds a compiled template (a component's, a row's, a list's empty
   template). `__nc`: the one empty cleanups array shared by rows that have no cleanups.
+- An exported fragment (`` export const Badge = html`…` ``) compiles to `{ t, b? }`: `t` its template, `b(ctx,
+  elements) → cleanup` its binding function, which reaches its nodes in the copy (`ctx.root`, `elements` as for
+  `__b`), calls `ctx.place()` to insert the copy, then binds. `__mf(anchor, fragment) → cleanup` mounts a copy
+  before `anchor`, a comment that stays; the nodes are removed with the template around them.
 - `__dc(instance) → destroy`; `__sig` = `signal`; `__enableComponentStyles()`; `__enableKeyframeScoping()` (called by a module whose stylesheet defines `@keyframes`; it enables component styles too);
   `mountComponent(component, target?, props?)`.
 

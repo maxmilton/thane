@@ -131,6 +131,10 @@ A call to a known component inside a template, `${Card({ title })}`, is replaced
 
 A call is matched to the component the file declares under that name, or imports under it (following re-exports and the tsconfig's `paths`). A file can declare several components; each is compiled on its own.
 
+## Fragments
+
+An `html` const used in a template of the same file is inlined where it is used. A fragment another module exports (`` export const Badge = html`…` ``) is resolved through the imports like a component: one without `${…}` is written out in place, and one with expressions is compiled in its own module into `{ t, b }`, its static template and a binding function closed over that module, which the importing template mounts before a comment placeholder (`__mf`). Its static templates are marked pure, so esbuild drops a fragment no template uses.
+
 ## CSS Processing
 
 ### Scoped Styles

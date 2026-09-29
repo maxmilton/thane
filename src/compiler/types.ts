@@ -47,6 +47,15 @@ export interface ComponentDefinition {
   exported: boolean;
 }
 
+/** A fragment a module exports (`export const Name = html\`…\``), which other files' templates use */
+export interface FragmentDefinition {
+  name: string;
+  filePath: string;
+  exported: true;
+  /** Its markup, as written, when it has no `${}`: a template that uses it inlines it */
+  staticText: string | null;
+}
+
 /**
  * Template info from AST analysis
  */

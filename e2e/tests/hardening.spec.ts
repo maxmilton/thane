@@ -1460,6 +1460,35 @@ test.describe('fragments', () => {
   });
 });
 
+test.describe('fragments another module exports', () => {
+  test('F2 a static one is written out; one with bindings is mounted at the top, in a branch and in rows', async ({
+    page,
+  }) => {
+    const probe = await mountProbe(page, 'f2');
+    await expect(page.locator('.f2-static')).toHaveText('static');
+    await expect(page.locator('.f2-badge')).toHaveText(['calm', 'calm', 'calm']);
+    await expect(page.locator('.f2-kid-n')).toHaveText(['3', '3', '3']);
+    await expect(page.locator('.f2-tag')).toHaveText(['a', 'b']);
+
+    await setProbe(page, 'f2', 'tone', 'loud');
+    await expect(page.locator('.f2-badge')).toHaveText(['loud', 'loud', 'loud']);
+    await expect(page.locator('.f2-top .f2-badge')).toHaveAttribute('data-tone', 'loud');
+    await setProbe(page, 'f2', 'tags', ['c']);
+    await expect(page.locator('.f2-tag')).toHaveText(['c']);
+
+    await setProbe(page, 'f2', 'open', false);
+    await expect(page.locator('.f2-tags')).toHaveCount(0);
+    await setProbe(page, 'f2', 'open', true);
+    await expect(page.locator('.f2-tag')).toHaveText(['c']);
+
+    await setProbe(page, 'f2', 'rows', [2]);
+    await expect(page.locator('.f2-row .f2-badge')).toHaveCount(1);
+    await setProbe(page, 'f2', 'tone', 'calm');
+    await expect(page.locator('.f2-badge')).toHaveText(['calm', 'calm']);
+    expect(probe.pageErrors).toEqual([]);
+  });
+});
+
 test.describe('a keyed list reordered while a row goes', () => {
   test('R1 the rows stay before the list anchor, so a later append goes last', async ({ page }) => {
     const probe = await mountProbe(page, 'r1');

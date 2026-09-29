@@ -1,7 +1,7 @@
 /** Helpers for working with the TypeScript AST. */
 
 import ts from 'typescript';
-import type { ComponentDefinition } from '../types.js';
+import type { ComponentDefinition, FragmentDefinition } from '../types.js';
 import { FN } from './constants.js';
 
 // ============================================================================
@@ -186,6 +186,38 @@ export const findComponentDeclarations = (sourceFile: ts.SourceFile): ComponentD
 /** The components a file declares: the ones it exports, and the ones only its own templates can call. */
 export const extractComponentDefinitions = (sourceFile: ts.SourceFile, filePath: string): ComponentDefinition[] =>
   findComponentDeclarations(sourceFile).map(({ name, selector, exported }) => ({ name, selector, filePath, exported }));
+
+/** An exported fragment: `export const Name = html\`…\`` at the top level of a module. */
+export interface FragmentDeclaration {
+  name: string;
+  template: ts.TaggedTemplateExpression;
+  statement: ts.VariableStatement;
+}
+
+/** The fragments a module exports, in source order: other files' templates can use them. */
+export const findExportedFragments = (sourceFile: ts.SourceFile): FragmentDeclaration[] => {
+  const fragments: FragmentDeclaration[] = [];
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    if (!statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      const init = decl.initializer;
+      if (ts.isIdentifier(decl.name) && init && ts.isTaggedTemplateExpression(init) && isHtmlTemplate(init)) {
+        fragments.push({ name: decl.name.text, template: init, statement });
+      }
+    }
+  }
+  return fragments;
+};
+
+/** The fragments a file exports, for the files that import them */
+export const extractFragmentDefinitions = (sourceFile: ts.SourceFile, filePath: string): FragmentDefinition[] =>
+  findExportedFragments(sourceFile).map(({ name, template }) => ({
+    name,
+    filePath,
+    exported: true,
+    staticText: ts.isNoSubstitutionTemplateLiteral(template.template) ? template.template.rawText! : null,
+  }));
 
 // ============================================================================
 // Utility Functions
